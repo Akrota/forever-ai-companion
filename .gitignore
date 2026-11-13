@@ -1,0 +1,6 @@
+node_modules/
+companion/config.json
+companion/state.json
+companion/dist/
+*.log
+companion/context-cache.json
