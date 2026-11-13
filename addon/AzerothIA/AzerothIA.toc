@@ -1,0 +1,21 @@
+## Interface: 16001
+## Title: Forever AI Companion
+## Notes: Tu asistente personal en Azeroth: Fizzi (gnoma, Alianza) o Rizzik (goblin, Horda). Requiere la app compañera.
+## Author: Forever AI Companion
+## Version: 1.6.0
+## SavedVariables: AzerothIA_DB
+## IconTexture: Interface\Icons\INV_Misc_Gear_01
+## AddonCompartmentFunc: AzerothIA_Toggle
+
+Json.lua
+Collect.lua
+Uplink.lua
+Voice.lua
+Live.lua
+Chats.lua
+Personas.lua
+UI.lua
+Button.lua
+Notify.lua
+Probe.lua
+Core.lua

@@ -1,0 +1,53 @@
+// Files the app needs at runtime. In development they are read from disk;
+// scripts/build.js replaces this whole module with embedded copies so the
+// packaged ForeverAICompanion.exe is self-contained.
+import fs from 'node:fs';
+import path from 'node:path';
+import { ADDON_SRC, ROOT } from './config.js';
+
+// { "AzerothIA.toc": "...", "Core.lua": "...", ... }
+export function addonFiles() {
+  const out = {};
+  for (const name of fs.readdirSync(ADDON_SRC)) {
+    const file = path.join(ADDON_SRC, name);
+    if (fs.statSync(file).isFile()) out[name] = fs.readFileSync(file, 'utf8');
+  }
+  return out;
+}
+
+export function uiHtml() {
+  return fs.readFileSync(path.join(ROOT, 'src', 'app', 'ui.html'), 'utf8');
+}
+
+export function sampleContext() {
+  return JSON.parse(fs.readFileSync(path.join(ROOT, 'sample', 'contexto-ejemplo.json'), 'utf8'));
+}
+
+// C# source of the silent voice; compiled on the player's PC with the
+// compiler that ships with Windows.
+export function ttsEngineSource() {
+  return fs.readFileSync(path.join(ROOT, 'tts', 'AzerothIATts.cs'), 'utf8');
+}
+
+export function knowledgeReadme() {
+  return fs.readFileSync(path.join(ROOT, 'knowledge', 'README.md'), 'utf8');
+}
+
+// Icon shown in the app window (tab / taskbar) and its header.
+export function appIconPng() {
+  return fs.readFileSync(path.join(ROOT, 'assets', 'icon-256.png'));
+}
+
+// Icon file for the program next to the clock (tray/Tray.cs).
+export function appIconIco() {
+  return fs.readFileSync(path.join(ROOT, 'assets', 'app.ico'));
+}
+
+export function trayCsSource() {
+  return fs.readFileSync(path.join(ROOT, 'tray', 'Tray.cs'), 'utf8');
+}
+
+// Built-in guide about WoW Forever for the AI (knowledge-builtin/wow-forever.md).
+export function foreverGuide() {
+  return fs.readFileSync(path.join(ROOT, 'knowledge-builtin', 'wow-forever.md'), 'utf8');
+}

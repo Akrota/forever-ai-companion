@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forever AI Companion</title>
+<link rel="icon" type="image/png" href="/icon.png">
+<style>
+  :root {
+    --bg: #0e1014;
+    --surface: #161a21;
+    --surface-2: #1d222b;
+    --surface-3: #252b36;
+    --line: #2a303b;
+    --line-2: #363d4a;
+    --text: #eef1f6;
+    --muted: #a3abb9;
+    --faint: #737c8c;
+    --accent: #5b8cff;
+    --accent-2: #3f6fe6;
+    --accent-soft: rgba(91, 140, 255, .14);
+    --ok: #3ccf7a;
+    --ok-soft: rgba(60, 207, 122, .13);
+    --warn: #f5b43c;
+    --warn-soft: rgba(245, 180, 60, .13);
+    --bad: #f26b5b;
+    --bad-soft: rgba(242, 107, 91, .13);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  a { color: var(--accent); }
+  code, kbd { font-family: Consolas, monospace; font-size: 13px; background: var(--surface-3); border: 1px solid var(--line-2); border-radius: 6px; padding: 1px 7px; }
+  kbd { border-bottom-width: 2px; }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); }
+  .small { font-size: 13px; }
+  h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -.01em; }
+
+  /* Top bar ----------------------------------------------------------------- */
+  .top { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: #0b0d11; height: 63px; }
+  .logo { width: 36px; height: 36px; flex: none; }
+  .logo svg { width: 20px; height: 20px; }
+  .top .name { font-weight: 650; font-size: 16px; }
+  .top .ver { color: var(--faint); font-size: 12.5px; margin-left: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 99px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .chip.ok { color: var(--ok); background: var(--ok-soft); }
+  .chip.warn { color: var(--warn); background: var(--warn-soft); }
+  .chip.bad { color: var(--bad); background: var(--bad-soft); }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .top .chip { margin-left: auto; }
+
+  /* Wizard layout --------------------------------------------------------- */
+  .wizard { display: grid; grid-template-columns: 250px 1fr; height: calc(100% - 63px); }
+  .steps { padding: 24px 16px; border-right: 1px solid var(--line); overflow-y: auto; }
+  .steps ol { list-style: none; margin: 0; padding: 0; }
+  .steps li { position: relative; }
+  .steps li:not(:last-child)::after { content: ""; position: absolute; left: 21px; top: 42px; bottom: -6px; width: 2px; background: var(--line); }
+  .steps li.done:not(:last-child)::after { background: var(--ok); opacity: .5; }
+  .steps button {
+    width: 100%; display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 8px 8px 14px; border-radius: 10px;
+    background: none; border: none; color: var(--muted); font: inherit; cursor: pointer;
+  }
+  .steps button:disabled { cursor: default; }
+  .steps button:not(:disabled):hover { background: var(--surface); }
+  .steps .num {
+    width: 28px; height: 28px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 13px;
+    border: 2px solid var(--line-2); color: var(--faint); background: var(--bg); position: relative; z-index: 1;
+  }
+  .steps li.done .num { background: var(--ok); border-color: var(--ok); color: #06210f; }
+  .steps li.current .num { border-color: var(--accent); color: #fff; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .steps b { display: block; font-weight: 600; color: var(--text); font-size: 14.5px; line-height: 1.3; margin-top: 3px; }
+  .steps li:not(.done):not(.current) b { color: var(--muted); }
+  .steps small { display: block; font-size: 12.5px; color: var(--faint); line-height: 1.35; margin-top: 2px; }
+  .steps .opt { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); margin-left: 6px; font-weight: 600; }
+
+  .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .page { flex: 1; overflow-y: auto; padding: 32px 40px 28px; }
+  .page-inner { max-width: 680px; }
+  .kicker { color: var(--accent); font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .page h1 { font-size: 26px; line-height: 1.25; }
+  .lead { color: var(--muted); font-size: 16px; margin: 8px 0 22px; }
+  .footer { display: flex; align-items: center; gap: 10px; padding: 14px 40px; border-top: 1px solid var(--line); background: #0b0d11; }
+  .footer .hint { color: var(--faint); font-size: 13px; margin-right: auto; }
+
+  /* Buttons ----------------------------------------------------------------- */
+  .btn {
+    font: inherit; font-weight: 600; font-size: 14.5px; padding: 9px 18px; border-radius: 9px; cursor: pointer;
+    background: var(--surface-3); color: var(--text); border: 1px solid var(--line-2); transition: background .12s, border-color .12s;
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { border-color: #4a5262; background: #2b3240; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-2); border-color: var(--accent-2); }
+  .btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+  .btn.ghost:hover:not(:disabled) { color: var(--text); background: var(--surface-2); border-color: transparent; }
+  .btn.danger { color: var(--bad); }
+  .btn.small { padding: 6px 12px; font-size: 13.5px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn:focus-visible, .switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Content blocks ------------------------------------------------------------ */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px; }
+  .card h3 { font-size: 16px; margin-bottom: 4px; }
+  .callout { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border-radius: var(--radius); margin-bottom: 14px; border: 1px solid; }
+  .callout .ic { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; }
+  .callout .ic svg { width: 17px; height: 17px; }
+  .callout > div > b { display: block; font-size: 15.5px; margin-bottom: 2px; }
+  .callout p { margin: 0; color: var(--muted); }
+  .callout > div { min-width: 0; flex: 1; }
+  .callout.ok { background: var(--ok-soft); border-color: rgba(60,207,122,.35); } .callout.ok .ic { background: var(--ok); }
+  .callout.warn { background: var(--warn-soft); border-color: rgba(245,180,60,.35); } .callout.warn .ic { background: var(--warn); }
+  .callout.bad { background: var(--bad-soft); border-color: rgba(242,107,91,.35); } .callout.bad .ic { background: var(--bad); }
+  .callout.info { background: var(--accent-soft); border-color: rgba(91,140,255,.35); } .callout.info .ic { background: var(--accent); }
+  .path { font-family: Consolas, monospace; font-size: 13px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; margin-top: 10px; word-break: break-all; color: var(--text); }
+  .features { display: grid; gap: 14px; margin: 4px 0 22px; }
+  .feature { display: flex; gap: 14px; align-items: flex-start; }
+  .feature .ic { width: 40px; height: 40px; border-radius: 10px; flex: none; display: grid; place-items: center; background: var(--accent-soft); }
+  .feature .ic svg { width: 20px; height: 20px; }
+  .feature div > b { display: block; }
+  .feature span { color: var(--muted); font-size: 14px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fact { font-size: 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 99px; padding: 4px 12px; }
+  .links { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* Choices (radio cards) ----------------------------------------------------- */
+  .choices { display: grid; gap: 10px; }
+  .choice {
+    display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: flex-start; padding: 15px 18px; border-radius: var(--radius); cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); transition: border-color .12s, background .12s;
+  }
+  .choice:hover { border-color: #46505f; }
+  .choice.sel { border-color: var(--accent); background: linear-gradient(0deg, var(--accent-soft), var(--accent-soft)), var(--surface); }
+  .choice:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .choice input { appearance: none; width: 20px; height: 20px; margin: 2px 0 0; border-radius: 50%; border: 2px solid var(--line-2); background: var(--bg); cursor: pointer; }
+  .choice input:checked { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 5px, var(--bg) 6px); }
+  .choice input:focus { outline: none; }
+  .choice .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .choice .title { font-weight: 650; font-size: 15.5px; }
+  .choice .desc { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .badge { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+  .badge.rec { color: #fff; background: var(--accent); }
+  .badge.using { color: var(--ok); background: var(--ok-soft); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tag { font-size: 12.5px; padding: 2px 9px; border-radius: 6px; background: var(--surface-3); color: var(--muted); }
+  .tag.good { color: var(--ok); background: var(--ok-soft); }
+  .tag.cost { color: var(--warn); background: var(--warn-soft); }
+  details.more { margin-top: 10px; }
+  .explain { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13.5px; }
+  .explain dt { color: var(--text); font-weight: 600; }
+  .explain dd { margin: 0; color: var(--muted); }
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 16px; font-size: 13px; }
+  .flow span { padding: 5px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+  .flow span.hi { color: #fff; background: var(--accent-soft); border-color: rgba(91,140,255,.5); }
+  .flow i { color: var(--faint); font-style: normal; }
+  details.more summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 4px 0; }
+
+  /* Setup checklist inside the AI step --------------------------------------- */
+  .todo { list-style: none; margin: 8px 0 0; padding: 0; }
+  .todo > li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .todo > li:first-child { border-top: none; padding-top: 4px; }
+  .todo .n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--surface-3); color: var(--muted); }
+  .todo .n.ok { background: var(--ok); color: #06210f; }
+  .todo li > div > b { display: block; }
+  .todo p, .todo ol { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .todo ol { padding-left: 18px; }
+  .todo .act { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .todo .act > input, .todo .act > .models { flex: 1 1 100%; }
+  input[type=text], input[type=password] {
+    width: 100%; font: inherit; padding: 10px 12px; border-radius: 9px;
+    background: var(--bg); color: var(--text); border: 1px solid var(--line-2);
+  }
+  input[type=text]:focus, input[type=password]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .models { display: grid; gap: 8px; }
+  .models .choice { padding: 11px 14px; }
+  .result { margin-top: 14px; }
+  .answer { white-space: pre-wrap; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,.25); color: var(--text); font-size: 14px; }
+
+  /* Switch ------------------------------------------------------------------- */
+  .switch { position: relative; width: 44px; height: 24px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch i { position: absolute; inset: 0; border-radius: 99px; background: var(--surface-3); border: 1px solid var(--line-2); cursor: pointer; transition: .2s; }
+  .switch i::before { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; border-radius: 50%; background: var(--muted); transition: .2s; }
+  .switch input:checked + i { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + i::before { transform: translateX(20px); background: #fff; }
+  .select { font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 9px; background: var(--surface-3); color: var(--text); border: 1px solid var(--line-2); cursor: pointer; }
+  .select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .line { display: flex; align-items: center; gap: 14px; }
+  .line .t { flex: 1; min-width: 0; }
+  .line .t p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+
+  /* Done step ------------------------------------------------------------------- */
+  .big-check { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--ok); margin-bottom: 16px; box-shadow: 0 0 0 8px var(--ok-soft); }
+  .big-check svg { width: 32px; height: 32px; }
+  .howto { counter-reset: h; list-style: none; padding: 0; margin: 0; }
+  .howto li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 10px 0; }
+  .howto li::before { counter-increment: h; content: counter(h); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+  .howto li > div > b { display: block; }
+  .howto span { color: var(--muted); font-size: 14px; }
+
+  /* Dashboard -------------------------------------------------------------------- */
+  .dash { height: calc(100% - 63px); overflow-y: auto; }
+  .dash-inner { max-width: 860px; margin: 0 auto; padding: 28px 28px 40px; }
+  .rows { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 22px; }
+  .rowi { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-top: 1px solid var(--line); }
+  .rowi:first-child { border-top: none; }
+  .rowi .ic { width: 38px; height: 38px; border-radius: 10px; flex: none; display: grid; place-items: center; background: var(--surface-3); }
+  .rowi .ic svg { width: 19px; height: 19px; }
+  .rowi .t { flex: 1; min-width: 0; }
+  .rowi .t > b { display: block; font-weight: 600; }
+  .rowi .t span { color: var(--muted); font-size: 13.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .section-title { font-size: 12.5px; font-weight: 650; color: var(--faint); text-transform: uppercase; letter-spacing: .07em; margin: 0 0 8px 4px; }
+  .feed { list-style: none; margin: 0; padding: 0; }
+  .feed li { padding: 14px 18px; border-top: 1px solid var(--line); }
+  .feed li:first-child { border-top: none; }
+  .feed .meta { font-size: 12.5px; color: var(--faint); }
+  .feed .q { font-weight: 600; margin: 2px 0 6px; }
+  .feed .a { color: var(--muted); white-space: pre-wrap; font-size: 14px; }
+  .feed .a.bad { color: var(--bad); }
+  .feed .a.wait { display: flex; align-items: center; gap: 8px; }
+  .feed .a.wait .spin { border-color: rgba(91,140,255,.3); border-top-color: var(--accent); }
+  .empty { text-align: center; padding: 26px 16px; color: var(--muted); }
+
+  /* Toasts and dialogs --------------------------------------------------------- */
+  #toasts { position: fixed; right: 20px; bottom: 84px; display: flex; flex-direction: column; gap: 8px; z-index: 50; max-width: min(380px, calc(100vw - 40px)); }
+  .toast { background: var(--surface-3); border: 1px solid var(--line-2); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: rise .2s ease-out; font-size: 14px; }
+  .toast.ok { border-left-color: var(--ok); } .toast.bad { border-left-color: var(--bad); }
+  @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+  .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 60; padding: 16px; }
+  .modal { width: min(440px, 100%); background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 14px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .modal h3 { font-size: 18px; margin-bottom: 6px; }
+  .modal p { color: var(--muted); margin: 0; }
+  .modal .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+  @media (max-width: 780px) {
+    .wizard { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .steps { border-right: none; border-bottom: 1px solid var(--line); padding: 10px 12px; }
+    .steps ol { display: flex; gap: 4px; overflow-x: auto; }
+    .steps li::after { display: none !important; }
+    .steps button { padding: 6px; align-items: center; }
+    .steps button div { display: none; }
+    .steps li.current button div { display: block; }
+    .steps li.current b { margin-top: 0; }
+    .steps small { display: none; }
+    .page { padding: 22px 18px; }
+    .footer { padding: 12px 18px; }
+    .footer .hint { display: none; }
+    .top { padding: 12px 16px; }
+    .top .ver { display: none; }
+    .dash-inner { padding: 20px 16px 32px; }
+    .explain { grid-template-columns: 1fr; gap: 2px; }
+    .explain dd { margin-bottom: 8px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <img class="logo" src="/icon.png" alt="">
+  <div><span class="name">Forever AI Companion</span><span class="ver" id="version"></span></div>
+  <span class="chip hidden" id="chip"><span class="dot"></span><span id="chip-text"></span></span>
+</header>
+
+<!-- Setup wizard ---------------------------------------------------------------->
+<div class="wizard hidden" id="wizard">
+  <nav class="steps" aria-label="Pasos de la configuración"><ol id="stepper"></ol></nav>
+  <div class="pane">
+    <main class="page" id="page"><div class="page-inner" id="page-inner"></div></main>
+    <div class="footer">
+      <span class="hint" id="footer-hint"></span>
+      <button class="btn ghost" id="btn-back">Atrás</button>
+      <button class="btn primary" id="btn-next">Siguiente</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard (after setup) ---------------------------------------------------->
+<div class="dash hidden" id="dash"><div class="dash-inner" id="dash-inner"></div></div>
+
+<div id="toasts"></div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Data
+// ---------------------------------------------------------------------------
+const PROVIDERS = {
+  'claude-code': {
+    name: 'Mi suscripción de Claude', rec: true,
+    desc: 'Usa tu plan Claude Pro o Max. No necesitas claves ni pagar nada extra.',
+    tags: [['good', 'Incluido en tu plan'], ['', 'Requiere Claude Pro o Max']],
+    models: [
+      ['sonnet', 'Sonnet', 'Rápido y listo. La mejor opción para la mayoría.', true],
+      ['opus', 'Opus', 'El más inteligente, pero tarda más y gasta más de tu límite.'],
+      ['haiku', 'Haiku', 'El más rápido; gasta muy poco de tu límite.'],
+      ['default', 'El de tu plan', 'Usa el modelo que tu plan tenga por defecto.'],
+    ],
+  },
+  codex: {
+    name: 'Mi suscripción de ChatGPT',
+    desc: 'Usa tu plan ChatGPT Plus o Pro a través de Codex, el programa oficial de OpenAI. No necesitas claves ni pagar nada extra.',
+    tags: [['good', 'Incluido en tu plan'], ['', 'Requiere ChatGPT Plus o Pro']],
+    models: [
+      ['default', 'El de tu plan', 'Usa el modelo que tu plan tenga por defecto. La mejor opción para la mayoría.', true],
+      ['gpt-6-luna', 'GPT-6 Luna', 'El más rápido; gasta muy poco de tu límite.'],
+      ['gpt-6-astra', 'GPT-6 Astra', 'El más inteligente, pero tarda más y gasta más de tu límite.'],
+    ],
+  },
+  claude: {
+    name: 'Claude con clave de API',
+    desc: 'Para quien no tiene suscripción: pagas solo lo que usas en la web de Anthropic.',
+    tags: [['cost', 'Pagas por uso (≈ 1 centavo por pregunta)'], ['', 'Requiere una clave']],
+    key: ['Entra a <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> e inicia sesión o crea una cuenta.',
+      'En <b>Billing</b>, carga algo de crédito (unos pocos dólares alcanzan para muchas preguntas).',
+      'En <b>API Keys</b>, pulsa <b>Create Key</b> y copia la clave (empieza con <code>sk-ant-</code>).'],
+    models: [
+      ['claude-opus-5-5', 'Claude Opus 5.5', 'El más inteligente (≈ 2 centavos por pregunta).', true],
+      ['claude-sonnet-5-5', 'Claude Sonnet 5.5', 'Equilibrado (≈ 1 centavo por pregunta).'],
+      ['claude-haiku-5-5', 'Claude Haiku 5.5', 'El más barato y rápido (menos de 0,1 centavo).'],
+    ],
+  },
+  chatgpt: {
+    name: 'ChatGPT con clave de API',
+    desc: 'Para quien no tiene suscripción: pagas solo lo que usas en la web de OpenAI. Si tienes ChatGPT Plus o Pro, elige «Mi suscripción de ChatGPT».',
+    tags: [['cost', 'Pagas por uso'], ['', 'Requiere una clave']],
+    key: ['Entra a <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> e inicia sesión.',
+      'Carga crédito en <b>Billing</b>.',
+      'Pulsa <b>Create new secret key</b> y copia la clave (empieza con <code>sk-</code>).'],
+  },
+  gemini: {
+    name: 'Gemini',
+    desc: 'La IA de Google. Suele tener un uso gratuito con límites.',
+    tags: [['good', 'Uso gratis con límites'], ['', 'Requiere una clave']],
+    key: ['Entra a <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> con tu cuenta de Google.',
+      'Pulsa <b>Create API key</b> y cópiala.'],
+  },
+  echo: {
+    name: 'Modo prueba',
+    desc: 'No usa IA: responde con los datos que recibe. Sirve para comprobar que el juego y la app se conectan.',
+    tags: [['good', 'Gratis'], ['', 'No responde con IA']],
+  },
+};
+const ADVANCED = {
+  ollama: {
+    name: 'IA en tu PC (Ollama)',
+    desc: 'Gratis y sin internet, pero necesita un PC potente y algo de configuración.',
+    tags: [['good', 'Gratis'], ['', 'Necesita un PC potente']],
+    modelText: true,
+    local: ['Instala <a href="https://ollama.com" target="_blank">Ollama</a>.', 'Descarga un modelo (por ejemplo <code>llama3.2</code>) desde la app de Ollama.'],
+  },
+};
+const ALL = { ...PROVIDERS, ...ADVANCED };
+
+// Options that use a subscription through an official program on this PC.
+const CLI = {
+  'claude-code': {
+    api: 'claude', app: 'Claude Code', account: 'Claude',
+    about: 'Es el programa oficial y gratuito de Anthropic que conecta tu suscripción. Se instala con un clic.',
+  },
+  codex: {
+    api: 'codex', app: 'Codex', account: 'ChatGPT',
+    about: 'Es el programa oficial y gratuito de OpenAI que conecta tu plan de ChatGPT. Se instala con un clic.',
+  },
+};
+// Options that can search the internet.
+const SEARCHES = ['claude-code', 'claude', 'codex'];
+
+const STEPS = [
+  { id: 'welcome', title: 'Bienvenida', sub: 'Qué hace la app' },
+  { id: 'game', title: 'Tu juego', sub: 'Dónde está WoW Forever' },
+  { id: 'addon', title: 'El addon', sub: 'La ventana dentro del juego' },
+  { id: 'ai', title: 'Tu IA', sub: 'Quién responde tus preguntas' },
+  { id: 'voice', title: 'Envío invisible', sub: 'Que no se vea nada', optional: true },
+  { id: 'done', title: 'Listo', sub: 'Cómo usarlo' },
+];
+
+const ICON = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="#06210f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke="#1a1204" stroke-width="2.6" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 11v6M12 7h.01"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="#7fa6ff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="#7fa6ff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" fill="#7fa6ff"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z"/></svg>',
+  game: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg>',
+  puzzle: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4a2 2 0 114 0v2h4v4h-2a2 2 0 100 4h2v4h-4v-2a2 2 0 10-4 0v2H6v-4h2a2 2 0 100-4H6V6h4z"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.3l5-.7z"/></svg>',
+  hide: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><path d="M4 4l16 16"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 016.5 3H20v15H6.5A2.5 2.5 0 004 20.5z"/><path d="M4 20.5A2.5 2.5 0 016.5 18H20v3H6.5A2.5 2.5 0 014 20.5z"/></svg>',
+  power: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round"><path d="M12 3v8M6.3 6.3a8 8 0 1011.4 0"/></svg>',
+};
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let status = null;
+let voice = null;          // { supported, active }
+const cli = {};            // per CLI option: { installed, loggedIn, method, waiting }
+let mode = null;           // 'wizard' | 'dash'
+let step = 'welcome';
+let returnToDash = false;  // a step opened from the dashboard ("Cambiar")
+let addonJustInstalled = null;
+let aiChoice = null;       // provider selected in the AI step
+let aiModel = null;        // model picked by the player (survives redraws)
+let aiTest = null;         // { state: 'running'|'ok'|'bad', html }
+let voiceChoice = null;    // 'on' | 'off'
+let voiceMsg = null;
+let busyAction = null;
+
+// Identifies this window to the app (to tell a closed window from a reload).
+const PAGE_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+async function api(path, body) {
+  const opts = body === undefined && path === 'status'
+    ? {}
+    : { method: 'POST', headers: { 'content-type': 'application/json', 'x-azerothia': '1' }, body: JSON.stringify(body || {}) };
+  const res = await fetch(path === 'status' ? `/api/status?page=${PAGE_ID}` : `/api/${path}`, opts);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
+  return json;
+}
+
+function toast(kind, html, ms = 5000) {
+  const el = document.createElement('div');
+  el.className = `toast ${kind || ''}`;
+  el.innerHTML = html;
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+
+function confirmBox(title, text, okLabel, danger) {
+  return new Promise((resolve) => {
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h3>${title}</h3><p>${text}</p>
+      <div class="acts"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn ${danger ? 'danger' : 'primary'}" data-a="yes">${okLabel}</button></div></div>`;
+    const onKey = (e) => { if (e.key === 'Escape') done(false); };
+    const done = (v) => { document.removeEventListener('keydown', onKey); back.remove(); resolve(v); };
+    document.addEventListener('keydown', onKey);
+    back.onclick = (e) => { if (e.target === back) done(false); };
+    back.querySelector('[data-a=no]').onclick = () => done(false);
+    back.querySelector('[data-a=yes]').onclick = () => done(true);
+    document.body.appendChild(back);
+    back.querySelector('[data-a=yes]').focus();
+  });
+}
+
+const callout = (kind, title, text) => {
+  const ic = { ok: ICON.check, warn: ICON.alert, bad: ICON.x, info: ICON.info }[kind];
+  return `<div class="callout ${kind}"><span class="ic">${ic}</span><div><b>${title}</b>${text ? `<p>${text}</p>` : ''}</div></div>`;
+};
+
+// What is already done.
+const isDone = {
+  welcome: () => true,
+  game: () => Boolean(status?.wow.valid),
+  addon: () => Boolean(status?.wow.addonInstalled),
+  ai: () => Boolean(status?.ai.preset),
+  voice: () => Boolean(voice?.active) || voiceChoice === 'off',
+  done: () => false,
+};
+const setupComplete = () => isDone.game() && isDone.addon() && isDone.ai();
+const voiceStepNeeded = () => voice?.supported !== false;
+const visibleSteps = () => STEPS.filter((s) => s.id !== 'voice' || voiceStepNeeded());
+
+// Runs an action while its button shows a spinner.
+async function run(key, fn) {
+  if (busyAction) return;
+  busyAction = key;
+  render();
+  try { await fn(); } catch (e) { toast('bad', esc(e.message), 8000); }
+  finally { busyAction = null; await refresh(true); }
+}
+const spinner = (key, label, busyLabel) => (busyAction === key ? `<span class="spin"></span>${busyLabel}` : label);
+
+// ---------------------------------------------------------------------------
+// Wizard steps: each returns { html, next: {label, disabled, action}, hint, after }
+// ---------------------------------------------------------------------------
+const VIEWS = {
+  welcome() {
+    return {
+      html: `<div class="kicker">Te damos la bienvenida</div>
+        <h1>Tu compañero con IA para WoW Forever</h1>
+        <p class="lead">Pregúntale lo que quieras sin salir del juego: qué misión hacer, cómo mejorar tu equipo, a dónde ir. La IA ve tu personaje y te responde dentro del juego.</p>
+        <div class="features">
+          <div class="feature"><span class="ic">${ICON.chat}</span><div><b>Preguntas desde el juego</b><span>Pulsa el botón flotante que aparece en tu pantalla y escribe lo que quieras saber.</span></div></div>
+          <div class="feature"><span class="ic">${ICON.spark}</span><div><b>Conoce a tu personaje</b><span>Tu clase, nivel, equipo, misiones y dónde estás, sin que tengas que explicarlo.</span></div></div>
+          <div class="feature"><span class="ic">${ICON.eye}</span><div><b>Respuestas en el juego</b><span>Llegan en una ventana del juego, con chats separados por tema.</span></div></div>
+        </div>
+        <div class="facts"><span class="fact">Toma unos 3 minutos</span><span class="fact">Se hace una sola vez</span><span class="fact">Puedes cambiar todo después</span></div>`,
+      next: { label: 'Empezar', action: () => go('game') },
+    };
+  },
+
+  game() {
+    const ok = isDone.game();
+    return {
+      html: `<div class="kicker">Paso 2</div><h1>¿Dónde está tu juego?</h1>
+        <p class="lead">Necesitamos la carpeta de WoW Forever para instalar el addon y recibir tus preguntas.</p>
+        ${ok
+          ? `${callout('ok', 'Encontramos WoW Forever', 'Si es la carpeta correcta, pulsa Siguiente.')}
+             <div class="card"><h3>Carpeta del juego</h3><div class="path">${esc(status.wow.dir)}</div>
+             <div style="margin-top:12px"><button class="btn small" data-act="pick">${spinner('pick', 'Elegir otra carpeta…', 'Esperando tu elección…')}</button></div></div>`
+          : `${callout('warn', 'No encontramos WoW Forever automáticamente', 'Puede estar en otro disco o carpeta. Búscala tú: suele llamarse <b>World of Warcraft</b> y dentro tiene una carpeta <b>_forever_</b>.')}
+             <div class="links"><button class="btn primary" data-act="pick">${spinner('pick', 'Elegir carpeta…', 'Esperando tu elección…')}</button>
+             <button class="btn" data-act="detect">${spinner('detect', 'Buscar de nuevo', 'Buscando…')}</button></div>
+             <p class="small faint" style="margin-top:14px">Ejemplo: <code>C:\\Program Files (x86)\\World of Warcraft</code></p>`}`,
+      next: returnToDash && ok ? { label: 'Volver al panel', action: openDash } : { label: 'Siguiente', disabled: !ok, action: () => go('addon') },
+      hint: ok ? '' : 'Elige la carpeta para continuar',
+    };
+  },
+
+  addon() {
+    const ok = isDone.addon();
+    const just = addonJustInstalled;
+    return {
+      html: `<div class="kicker">Paso 3</div><h1>Instalar el addon</h1>
+        <p class="lead">El addon es la parte que vive dentro del juego: el botón flotante y la ventana de chats donde preguntas y lees las respuestas.</p>
+        ${ok
+          ? (just?.wowRunning
+              ? callout('warn', 'Addon instalado. Reinicia el juego', 'WoW está abierto: ciérralo por completo y vuelve a abrirlo para que cargue el addon (con /reload no basta).')
+              : callout('ok', just ? 'Addon instalado' : 'El addon ya está instalado', `Versión ${esc(status.wow.addonVersion)}. Se actualiza solo cuando sale una versión nueva.`))
+            + `<button class="btn small" data-act="install">${spinner('install', 'Reinstalar', 'Instalando…')}</button>`
+          : `<div class="card"><h3>Se instalará en</h3><div class="path">${esc(status.wow.dir)}\\Interface\\AddOns</div>
+             <p class="small muted" style="margin:10px 0 0">No modifica nada más del juego. Puedes desinstalarlo cuando quieras.</p></div>`}`,
+      next: ok
+        ? (returnToDash ? { label: 'Volver al panel', action: openDash } : { label: 'Siguiente', action: () => go('ai') })
+        : { label: spinner('install', 'Instalar el addon', 'Instalando…'), disabled: busyAction === 'install', action: installAddon },
+      hint: ok ? '' : 'Un clic y listo',
+    };
+  },
+
+  ai() {
+    const active = status.ai.preset;
+    const id = aiChoice || active || 'claude-code';
+    aiChoice = id;
+    const p = ALL[id];
+    const choice = (pid, q) => `<label class="choice ${pid === id ? 'sel' : ''}">
+        <input type="radio" name="provider" value="${pid}" ${pid === id ? 'checked' : ''}>
+        <div><div class="head"><span class="title">${q.name}</span>${q.rec ? '<span class="badge rec">Recomendado</span>' : ''}${pid === active ? '<span class="badge using">En uso</span>' : ''}</div>
+        <div class="desc">${q.desc}</div><div class="tags">${q.tags.map(([k, t]) => `<span class="tag ${k}">${t}</span>`).join('')}</div></div></label>`;
+    const saved = status.ai.keys[id];
+    const current = aiModel || status.ai.models[id] || status.ai.defaults[id] || p.models?.find((m) => m[3])?.[0] || p.models?.[0]?.[0];
+
+    // Numbered setup for the chosen option.
+    const items = [];
+    if (CLI[id]) {
+      const c = cli[id] || {};
+      const m = CLI[id];
+      items.push([c.installed, `Instalar ${m.app}`, c.installed ? 'Ya está instalado.' : m.about,
+        c.installed ? '' : `<button class="btn primary small" data-act="cli-install">Instalar ${m.app}</button>`]);
+      items.push([c.loggedIn, `Iniciar sesión con tu cuenta de ${m.account}`, c.loggedIn ? 'Sesión iniciada.' : 'Se abrirá tu navegador para que entres con tu cuenta (solo la primera vez).',
+        c.installed && !c.loggedIn ? `<button class="btn primary small" data-act="cli-login">Iniciar sesión</button>` : '']);
+      if (c.waiting && !(c.installed && c.loggedIn)) items.push([false, 'Sigue los pasos de la ventana que se abrió', 'Esta pantalla se actualiza sola cuando termines.', '']);
+    }
+    if (p.key) {
+      items.push([Boolean(saved), 'Consigue tu clave', `<ol>${p.key.map((s) => `<li>${s}</li>`).join('')}</ol>`, '']);
+      items.push([Boolean(saved), 'Pega tu clave aquí', saved ? `Ya tienes una guardada (${esc(saved)}). Déjalo vacío para mantenerla.` : 'Se guarda solo en este PC.',
+        `<input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="Pega tu clave">`]);
+    }
+    if (p.local) items.push([false, 'Prepara Ollama', `<ol>${p.local.map((s) => `<li>${s}</li>`).join('')}</ol>`, '']);
+    if (p.models) {
+      items.push([true, 'Elige el modelo', 'Puedes cambiarlo cuando quieras.',
+        `<div class="models">${p.models.map(([v, t, d, rec]) => `<label class="choice ${v === current ? 'sel' : ''}"><input type="radio" name="model" value="${v}" ${v === current ? 'checked' : ''}>
+          <div><div class="head"><span class="title">${t}</span>${rec ? '<span class="badge rec">Recomendado</span>' : ''}</div><div class="desc">${d}</div></div></label>`).join('')}</div>`]);
+    } else if (p.modelText) {
+      items.push([true, 'Escribe el nombre del modelo', 'El que descargaste en Ollama.', `<input type="text" id="model-text" spellcheck="false" value="${esc(aiModel || status.ai.models[id] || status.ai.defaults[id] || 'llama3.2')}">`]);
+    }
+
+    const ready = !CLI[id] || (cli[id]?.installed && cli[id]?.loggedIn);
+    const testOk = aiTest?.state === 'ok' && active === id;
+    return {
+      html: `<div class="kicker">Paso 4</div><h1>Elige tu IA</h1>
+        <p class="lead">Es quien responde tus preguntas. Si tienes Claude Pro o Max, o ChatGPT Plus o Pro, usa tu suscripción: no pagas nada extra.</p>
+        <div class="choices">${Object.entries(PROVIDERS).map(([pid, q]) => choice(pid, q)).join('')}</div>
+        <details class="more" ${ADVANCED[id] ? 'open' : ''}><summary>Más opciones</summary><div class="choices" style="margin-top:10px">${Object.entries(ADVANCED).map(([pid, q]) => choice(pid, q)).join('')}</div></details>
+        ${items.length ? `<div class="card" style="margin-top:18px"><h3>Configura: ${p.name}</h3>
+          <ol class="todo">${items.map(([ok, t, d, act], i) => `<li><span class="n ${ok ? 'ok' : ''}">${ok ? '✓' : i + 1}</span>
+            <div><b>${t}</b>${d.startsWith('<ol>') ? d : d ? `<p>${d}</p>` : ''}${act ? `<div class="act">${act}</div>` : ''}</div></li>`).join('')}</ol></div>` : ''}
+        ${SEARCHES.includes(id) ?`<div class="card"><div class="line"><div class="t"><b>Buscar en internet cuando haga falta</b><p>Recomendado. WoW Forever salió en noviembre de 2026 y la IA no lo conoce de memoria: así puede consultar guías de Forever (zonas, mazmorras, misiones nuevas) antes de responder. Las respuestas que necesitan buscar tardan unos segundos más.</p></div>
+          <label class="switch" title="Buscar en internet"><input type="checkbox" id="web-search" ${status.ai.webSearch ? 'checked' : ''}><i></i></label></div></div>` : ''}
+        <div class="result" id="ai-result">${aiTest ? aiTest.html : ''}</div>`,
+      next: testOk
+        ? { label: returnToDash ? 'Volver al panel' : 'Siguiente', action: () => (returnToDash ? openDash() : go(voiceStepNeeded() ? 'voice' : 'done')) }
+        : { label: spinner('save', 'Guardar y probar', 'Probando…'), disabled: !ready || Boolean(busyAction), action: saveAndTest },
+      hint: !ready ? 'Completa los pasos de arriba' : testOk ? '' : 'Haremos una pregunta de prueba',
+      after() {
+        document.querySelectorAll('input[name=provider]').forEach((r) => {
+          r.onchange = () => { aiChoice = r.value; aiModel = null; aiTest = null; render(); if (CLI[r.value]) checkCli(r.value); };
+        });
+        document.querySelectorAll('input[name=model]').forEach((r) => {
+          r.onchange = () => {
+            aiModel = r.value; aiTest = null;
+            document.querySelectorAll('.models .choice').forEach((c) => c.classList.toggle('sel', c.contains(r)));
+            renderWizard(false);
+          };
+        });
+        bindWebSearch();
+        const mt = $('model-text');
+        if (mt) mt.oninput = () => { aiModel = mt.value; };
+      },
+    };
+  },
+
+  voice() {
+    const on = voice?.active;
+    const choice = voiceChoice || 'on';
+    const opt = (v, t, d, rows, rec) => `<label class="choice ${choice === v ? 'sel' : ''}"><input type="radio" name="voice" value="${v}" ${choice === v ? 'checked' : ''}>
+      <div><div class="head"><span class="title">${t}</span>${rec ? '<span class="badge rec">Recomendado</span>' : ''}${v === 'on' && on ? '<span class="badge using">Activado</span>' : ''}</div><div class="desc">${d}</div>
+      <dl class="explain">${rows.map(([k, text]) => `<dt>${k}</dt><dd>${text}</dd>`).join('')}</dl></div></label>`;
+    const leave = returnToDash ? { label: 'Volver al panel', action: openDash } : { label: 'Siguiente', action: () => go('done') };
+    let next = leave;
+    if (choice === 'on' && !on) next = { label: spinner('voice', 'Activar envío invisible', 'Activando…'), disabled: Boolean(busyAction), action: activateVoice };
+    if (choice === 'off' && on) next = { label: spinner('voice', 'Desactivar envío invisible', 'Desactivando…'), disabled: Boolean(busyAction), action: deactivateVoice };
+    // Installed under the app's first name: one click (and one permission) renames it.
+    const legacy = choice === 'on' && voice?.legacy && !voiceMsg;
+    if (legacy) next = { label: spinner('voice', 'Actualizar envío invisible', 'Actualizando…'), disabled: Boolean(busyAction), action: activateVoice };
+    return {
+      html: `<div class="kicker">Paso 5 · Opcional</div><h1>¿Cómo llegan tus preguntas a la app?</h1>
+        <p class="lead">Por seguridad, WoW no deja que los addons se comuniquen con otros programas de tu PC: no pueden usar internet ni escribir archivos mientras juegas. Por eso tu pregunta necesita un camino para salir del juego y llegar a esta app, que es la que habla con la IA.</p>
+        <div class="flow" aria-hidden="true">
+          <span>Tu pregunta</span><i>→</i><span class="hi">El camino que eliges</span><i>→</i><span>Esta app</span><i>→</i><span>La IA</span><i>→</i><span>Respuesta en el juego</span>
+        </div>
+        <p class="small muted" style="margin:-6px 0 16px">Las respuestas vuelven al juego igual con los dos caminos. Puedes cambiarlo después.</p>
+        ${callout('info', 'Te recomendamos el envío invisible', 'Es el único que no interfiere con nada mientras juegas: no aparece nada en tu pantalla, no se escucha nada y funciona aunque tengas WoW minimizado o detrás de otra ventana. Solo pide un permiso de Windows una vez.')}
+        <div class="choices">
+          ${opt('on', 'Invisible', 'No interfiere con nada: no se ve, no se oye y no depende de que el juego esté visible.', [
+            ['Cómo funciona', 'Se agrega a Windows una voz más, como las que usa el Narrador, pero completamente muda. Al preguntar, el addon «lee» tu pregunta con esa voz y, en lugar de sonar, la voz se la entrega a la app.'],
+            ['Qué se instala', 'Una voz silenciosa llamada «ForeverAICompanion» en la lista de voces de Windows. No cambia tus otras voces ni el sonido de tu PC, y nadie más la usa.'],
+            ['Por qué pide permiso', 'Windows solo permite agregar voces con permiso de administrador. Te lo pide una sola vez; si dices que no, no se instala nada.'],
+            ['Ten en cuenta', 'Después de activarlo, cierra WoW por completo y vuelve a abrirlo. Puedes desactivarlo cuando quieras desde el panel.'],
+          ], true)}
+          ${opt('off', 'Con una línea en pantalla', 'No instala nada ni pide permisos, pero se nota un poco al preguntar.', [
+            ['Cómo funciona', 'Al preguntar, el addon dibuja durante un instante una línea delgada de cuadritos oscuros en el borde superior de la pantalla. La app la lee, como si fuera un código QR, y la línea desaparece.'],
+            ['Qué se instala', 'Nada extra.'],
+            ['Ten en cuenta', 'Verás un parpadeo breve arriba de la pantalla cada vez que preguntas, y WoW debe estar visible (no minimizado ni tapado por otra ventana) en ese momento. Si otro addon o una ventana tapa esa franja, la pregunta puede no llegar.'],
+          ])}
+        </div>
+        <p class="small faint" style="margin-top:14px">Los dos caminos usan funciones normales de Windows y del juego: no modifican WoW, no leen su memoria y no juegan por ti.</p>
+        ${legacy ? `<div style="margin-top:14px">${callout('warn', 'Actualiza el envío invisible', 'Tienes la voz con su nombre anterior («AzerothIA»). Sigue funcionando, pero pulsa <b>Actualizar envío invisible</b> para cambiarla a «ForeverAICompanion». Windows pedirá permiso una vez; luego reinicia WoW.')}</div>` : ''}
+        ${voiceMsg ? `<div style="margin-top:14px">${voiceMsg}</div>` : ''}`,
+      next,
+      hint: (choice === 'on' && !on) || legacy ? 'Windows te pedirá permiso: pulsa Sí' : '',
+      after() {
+        document.querySelectorAll('input[name=voice]').forEach((r) => { r.onchange = () => { voiceChoice = r.value; voiceMsg = null; render(); }; });
+      },
+    };
+  },
+
+  done() {
+    const auto = status.autostart;
+    return {
+      html: `<div class="big-check">${ICON.check}</div>
+        <h1>¡Todo listo!</h1>
+        <p class="lead">Así se usa en el juego:</p>
+        <ol class="howto">
+          <li><div><b>Abre WoW Forever</b><span>Si ya estaba abierto, ciérralo por completo y vuelve a abrirlo.</span></div></li>
+          <li><div><b>Pulsa el botón flotante</b><span>Es un círculo con el retrato de tu asistente, arriba a la derecha de la pantalla, junto al minimapa. Puedes arrastrarlo a donde te quede más cómodo. Al pulsarlo se abre la ventana de chats.</span></div></li>
+          <li><div><b>Elige a tu asistente (solo la primera vez)</b><span>Fizzi, la inventora gnoma (Alianza), o Rizzik, el negociante goblin (Horda). Puedes cambiarlo cuando quieras.</span></div></li>
+          <li><div><b>Pregunta lo que quieras</b><span>Por ejemplo: «¿Qué mazmorra me conviene hacer ahora?». La respuesta llega en unos segundos.</span></div></li>
+        </ol>
+        ${auto === null ? '' : `<div class="card" style="margin-top:18px"><div class="line"><div class="t"><b>Abrir al iniciar Windows</b><p>Recomendado: así la app está lista siempre que juegas, sin que tengas que abrirla.</p></div>
+          <label class="switch" title="Abrir al iniciar Windows"><input type="checkbox" id="autostart" ${auto ? 'checked' : ''}><i></i></label></div></div>`}
+        ${status.tray ? `<div class="callout info" style="margin-top:16px"><span class="ic">${ICON.info}</span><div><b>Puedes cerrar esta ventana</b><p>Al cerrarla te preguntaremos si quieres que la app siga funcionando en segundo plano. Si sigue, la encuentras junto al reloj de Windows con este ícono <img src="/icon.png" alt="" style="width:18px;height:18px;vertical-align:-4px">: clic para abrirla, clic derecho para cerrarla.</p></div></div>` : ''}
+        <p class="small faint">¿Prefieres el teclado? También puedes escribir <kbd>/ia</kbd> en el chat del juego.</p>`,
+      next: { label: 'Ir al panel', action: openDash },
+      after() { bindAutostart(); },
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+let currentView = null;
+function renderWizard(full = true) {
+  const steps = visibleSteps();
+  const idx = steps.findIndex((s) => s.id === step);
+  // Steps can be visited up to the first one not done yet.
+  const firstOpen = steps.findIndex((s) => s.id !== 'welcome' && s.id !== 'voice' && !isDone[s.id]());
+  $('stepper').innerHTML = steps.map((s, i) => {
+    const doneStep = isDone[s.id]() && s.id !== 'welcome' && i !== idx;
+    const reachable = !returnToDash && (firstOpen === -1 || i <= firstOpen);
+    return `<li class="${i === idx ? 'current' : doneStep ? 'done' : ''}"><button data-step="${s.id}" ${reachable && i !== idx ? '' : 'disabled'}>
+      <span class="num">${doneStep ? '✓' : i + 1}</span><div><b>${s.title}${s.optional ? '<span class="opt">opcional</span>' : ''}</b><small>${s.sub}</small></div></button></li>`;
+  }).join('');
+  document.querySelectorAll('#stepper button').forEach((b) => { b.onclick = () => go(b.dataset.step); });
+
+  currentView = VIEWS[step]();
+  if (full) {
+    const focusId = document.activeElement?.id;
+    const keyVal = $('key')?.value;
+    $('page-inner').innerHTML = currentView.html;
+    if (keyVal && $('key')) $('key').value = keyVal;
+    if (focusId && $(focusId)) $(focusId).focus();
+    document.querySelectorAll('#page [data-act]').forEach((b) => { b.onclick = () => ACTIONS[b.dataset.act](); });
+    currentView.after?.();
+  }
+  const n = currentView.next;
+  $('btn-back').classList.toggle('hidden', idx === 0 && !returnToDash);
+  $('btn-back').textContent = returnToDash ? 'Cancelar' : 'Atrás';
+  $('btn-next').innerHTML = n.label;
+  $('btn-next').disabled = Boolean(n.disabled);
+  $('footer-hint').textContent = currentView.hint || `Paso ${idx + 1} de ${steps.length}`;
+}
+
+$('btn-next').onclick = () => currentView?.next.action?.();
+$('btn-back').onclick = () => {
+  if (returnToDash) return openDash();
+  const steps = visibleSteps();
+  const idx = steps.findIndex((s) => s.id === step);
+  if (idx > 0) go(steps[idx - 1].id);
+};
+
+function go(id) {
+  step = id;
+  const choice = aiChoice || status?.ai.preset || 'claude-code';
+  if (id === 'ai' && CLI[choice]) checkCli(choice);
+  $('page').scrollTo(0, 0);
+  render();
+}
+
+function openWizard(id, fromDash = false) {
+  mode = 'wizard';
+  returnToDash = fromDash;
+  aiChoice = null; aiModel = null; aiTest = null;
+  voiceChoice = null; voiceMsg = null; addonJustInstalled = null;
+  go(id);
+}
+
+function openDash() {
+  mode = 'dash';
+  returnToDash = false;
+  render();
+}
+
+function render() {
+  if (!status) return;
+  $('wizard').classList.toggle('hidden', mode !== 'wizard');
+  $('dash').classList.toggle('hidden', mode !== 'dash');
+  const ok = setupComplete() && status.running;
+  $('chip').className = `chip ${ok ? 'ok' : 'warn'}${mode === 'dash' ? '' : ' hidden'}`;
+  $('chip-text').textContent = ok ? 'Funcionando' : 'Revisa la configuración';
+  $('version').textContent = `v${status.version}`;
+  if (mode === 'wizard') { renderWizard(); lastWizardKey = wizardKey(); }
+  else renderDash();
+}
+
+// Dashboard ------------------------------------------------------------------
+function ago(iso) {
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso)) / 1000));
+  if (s < 60) return 'hace un momento';
+  if (s < 3600) return `hace ${Math.round(s / 60)} min`;
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function modelLabel(id) {
+  const p = ALL[id];
+  const m = status.ai.models[id] || status.ai.defaults[id];
+  return p?.models?.find(([v]) => v === m)?.[1] || m || '';
+}
+
+// "Revisada el 13 de noviembre de 2026 · se actualiza sola"
+function guideText(g) {
+  const [y, m, d] = g.date.split('-').map(Number);
+  const date = new Date(y, m - 1, d).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' });
+  const how = g.autoUpdate ? 'se actualiza sola desde internet' : 'incluida en la app';
+  const old = g.stale ? ` · <span style="color:var(--warn)">tiene ${g.age} días: la IA comprueba en internet lo que pudo cambiar</span>` : '';
+  return `Lo que la IA sabe de Forever. Revisada el ${esc(date)} · ${how}${old}`;
+}
+
+function renderDash() {
+  const s = status;
+  const ok = setupComplete() && s.running;
+  const p = ALL[s.ai.preset];
+  const row = (icon, title, sub, btn) => `<div class="rowi"><span class="ic">${icon}</span><div class="t"><b>${title}</b><span>${sub}</span></div>${btn}</div>`;
+  const html = `
+    ${ok
+      ? callout('ok', 'Todo funciona', `En el juego pulsa el botón flotante (arriba a la derecha, junto al minimapa) y pregunta lo que quieras.${s.ai.preset === 'echo' ? ' <b>Estás en Modo prueba:</b> cuando veas que funciona, elige una IA.' : ''}`)
+      : callout('warn', 'Falta algo por configurar', esc(s.problem || 'Revisa lo que está marcado abajo.'))}
+    <div class="section-title">Configuración</div>
+    <div class="rows">
+      ${row(ICON.game, 'Juego', s.wow.valid ? esc(s.wow.dir) : '<span style="color:var(--warn)">No encontrado</span>', '<button class="btn small" data-open="game">Cambiar</button>')}
+      ${row(ICON.puzzle, 'Addon', s.wow.addonInstalled ? `Instalado · versión ${esc(s.wow.addonVersion)}` : '<span style="color:var(--warn)">Sin instalar</span>', `<button class="btn small" data-open="addon">${s.wow.addonInstalled ? 'Reinstalar' : 'Instalar'}</button>`)}
+      ${row(ICON.star, 'Inteligencia artificial', p ? `${esc(p.name)}${modelLabel(s.ai.preset) ? ' · ' + esc(modelLabel(s.ai.preset)) : ''}` : '<span style="color:var(--warn)">Sin elegir</span>', '<button class="btn small" data-open="ai">Cambiar</button>')}
+      ${SEARCHES.includes(s.ai.preset) ?`<div class="rowi"><span class="ic">${ICON.spark}</span><div class="t"><b>Buscar en internet</b><span>${s.ai.webSearch ? 'La IA consulta guías de WoW Forever cuando lo necesita' : 'Desactivado: responde solo con lo que sabe y tus datos'}</span></div>
+        <label class="switch" title="Buscar en internet"><input type="checkbox" id="web-search" ${s.ai.webSearch ? 'checked' : ''}><i></i></label></div>` : ''}
+      ${s.guide ? row(ICON.book, 'Guía de WoW Forever', guideText(s.guide),
+        s.guide.autoUpdate ? `<button class="btn small" data-act="guide">${spinner('guide', 'Buscar actualización', 'Buscando…')}</button>` : '') : ''}
+      ${voiceStepNeeded() && voice ? row(ICON.hide, 'Envío invisible', voice.legacy ? '<span style="color:var(--warn)">Activado con el nombre anterior: actualízalo</span>' : voice.active ? 'Activado: tus preguntas viajan sin que se vea ni se oiga nada' : 'Desactivado: al preguntar aparece un instante una línea arriba de la pantalla', `<button class="btn small" data-open="voice">${voice.legacy ? 'Actualizar' : voice.active ? 'Cambiar' : 'Activar'}</button>`) : ''}
+      ${s.tray ? `<div class="rowi"><span class="ic"><img src="/icon.png" alt="" style="width:22px;height:22px"></span><div class="t"><b>Al cerrar esta ventana</b><span>La app puede seguir funcionando junto al reloj de Windows.</span></div>
+        <select id="close-action" class="select" title="Al cerrar esta ventana">
+          <option value="ask" ${s.closeAction === 'ask' ? 'selected' : ''}>Preguntarme</option>
+          <option value="tray" ${s.closeAction === 'tray' ? 'selected' : ''}>Seguir en segundo plano</option>
+          <option value="quit" ${s.closeAction === 'quit' ? 'selected' : ''}>Cerrar la app</option>
+        </select></div>` : ''}
+      ${s.autostart === null ? '' : `<div class="rowi"><span class="ic">${ICON.power}</span><div class="t"><b>Abrir al iniciar Windows</b><span>Así la app siempre está lista cuando juegas.</span></div>
+        <label class="switch" title="Abrir al iniciar Windows"><input type="checkbox" id="autostart" ${s.autostart ? 'checked' : ''}><i></i></label></div>`}
+    </div>
+    <div class="section-title">Últimas preguntas</div>
+    <div class="rows"><ul class="feed">${s.events.length ? s.events.map((e) => `<li>
+        <div class="meta">${ago(e.time)} · ${esc(e.who)}</div><div class="q">${esc(e.question)}</div>
+        ${e.pending ? '<div class="a wait"><span class="spin"></span>Pensando…</div>' : `<div class="a ${e.ok === false ? 'bad' : ''}">${esc(e.answer)}</div>`}</li>`).join('')
+      : '<li class="empty">Todavía no hay preguntas. En el juego pulsa el botón flotante y pregunta algo: la verás aquí.</li>'}</ul></div>
+    <div class="section-title">Más opciones</div>
+    <div class="links">
+      <button class="btn small" data-act="knowledge">Conocimiento del servidor…</button>
+      <button class="btn small" data-act="wizard">Repetir la configuración</button>
+      <button class="btn small" data-act="quit">Cerrar la app</button>
+      <button class="btn small danger" data-act="uninstall">Desinstalar</button>
+    </div>
+    <p class="small faint" style="margin-top:18px">${s.tray ? 'Al cerrar esta ventana, la app puede seguir funcionando junto al reloj de Windows: clic en su ícono para volver aquí.' : 'Puedes cerrar esta ventana: la app sigue funcionando en segundo plano.'}</p>`;
+  if ($('dash-inner')._html === html) return;
+  $('dash-inner')._html = html;
+  $('dash-inner').innerHTML = html;
+  document.querySelectorAll('[data-open]').forEach((b) => { b.onclick = () => openWizard(b.dataset.open, true); });
+  document.querySelectorAll('#dash [data-act]').forEach((b) => { b.onclick = () => ACTIONS[b.dataset.act](); });
+  bindAutostart();
+  bindWebSearch();
+  const ca = $('close-action');
+  if (ca) ca.onchange = async () => {
+    try {
+      await api('close-action', { action: ca.value });
+      toast('ok', { ask: 'Te preguntaremos al cerrar la ventana.', tray: 'Al cerrar la ventana, la app seguirá funcionando junto al reloj.', quit: 'Al cerrar la ventana, la app se cerrará.' }[ca.value]);
+    } catch (e) { toast('bad', esc(e.message)); }
+    await refresh(true);
+  };
+}
+
+function bindWebSearch() {
+  const el = $('web-search');
+  if (!el) return;
+  el.onchange = async () => {
+    try {
+      await api('web-search', { enabled: el.checked });
+      toast('ok', el.checked ? 'La IA buscará en internet cuando haga falta.' : 'La IA responderá solo con lo que sabe y tus datos.');
+    } catch (e) { toast('bad', esc(e.message)); }
+    await refresh(true);
+  };
+}
+
+function bindAutostart() {
+  const el = $('autostart');
+  if (!el) return;
+  el.onchange = async () => {
+    try {
+      await api('autostart', { enabled: el.checked });
+      toast('ok', el.checked ? 'La app se abrirá al iniciar Windows.' : 'La app ya no se abrirá al iniciar Windows.');
+    } catch (e) { toast('bad', esc(e.message)); }
+    await refresh(true);
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+async function installAddon() {
+  await run('install', async () => { addonJustInstalled = await api('install-addon'); });
+}
+
+async function saveAndTest() {
+  await run('save', async () => {
+    const p = ALL[aiChoice];
+    const model = p.models ? document.querySelector('input[name=model]:checked')?.value
+      : p.modelText ? $('model-text')?.value : undefined;
+    try {
+      await api('set-ai', { preset: aiChoice, apiKey: $('key')?.value || '', model });
+    } catch (e) {
+      aiTest = { state: 'bad', html: callout('bad', 'No se pudo guardar', esc(e.message)) };
+      return;
+    }
+    aiTest = { state: 'running', html: callout('info', 'Probando…', 'Hacemos una pregunta de ejemplo a la IA. Puede tardar unos segundos.') };
+    status = await api('status');
+    render();
+    $('ai-result')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try {
+      const r = await api('test-ai');
+      aiTest = { state: 'ok', html: `<div class="callout ok"><span class="ic">${ICON.check}</span><div><b>¡Funciona!</b><p>${esc(r.model)} respondió en ${r.seconds} s:</p><div class="answer">${esc(r.text)}</div></div></div>` };
+    } catch (e) {
+      aiTest = { state: 'bad', html: callout('bad', 'La prueba no funcionó', `${esc(e.message)}<br>Revisa los pasos de arriba y vuelve a intentarlo.`) };
+    }
+  });
+  $('ai-result')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function activateVoice() {
+  await run('voice', async () => {
+    try {
+      const r = await api('voice-install');
+      voiceMsg = r.wowRunning
+        ? callout('warn', 'Envío invisible activado. Reinicia el juego', 'Cierra WoW por completo y vuelve a abrirlo para que lo use.')
+        : callout('ok', 'Envío invisible activado', 'La próxima vez que abras WoW, tus preguntas viajarán sin que se vea nada.');
+    } catch (e) {
+      voiceMsg = callout('bad', 'No se pudo activar el envío invisible', `${esc(e.message)}. Si no aceptaste el permiso de Windows, vuelve a intentarlo. O elige «Con una línea en pantalla» y sigue: funciona igual.`);
+    }
+    await checkVoice();
+  });
+}
+
+async function deactivateVoice() {
+  await run('voice', async () => {
+    await api('voice-uninstall');
+    voiceMsg = callout('ok', 'Envío invisible desactivado', 'Tus preguntas usarán la línea en pantalla.');
+    await checkVoice();
+  });
+}
+
+const ACTIONS = {
+  detect: () => run('detect', async () => {
+    const r = await api('detect-wow');
+    if (!r.found.length) toast('bad', 'Tampoco lo encontramos esta vez. Usa <b>Elegir carpeta…</b>.');
+  }),
+  pick: () => run('pick', async () => { await api('pick-wow'); }),
+  install: installAddon,
+  'cli-install': async () => {
+    const id = aiChoice;
+    try { await api(`${CLI[id].api}-install`); cli[id] = { ...(cli[id] || {}), waiting: true }; render(); } catch (e) { toast('bad', esc(e.message)); }
+  },
+  'cli-login': async () => {
+    const id = aiChoice;
+    try { await api(`${CLI[id].api}-login`); cli[id] = { ...(cli[id] || {}), waiting: true }; render(); } catch (e) { toast('bad', esc(e.message)); }
+  },
+  knowledge: () => api('knowledge').catch((e) => toast('bad', esc(e.message))),
+  guide: () => run('guide', async () => {
+    const r = await api('guide-check');
+    toast('ok', r.updated ? 'Guía de Forever actualizada.' : 'Ya tienes la guía más reciente.');
+  }),
+  wizard: () => openWizard('welcome'),
+  quit: async () => {
+    if (!(await confirmBox('¿Cerrar Forever AI Companion?', 'Dejarás de recibir respuestas en el juego hasta que la vuelvas a abrir desde el menú Inicio.', 'Cerrar la app'))) return;
+    await api('quit').catch(() => {});
+    endScreen('La app está cerrada', 'Ya puedes cerrar esta ventana. Para volver a usarla, ábrela desde el menú Inicio.');
+  },
+  uninstall: async () => {
+    if (!(await confirmBox('¿Desinstalar Forever AI Companion?', 'Se borrará el addon del juego, tu configuración (incluidas las claves) y la app. No se puede deshacer.', 'Desinstalar', true))) return;
+    await api('uninstall').catch(() => {});
+    endScreen('Desinstalación completa', 'Ya puedes cerrar esta ventana.');
+  },
+};
+
+function endScreen(title, text) {
+  stopped = true;
+  document.body.innerHTML = `<div style="height:100%;display:grid;place-items:center;text-align:center;padding:24px">
+    <div><h1 style="font-size:24px;margin-bottom:8px">${title}</h1><p style="color:var(--muted)">${text}</p></div></div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Data refresh
+// ---------------------------------------------------------------------------
+let stopped = false;
+async function checkCli(id) {
+  let next;
+  try {
+    next = await api(`${CLI[id].api}-status`);
+    if (cli[id]?.waiting && !(next.installed && next.loggedIn)) next.waiting = true;
+  } catch { next = { installed: false, loggedIn: false }; }
+  cli[id] = next;
+  if (mode === 'wizard' && step === 'ai') render();
+}
+setInterval(() => {
+  if (!stopped && mode === 'wizard' && step === 'ai' && CLI[aiChoice] && !(cli[aiChoice]?.installed && cli[aiChoice]?.loggedIn)) checkCli(aiChoice);
+}, 3000);
+
+async function checkVoice() {
+  try { voice = await api('voice-status'); } catch { voice = { supported: false, active: false }; }
+}
+
+// Polls the app every 2 s. The wizard is only redrawn when something it shows
+// changed (new questions alone don't redraw it, so typing is never disturbed).
+let lastWizardKey = '';
+const wizardKey = () => JSON.stringify([{ ...status, events: null }, voice, cli, busyAction, step, aiChoice, aiTest?.state, voiceChoice]);
+async function refresh(force = false) {
+  if (stopped) return;
+  try {
+    status = await api('status');
+  } catch {
+    $('chip').className = 'chip bad';
+    $('chip-text').textContent = 'La app no responde';
+    return;
+  }
+  if (!mode) {
+    mode = setupComplete() ? 'dash' : 'wizard';
+    if (mode === 'wizard') {
+      // Start at the first step that is not done (or the welcome on a fresh install).
+      const first = visibleSteps().find((s) => !['welcome', 'voice', 'done'].includes(s.id) && !isDone[s.id]());
+      step = isDone.game() ? first.id : 'welcome';
+      if (step === 'ai') checkCli(CLI[status.ai.preset] ? status.ai.preset : 'claude-code');
+    }
+  }
+  if (mode === 'wizard' && !force && wizardKey() === lastWizardKey) return;
+  render();
+}
+
+// Closing the window: the app decides (ask / keep running / quit). A reload
+// sends this too, but the app waits and sees the page come back.
+window.addEventListener('pagehide', () => {
+  if (stopped) return;
+  try { fetch('/api/window-closed', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json', 'x-azerothia': '1' }, body: JSON.stringify({ page: PAGE_ID }) }); } catch { /* closing */ }
+});
+
+(async () => {
+  await checkVoice();
+  await refresh();
+  setInterval(refresh, 2000);
+  setInterval(checkVoice, 15000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "client": { "version": "1.0.0", "interface": 16001, "locale": "esES" },
+  "character": {
+    "name": "Thoradin", "realm": "Ejemplo", "level": 24, "race": "Enano", "class": "Paladín",
+    "classToken": "PALADIN", "faction": "Alliance", "xp": 5120, "xpMax": 13600, "restedXp": 2400,
+    "maxHealth": 812, "maxPower": 640, "powerType": "MANA", "money": "4g 37s 12c"
+  },
+  "specialization": { "spec": "Reprensión", "role": "DAMAGER" },
+  "stats": { "strength": 61, "agility": 28, "stamina": 55, "intellect": 34, "spirit": 39, "armor": 1104, "attackPower": 152, "critPct": 6.1 },
+  "gear": [
+    { "slot": "head", "name": "Yelmo de cuero tachonado", "quality": "uncommon", "itemLevel": 22, "durabilityPct": 64 },
+    { "slot": "chest", "name": "Coraza de mallas de guardia", "quality": "uncommon", "itemLevel": 20, "durabilityPct": 58 },
+    { "slot": "mainHand", "name": "Martillo de guerra de forja", "quality": "rare", "itemLevel": 24, "type": "Mazas de dos manos", "durabilityPct": 71 }
+  ],
+  "emptySlots": ["neck", "finger2", "trinket1", "trinket2"],
+  "position": { "zone": "Montañas de Alterac", "subzone": "Ruinas de Alterac", "mapName": "Montañas de Alterac", "x": 38.2, "y": 46.7 },
+  "quests": [
+    { "title": "Las Minas de la Muerte", "level": 18, "zone": "Páramos de Poniente", "group": 5, "objectives": ["[ ] Edwin VanCleef: 0/1"] },
+    { "title": "Restos de los syndicate", "level": 25, "zone": "Montañas de Alterac", "objectives": ["[x] Ladrón del Sindicato: 10/10", "[ ] Carta sellada: 0/1"] }
+  ],
+  "professions": [{ "name": "Herrería", "rank": 112, "max": 150 }, { "name": "Minería", "rank": 120, "max": 150 }],
+  "bags": { "freeSlots": 3, "totalSlots": 50 },
+  "group": { "size": 1 },
+  "localTime": "2026-11-12 21:15"
+}

@@ -1,0 +1,1165 @@
+-- AzerothIA window, home of the player's assistant (Fizzi the gnome or Rizzik
+-- the goblin, see Personas.lua). Built from the game's own art so it looks
+-- like part of the real UI: gold dialog border over dark rock, the classic
+-- title banner, a round portrait with a gold ring in the corner, the red close
+-- button and red panel buttons. Chats on the left; on the right the
+-- conversation as messages with avatars, like the in-game messengers.
+local _, ns = ...
+
+local UI = {}
+ns.UI = UI
+
+local floor, max, min = math.floor, math.max, math.min
+
+local function persona() return ns.Personas:Current() end
+
+-- Game art ---------------------------------------------------------------------
+
+local function fileExists(path)
+  if not GetFileIDFromPath then return true end
+  local ok, id = pcall(GetFileIDFromPath, path)
+  return ok and id ~= nil
+end
+
+local ART = {
+  border    = "Interface\\DialogFrame\\UI-DialogBox-Gold-Border",
+  rock      = "Interface\\FrameGeneral\\UI-Background-Rock",
+  banner    = "Interface\\DialogFrame\\UI-DialogBox-Header",
+  edge      = "Interface\\Tooltips\\UI-Tooltip-Border",
+  white     = "Interface\\Buttons\\WHITE8X8",
+  ring      = "Interface\\Minimap\\MiniMap-TrackingBorder",
+  disc      = "Interface\\Minimap\\UI-Minimap-Background",
+  mask      = "Interface\\CharacterFrame\\TempPortraitAlphaMask",
+  rowLight  = "Interface\\QuestFrame\\UI-QuestLogTitleHighlight",
+  delete    = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+  grip      = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber",
+}
+if not fileExists(ART.border) then ART.border = "Interface\\DialogFrame\\UI-DialogBox-Border" end
+if not fileExists(ART.rock) then ART.rock = nil end
+
+local BACKDROP_TEMPLATE = BackdropTemplateMixin and "BackdropTemplate" or nil
+
+-- Gold for frames and titles, like the default UI.
+local GOLD = { 1, 0.82, 0 }
+local EDGE_GOLD = { 0.78, 0.64, 0.38, 0.95 }
+local EDGE_DIM = { 0.45, 0.4, 0.33, 0.9 }
+
+-- Theme ------------------------------------------------------------------------
+-- C holds the assistant's colors (bubbles, highlights). Its tables are updated
+-- in place when the assistant changes and painted textures are repainted.
+
+local C = {
+  error = { 0.3, 0.07, 0.06, 0.9 },
+  ok    = { 0.25, 0.95, 0.3, 1 },
+  warn  = { 1, 0.75, 0.2, 1 },
+  bad   = { 0.95, 0.3, 0.25, 1 },
+  panel = { 0, 0, 0, 0.45 },
+}
+UI.COLORS = C
+
+local function loadPalette(p)
+  for k, v in pairs(p.colors) do
+    local t = C[k] or {}
+    t[1], t[2], t[3], t[4] = v[1], v[2], v[3], v[4] or 1
+    C[k] = t
+  end
+end
+loadPalette(ns.Personas.list.fizzi)
+
+local painted = setmetatable({}, { __mode = "k" })
+
+local DEFAULTS = { width = 860, height = 600, fontSize = 13, sidebar = true }
+local MIN_W, MIN_H = 600, 430
+local SIDEBAR_W = 220
+local TOP_H = 64          -- room for the banner, the portrait and the tools
+local ROW_H = 44
+local AVATAR = 28
+
+local SUGGESTIONS = {
+  "¿Qué mazmorra me conviene hacer ahora?",
+  "Revisa mi equipo: ¿qué debería mejorar primero?",
+  "¿Qué misiones me conviene terminar primero?",
+  "¿Dónde subo de nivel más rápido?",
+  "¿Qué hago con lo que llevo en las bolsas?",
+  "Dame consejos para jugar mejor mi clase.",
+}
+
+local function settings()
+  ns.db.ui = ns.db.ui or {}
+  local s = ns.db.ui
+  for k, v in pairs(DEFAULTS) do if s[k] == nil then s[k] = v end end
+  return s
+end
+
+-- "|" is WoW's escape character: double it so AI text is shown literally.
+local function escape(s)
+  return (tostring(s or ""):gsub("|", "||"))
+end
+
+local function fill(region, color)
+  region:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+  painted[region] = color
+end
+
+-- A colored texture (anchors are up to the caller: used for lines).
+local function rect(parent, color, layer)
+  local t = parent:CreateTexture(nil, layer or "BACKGROUND")
+  fill(t, color)
+  return t
+end
+
+-- A round texture (when the client supports masks).
+local function round(frame, texture)
+  local mask = frame.CreateMaskTexture and frame:CreateMaskTexture()
+  if not mask then return end
+  mask:SetTexture(ART.mask, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+  mask:SetAllPoints(texture)
+  texture:AddMaskTexture(mask)
+end
+
+local function newFrame(kind, name, parent, template)
+  local tpl = BACKDROP_TEMPLATE
+  if template then tpl = tpl and (template .. "," .. tpl) or template end
+  return CreateFrame(kind, name, parent, tpl)
+end
+
+-- Thin tooltip-style border with a translucent dark fill: inset panels,
+-- message boxes, the text box.
+local function panel(frame, edge, bg, edgeSize)
+  if not frame.SetBackdrop then return end
+  frame:SetBackdrop({
+    bgFile = ART.white, edgeFile = ART.edge, tile = false,
+    edgeSize = edgeSize or 14, insets = { left = 3, right = 3, top = 3, bottom = 3 },
+  })
+  bg = bg or C.panel
+  frame:SetBackdropColor(bg[1], bg[2], bg[3], bg[4] or 1)
+  edge = edge or EDGE_DIM
+  frame:SetBackdropBorderColor(edge[1], edge[2], edge[3], edge[4] or 1)
+end
+
+-- The big window look: dark base, rock texture and the gold dialog border.
+local function dialog(frame)
+  local base = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
+  base:SetPoint("TOPLEFT", 6, -6)
+  base:SetPoint("BOTTOMRIGHT", -6, 6)
+  base:SetColorTexture(0.06, 0.055, 0.05, 0.97)
+  if ART.rock then
+    local rock = frame:CreateTexture(nil, "BACKGROUND", nil, -7)
+    rock:SetPoint("TOPLEFT", 6, -6)
+    rock:SetPoint("BOTTOMRIGHT", -6, 6)
+    rock:SetTexture(ART.rock, "REPEAT", "REPEAT")
+    if rock.SetHorizTile then rock:SetHorizTile(true); rock:SetVertTile(true) end
+    rock:SetVertexColor(0.55, 0.55, 0.55, 1)
+  end
+  if frame.SetBackdrop then
+    frame:SetBackdrop({ edgeFile = ART.border, edgeSize = 26, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
+  end
+end
+
+-- Round picture inside the gold minimap ring (proportions as LibDBIcon).
+local function ringedPortrait(parent, size)
+  local h = CreateFrame("Button", nil, parent)
+  h:SetSize(size, size)
+  local disc = h:CreateTexture(nil, "BACKGROUND")
+  disc:SetTexture(ART.disc)
+  disc:SetSize(size * 0.74, size * 0.74)
+  disc:SetPoint("CENTER")
+  disc:SetVertexColor(0.04, 0.04, 0.04, 1)
+  local icon = h:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(size * 0.64, size * 0.64)
+  icon:SetPoint("CENTER")
+  round(h, icon)
+  local ring = h:CreateTexture(nil, "OVERLAY")
+  ring:SetTexture(ART.ring)
+  ring:SetSize(size * 1.62, size * 1.62)
+  ring:SetPoint("TOPLEFT")
+  h.icon, h.ring = icon, ring
+  return h
+end
+
+-- Small round avatar (chat list, messages).
+local function avatar(parent, size)
+  local t = parent:CreateTexture(nil, "ARTWORK")
+  t:SetSize(size, size)
+  round(parent, t)
+  return t
+end
+
+-- The game's red button with gold text.
+local function panelButton(parent, label, width, height)
+  local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  b:SetSize(width, height)
+  b:SetText(label)
+  return b
+end
+
+-- Text-only button (gold, brightens on hover).
+local function linkButton(parent, label, width, height, font)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(width, height)
+  local fs = b:CreateFontString(nil, "OVERLAY", font or "GameFontNormalSmall")
+  fs:SetPoint("CENTER")
+  fs:SetText(label)
+  b.label = fs
+  b:SetScript("OnEnter", function() fs:SetTextColor(1, 1, 1) end)
+  b:SetScript("OnLeave", function() fs:SetTextColor(GOLD[1], GOLD[2], GOLD[3]) end)
+  return b
+end
+
+local function tooltip(frame, title, text)
+  frame:HookScript("OnEnter", function(self)
+    if not GameTooltip then return end
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine(title)
+    if text then GameTooltip:AddLine(text, 1, 1, 1, true) end
+    GameTooltip:Show()
+  end)
+  frame:HookScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+end
+
+local function stamp(t)
+  if not t then return "" end
+  return date("%H:%M", t)
+end
+
+local function dayGroup(t)
+  t = t or 0
+  local today = date("%Y-%m-%d")
+  if date("%Y-%m-%d", t) == today then return "Hoy" end
+  if date("%Y-%m-%d", t + 86400) == today then return "Ayer" end
+  if time() - t < 7 * 86400 then return "Esta semana" end
+  return "Anteriores"
+end
+
+-- The player's own face (for their messages).
+local function setPlayerPortrait(texture)
+  if SetPortraitTexture then
+    pcall(SetPortraitTexture, texture, "player")
+  else
+    texture:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+  end
+end
+
+-- Fonts that follow the size setting.
+local function makeFonts(size)
+  UI.fonts = UI.fonts or {}
+  local function font(name, base, delta)
+    local f = UI.fonts[name] or CreateFont("AzerothIAFont" .. name)
+    UI.fonts[name] = f
+    if base and base.GetFont then
+      local file, _, flags = base:GetFont()
+      if file then f:SetFont(file, size + delta, flags or "") end
+    end
+    return f
+  end
+  font("Body", GameFontHighlight, 0)
+  font("Small", GameFontHighlightSmall, -2)
+  font("Title", GameFontNormalLarge, 3)
+end
+
+-- Window ------------------------------------------------------------------------
+
+function UI:Build()
+  if self.frame then return end
+  local s = settings()
+  makeFonts(s.fontSize)
+  loadPalette(persona())
+
+  local f = newFrame("Frame", "AzerothIAFrame", UIParent)
+  f:SetSize(s.width, s.height)
+  if s.point then
+    f:SetPoint(s.point, UIParent, s.relPoint or s.point, s.x or 0, s.y or 0)
+  else
+    f:SetPoint("CENTER")
+  end
+  f:SetFrameStrata("DIALOG")
+  f:SetToplevel(true)
+  f:SetClampedToScreen(true)
+  f:SetMovable(true)
+  f:SetResizable(true)
+  if f.SetResizeBounds then f:SetResizeBounds(MIN_W, MIN_H) elseif f.SetMinResize then f:SetMinResize(MIN_W, MIN_H) end
+  f:EnableMouse(true)
+  f:RegisterForDrag("LeftButton")
+  f:Hide()
+  dialog(f)
+  tinsert(UISpecialFrames, "AzerothIAFrame")
+
+  local function savePosition()
+    local point, _, relPoint, x, y = f:GetPoint(1)
+    s.point, s.relPoint, s.x, s.y = point, relPoint, x, y
+    s.width, s.height = floor(f:GetWidth()), floor(f:GetHeight())
+  end
+  f:SetScript("OnDragStart", function() f:StartMoving() end)
+  f:SetScript("OnDragStop", function() f:StopMovingOrSizing(); savePosition() end)
+
+  -- Title banner on the top edge, like the classic option windows.
+  local banner = f:CreateTexture(nil, "ARTWORK")
+  banner:SetTexture(ART.banner)
+  banner:SetSize(300, 64)
+  banner:SetPoint("TOP", 0, 12)
+  local bannerTitle = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  bannerTitle:SetPoint("TOP", banner, "TOP", 0, -14)
+  bannerTitle:SetText("Forever AI Companion")
+
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", -3, -3)
+  close:SetScript("OnClick", function() f:Hide() end)
+
+  -- The assistant: round portrait with a gold ring over the corner, name and
+  -- role beside it. Click either to change assistant.
+  local portrait = ringedPortrait(f, 84)
+  portrait:SetPoint("TOPLEFT", -22, 20)
+  portrait:SetFrameLevel((f:GetFrameLevel() or 1) + 10)
+  portrait:SetScript("OnClick", function() UI:ShowChooser() end)
+  tooltip(portrait, "Cambiar de asistente", "Elige entre Fizzi (gnoma, Alianza) y Rizzik (goblin, Horda).")
+  local who = CreateFrame("Button", nil, f)
+  who:SetPoint("TOPLEFT", 66, -26)
+  who:SetSize(240, 32)
+  local appName = who:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  appName:SetPoint("TOPLEFT", 0, 0)
+  local tagline = who:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  tagline:SetPoint("TOPLEFT", appName, "BOTTOMLEFT", 0, -2)
+  who:SetScript("OnClick", function() UI:ShowChooser() end)
+  tooltip(who, "Cambiar de asistente", "Elige entre Fizzi (gnoma, Alianza) y Rizzik (goblin, Horda).")
+  self.logo, self.appName, self.tagline = portrait.icon, appName, tagline
+
+  -- Tools on the right of the top bar.
+  local bigger = panelButton(f, "A+", 34, 22)
+  bigger:SetPoint("TOPRIGHT", -36, -32)
+  bigger:SetScript("OnClick", function() UI:SetFontSize(s.fontSize + 1) end)
+  tooltip(bigger, "Letra más grande")
+  local smaller = panelButton(f, "A-", 34, 22)
+  smaller:SetPoint("RIGHT", bigger, "LEFT", -2, 0)
+  smaller:SetScript("OnClick", function() UI:SetFontSize(s.fontSize - 1) end)
+  tooltip(smaller, "Letra más pequeña")
+  local toggleSide = panelButton(f, "Chats", 70, 22)
+  toggleSide:SetPoint("RIGHT", smaller, "LEFT", -8, 0)
+  toggleSide:SetScript("OnClick", function() UI:SetSidebar(not s.sidebar) end)
+  tooltip(toggleSide, "Mostrar u ocultar la lista de chats")
+
+  -- Sidebar --------------------------------------------------------------------
+  local side = newFrame("Frame", nil, f)
+  side:SetPoint("TOPLEFT", 12, -TOP_H)
+  side:SetPoint("BOTTOMLEFT", 12, 12)
+  side:SetWidth(SIDEBAR_W)
+  panel(side)
+
+  local newChat = panelButton(side, "+ Nuevo chat", SIDEBAR_W - 20, 26)
+  newChat:SetPoint("TOP", 0, -10)
+  newChat:SetScript("OnClick", function()
+    ns.Chats:New()
+    UI.choosing = false
+    UI:Refresh()
+    UI.input:SetFocus()
+  end)
+
+  local listScroll = CreateFrame("ScrollFrame", "AzerothIAChatList", side, "UIPanelScrollFrameTemplate")
+  listScroll:SetPoint("TOPLEFT", 6, -44)
+  listScroll:SetPoint("BOTTOMRIGHT", -26, 34)
+  local list = CreateFrame("Frame", nil, listScroll)
+  list:SetSize(SIDEBAR_W - 34, 10)
+  listScroll:SetScrollChild(list)
+
+  local myData = linkButton(side, "Ver los datos que envío", SIDEBAR_W - 20, 22)
+  myData:SetPoint("BOTTOM", 0, 8)
+  myData:SetScript("OnClick", function() UI:ShowContext() end)
+  tooltip(myData, "Datos de tu personaje", "Lo que tu asistente recibe con cada pregunta: equipo, misiones, posición...")
+
+  -- Main area ------------------------------------------------------------------
+  local main = newFrame("Frame", nil, f)
+  main:SetPoint("TOPRIGHT", -12, -TOP_H)
+  main:SetPoint("BOTTOMRIGHT", -12, 12)
+  panel(main)
+
+  -- Chat header: title (click to rename), connection line, delete.
+  local titleBtn = CreateFrame("Button", nil, main)
+  titleBtn:SetPoint("TOPLEFT", 14, -8)
+  titleBtn:SetPoint("TOPRIGHT", -112, -8)
+  titleBtn:SetHeight(24)
+  local title = titleBtn:CreateFontString(nil, "OVERLAY")
+  title:SetFontObject(UI.fonts.Title)
+  title:SetPoint("LEFT")
+  title:SetPoint("RIGHT")
+  title:SetJustifyH("LEFT")
+  if title.SetWordWrap then title:SetWordWrap(false) end
+  local titleHl = titleBtn:CreateTexture(nil, "HIGHLIGHT")
+  titleHl:SetAllPoints()
+  titleHl:SetColorTexture(1, 0.82, 0, 0.06)
+  tooltip(titleBtn, "Renombrar chat", "Haz clic para cambiar el nombre.")
+
+  local renameBox = newFrame("EditBox", nil, main)
+  renameBox:SetAllPoints(titleBtn)
+  renameBox:SetFontObject(UI.fonts.Title)
+  renameBox:SetAutoFocus(false)
+  renameBox:SetMaxLetters(60)
+  renameBox:SetTextInsets(6, 6, 0, 0)
+  panel(renameBox, EDGE_GOLD, { 0, 0, 0, 0.8 }, 12)
+  renameBox:Hide()
+  local function finishRename(save)
+    if save then ns.Chats:Rename(ns.db.currentChat, renameBox:GetText()) end
+    renameBox:Hide()
+    titleBtn:Show()
+    UI:Refresh()
+  end
+  renameBox:SetScript("OnEnterPressed", function() finishRename(true) end)
+  renameBox:SetScript("OnEscapePressed", function() finishRename(false) end)
+  renameBox:SetScript("OnEditFocusLost", function() if renameBox:IsShown() then finishRename(true) end end)
+  titleBtn:SetScript("OnClick", function()
+    local current = ns.Chats:Get(ns.db.currentChat)
+    if not current then return end
+    titleBtn:Hide()
+    renameBox:SetText(current.title or "")
+    renameBox:Show()
+    renameBox:SetFocus()
+    renameBox:HighlightText()
+  end)
+
+  local dot = main:CreateTexture(nil, "OVERLAY")
+  dot:SetSize(8, 8)
+  dot:SetPoint("TOPLEFT", 16, -38)
+  round(main, dot)
+  local channel = main:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  channel:SetPoint("LEFT", dot, "RIGHT", 6, 0)
+
+  local deleteChat = panelButton(main, "Borrar chat", 96, 22)
+  deleteChat:SetPoint("TOPRIGHT", -10, -10)
+  deleteChat:SetScript("OnClick", function(self) UI:ConfirmDelete(self, ns.db.currentChat) end)
+
+  local headerLine = main:CreateTexture(nil, "BORDER")
+  headerLine:SetPoint("TOPLEFT", 8, -54)
+  headerLine:SetPoint("TOPRIGHT", -8, -54)
+  headerLine:SetHeight(1)
+  headerLine:SetColorTexture(EDGE_GOLD[1], EDGE_GOLD[2], EDGE_GOLD[3], 0.35)
+
+  -- Messages.
+  local scroll = CreateFrame("ScrollFrame", "AzerothIAScroll", main, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", 8, -60)
+  scroll:SetPoint("BOTTOMRIGHT", -28, 66)
+  local content = CreateFrame("Frame", nil, scroll)
+  content:SetSize(400, 10)
+  scroll:SetScrollChild(content)
+  scroll:SetScript("OnSizeChanged", function() UI:RefreshConversation() end)
+
+  -- Composer: gold-edged text box and the red "Enviar" button.
+  local composer = newFrame("Frame", nil, main)
+  composer:SetPoint("BOTTOMLEFT", 10, 28)
+  composer:SetPoint("BOTTOMRIGHT", -100, 28)
+  composer:SetHeight(32)
+  panel(composer, EDGE_GOLD, { 0, 0, 0, 0.65 }, 12)
+
+  local send = panelButton(main, "Enviar", 84, 28)
+  send:SetPoint("LEFT", composer, "RIGHT", 6, 0)
+  send:SetScript("OnClick", function() UI:Submit() end)
+
+  local input = CreateFrame("EditBox", "AzerothIAInput", composer)
+  input:SetPoint("LEFT", 10, 0)
+  input:SetPoint("RIGHT", -8, 0)
+  input:SetHeight(28)
+  input:SetFontObject(UI.fonts.Body)
+  input:SetAutoFocus(false)
+  input:SetMaxLetters(500)
+  local placeholder = input:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+  placeholder:SetPoint("LEFT", 2, 0)
+  self.placeholder = placeholder
+  input:SetScript("OnTextChanged", function(self)
+    placeholder:SetShown(self:GetText() == "")
+  end)
+  input:SetScript("OnEnterPressed", function() UI:Submit() end)
+  input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+  composer:EnableMouse(true)
+  composer:SetScript("OnMouseDown", function() input:SetFocus() end)
+
+  local status = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  status:SetPoint("BOTTOMLEFT", 14, 10)
+  status:SetPoint("BOTTOMRIGHT", -24, 10)
+  status:SetJustifyH("LEFT")
+
+  -- Resize grip.
+  local grip = CreateFrame("Button", nil, f)
+  grip:SetSize(16, 16)
+  grip:SetPoint("BOTTOMRIGHT", -6, 6)
+  grip:SetFrameLevel((f:GetFrameLevel() or 1) + 12)
+  grip:SetNormalTexture(ART.grip .. "-Up")
+  grip:SetHighlightTexture(ART.grip .. "-Highlight")
+  grip:SetPushedTexture(ART.grip .. "-Down")
+  grip:SetScript("OnMouseDown", function() f:StartSizing("BOTTOMRIGHT") end)
+  grip:SetScript("OnMouseUp", function() f:StopMovingOrSizing(); savePosition(); UI:Refresh() end)
+
+  f:SetScript("OnShow", function()
+    local current = ns.Chats:Get(ns.db.currentChat)
+    if current then current.unread = nil end
+    if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN or 839) end
+    UI:Refresh()
+    if ns.Button then ns.Button:Update() end
+  end)
+  f:SetScript("OnHide", function()
+    if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE or 840) end
+  end)
+
+  -- "Thinking" animation: animated dots and what the assistant "is doing".
+  local elapsedTotal, ticks = 0, 0
+  f:SetScript("OnUpdate", function(_, elapsed)
+    elapsedTotal = elapsedTotal + (elapsed or 0)
+    if elapsedTotal < 0.45 then return end
+    elapsedTotal = 0
+    ticks = ticks + 1
+    local phrase = ns.Personas:ThinkingText(ticks)
+    for _, b in ipairs(UI.bubbles or {}) do
+      if b:IsShown() and b.pending then b.text:SetText(phrase) end
+    end
+    UI:RefreshStatusBar()
+  end)
+
+  self.frame, self.side, self.main = f, side, main
+  self.scroll, self.content, self.input = scroll, content, input
+  self.list, self.listScroll = list, listScroll
+  self.title, self.titleBtn, self.renameBox, self.deleteButton = title, titleBtn, renameBox, deleteChat
+  self.dot, self.channel, self.status = dot, channel, status
+  self.rows, self.headings, self.bubbles = {}, {}, {}
+  self:SetSidebar(s.sidebar, true)
+  self:ApplyPersona(true)
+end
+
+-- Portrait, name and colors of the current assistant.
+function UI:ApplyPersona(silent)
+  if not self.frame then return end
+  local p = persona()
+  loadPalette(p)
+  for region, color in pairs(painted) do
+    region:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+  end
+  ns.Personas.SetPortrait(self.logo, p)
+  self.appName:SetText(p.nameColor .. p.name .. "|r")
+  self.tagline:SetText(p.role)
+  self.placeholder:SetText(p.placeholder)
+  if self.welcome then
+    ns.Personas.SetPortrait(self.welcome.portrait.icon, p)
+    self.welcome.online:SetText(p.nameColor .. p.online .. "|r")
+    self.welcome.sub:SetText(p.sub)
+  end
+  if not silent then self:Refresh() end
+end
+
+function UI:SetSidebar(shown, silent)
+  local s = settings()
+  s.sidebar = shown and true or false
+  self.side:SetShown(s.sidebar)
+  self.main:ClearAllPoints()
+  self.main:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -12, -TOP_H)
+  self.main:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -12, 12)
+  if s.sidebar then
+    self.main:SetPoint("TOPLEFT", self.side, "TOPRIGHT", 6, 0)
+  else
+    self.main:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 12, -TOP_H)
+  end
+  if not silent then self:Refresh() end
+end
+
+function UI:SetFontSize(size)
+  local s = settings()
+  s.fontSize = max(10, min(20, size))
+  makeFonts(s.fontSize)
+  self:Refresh()
+end
+
+-- Two clicks to delete: the first one asks.
+function UI:ConfirmDelete(btn, chatId)
+  if btn.confirmFor == chatId then
+    btn.confirmFor = nil
+    btn:SetText("Borrar chat")
+    ns.Chats:Delete(chatId)
+    self:Refresh()
+    return
+  end
+  btn.confirmFor = chatId
+  btn:SetText("¿Seguro?")
+  C_Timer.After(3, function()
+    if btn.confirmFor == chatId then
+      btn.confirmFor = nil
+      btn:SetText("Borrar chat")
+    end
+  end)
+end
+
+-- Sidebar list ---------------------------------------------------------------
+
+function UI:Heading(i)
+  local h = self.headings[i]
+  if h then return h end
+  h = self.list:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  h:SetJustifyH("LEFT")
+  self.headings[i] = h
+  return h
+end
+
+function UI:Row(i)
+  local row = self.rows[i]
+  if row then return row end
+  row = CreateFrame("Button", nil, self.list)
+  row:SetHeight(ROW_H - 4)
+  -- Selected: the gold quest-log highlight.
+  local selected = row:CreateTexture(nil, "BACKGROUND")
+  selected:SetAllPoints()
+  selected:SetTexture(ART.rowLight)
+  if selected.SetBlendMode then selected:SetBlendMode("ADD") end
+  selected:SetVertexColor(1, 0.82, 0.3, 0.75)
+  row.selected = selected
+  local hl = row:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetAllPoints()
+  hl:SetTexture(ART.rowLight)
+  if hl.SetBlendMode then hl:SetBlendMode("ADD") end
+  hl:SetVertexColor(1, 0.82, 0.3, 0.35)
+
+  local face = avatar(row, AVATAR)
+  face:SetPoint("LEFT", 4, 0)
+  row.face = face
+  local name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  name:SetPoint("TOPLEFT", face, "TOPRIGHT", 8, 0)
+  name:SetPoint("RIGHT", -22, 0)
+  name:SetJustifyH("LEFT")
+  if name.SetWordWrap then name:SetWordWrap(false) end
+  row.name = name
+  local info = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  info:SetPoint("BOTTOMLEFT", face, "BOTTOMRIGHT", 8, 0)
+  info:SetPoint("RIGHT", -22, 0)
+  info:SetJustifyH("LEFT")
+  row.info = info
+  -- Unread: a green light on the avatar, like an online friend.
+  local dot = row:CreateTexture(nil, "OVERLAY")
+  dot:SetSize(9, 9)
+  dot:SetPoint("BOTTOMRIGHT", face, "BOTTOMRIGHT", 2, -1)
+  dot:SetColorTexture(C.ok[1], C.ok[2], C.ok[3], 1)
+  round(row, dot)
+  row.dot = dot
+
+  -- Delete (x) shown on hover; a second click confirms.
+  local x = CreateFrame("Button", nil, row)
+  x:SetSize(16, 16)
+  x:SetPoint("RIGHT", -2, 0)
+  x:SetNormalTexture(ART.delete)
+  x:SetHighlightTexture(ART.delete)
+  x:Hide()
+  x:SetScript("OnClick", function(self)
+    if self.confirm then
+      ns.Chats:Delete(row.chatId)
+      UI:Refresh()
+      return
+    end
+    self.confirm = true
+    row.info:SetText("|cffff6060Clic otra vez para borrar|r")
+    C_Timer.After(3, function() self.confirm = nil; UI:RefreshList() end)
+  end)
+  tooltip(x, "Borrar chat")
+  row.deleteBtn = x
+  local function hover(on)
+    x:SetShown(on or x.confirm)
+  end
+  row:SetScript("OnEnter", function() hover(true) end)
+  row:SetScript("OnLeave", function() if not x:IsMouseOver() then hover(false) end end)
+  x:HookScript("OnLeave", function() if not row:IsMouseOver() then hover(false) end end)
+
+  row:SetScript("OnClick", function(self)
+    ns.Chats:Select(self.chatId)
+    UI.choosing = false
+    UI.renameBox:Hide()
+    UI.titleBtn:Show()
+    if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856) end
+    UI:Refresh()
+  end)
+  self.rows[i] = row
+  return row
+end
+
+function UI:RefreshList()
+  local width = self.list:GetWidth()
+  local p = persona()
+  local y, rowIndex, headIndex, lastGroup = 0, 0, 0, nil
+  for _, c in ipairs(ns.Chats:All()) do
+    local group = dayGroup(c.updated)
+    if group ~= lastGroup then
+      lastGroup = group
+      headIndex = headIndex + 1
+      local h = self:Heading(headIndex)
+      h:ClearAllPoints()
+      h:SetPoint("TOPLEFT", 6, -(y + 8))
+      h:SetText(group)
+      h:Show()
+      y = y + 26
+    end
+    rowIndex = rowIndex + 1
+    local row = self:Row(rowIndex)
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", 0, -y)
+    row:SetWidth(width)
+    row.chatId = c.id
+    row.unread = c.unread
+    ns.Personas.SetPortrait(row.face, p)
+    row.name:SetText(escape(c.title))
+    local pending = false
+    for _, m in ipairs(c.messages) do if m.status == "pending" then pending = true break end end
+    if not row.deleteBtn.confirm then
+      row.info:SetText(pending and ("|cffffd100" .. p.name .. " está escribiendo...|r")
+        or string.format("%s · %d %s", stamp(c.updated), #c.messages, #c.messages == 1 and "mensaje" or "mensajes"))
+    end
+    local isCurrent = c.id == ns.db.currentChat
+    row.selected:SetShown(isCurrent)
+    if isCurrent then row.name:SetTextColor(1, 1, 1) else row.name:SetTextColor(GOLD[1], GOLD[2], GOLD[3]) end
+    row.dot:SetShown(c.unread and true or false)
+    row:Show()
+    y = y + ROW_H
+  end
+  for i = rowIndex + 1, #self.rows do self.rows[i]:Hide() end
+  for i = headIndex + 1, #self.headings do self.headings[i]:Hide() end
+  self.list:SetHeight(max(10, y))
+end
+
+-- Conversation ---------------------------------------------------------------
+-- A message: avatar, a "name · time" line (with Copiar / Reintentar) and the
+-- text in a tooltip-style box. The player's messages go on the right.
+
+function UI:Bubble(i)
+  local b = self.bubbles[i]
+  if b then return b end
+  b = CreateFrame("Frame", nil, self.content)
+  local face = avatar(b, AVATAR)
+  b.face = face
+  local who = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  b.who = who
+  local meta = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  b.meta = meta
+  local box = newFrame("Frame", nil, b)
+  b.box = box
+  local text = box:CreateFontString(nil, "OVERLAY")
+  text:SetJustifyH("LEFT")
+  text:SetJustifyV("TOP")
+  text:SetSpacing(3)
+  if text.SetWordWrap then text:SetWordWrap(true) end
+  b.text = text
+  local action = linkButton(b, "Copiar", 70, 16)
+  b.action = action
+  self.bubbles[i] = b
+  return b
+end
+
+-- Lays out one message at height y. kind: "user", "ai", "pending", "error".
+function UI:PlaceBubble(i, y, kind, textValue, metaValue, onAction, actionLabel)
+  local b = self:Bubble(i)
+  local p = persona()
+  local width = self.content:GetWidth()
+  local mine = kind == "user"
+  local maxText = floor(width * (mine and 0.66 or 0.78)) - 20
+  b.text:SetFontObject(self.fonts.Body)
+  b.text:ClearAllPoints()
+  b.text:SetPoint("TOPLEFT", 10, -8)
+  b.text:SetWidth(maxText)
+  b.text:SetText(textValue)
+  -- Short messages get a snug box.
+  local natural = (b.text.GetUnboundedStringWidth and b.text:GetUnboundedStringWidth()) or b.text:GetStringWidth() or maxText
+  local textW = min(maxText, max(30, floor(natural + 2)))
+  b.text:SetWidth(textW)
+  local boxH = (b.text:GetStringHeight() or 14) + 16
+  local boxW = textW + 20
+
+  -- Avatar and name line.
+  b.face:ClearAllPoints()
+  b.who:ClearAllPoints()
+  b.meta:ClearAllPoints()
+  b.box:ClearAllPoints()
+  b.action:ClearAllPoints()
+  if mine then
+    setPlayerPortrait(b.face)
+    b.face:SetPoint("TOPRIGHT", b, "TOPRIGHT", -2, -2)
+    b.who:SetPoint("TOPRIGHT", b.face, "TOPLEFT", -8, 0)
+    b.who:SetText("Tú")
+    b.meta:SetPoint("RIGHT", b.who, "LEFT", -6, 0)
+    b.box:SetPoint("TOPRIGHT", b.face, "TOPLEFT", -6, -16)
+    b.action:SetPoint("RIGHT", b.meta, "LEFT", -6, 0)
+  else
+    ns.Personas.SetPortrait(b.face, p)
+    b.face:SetPoint("TOPLEFT", b, "TOPLEFT", 2, -2)
+    b.who:SetPoint("TOPLEFT", b.face, "TOPRIGHT", 8, 0)
+    b.who:SetText(p.nameColor .. p.name .. "|r")
+    b.meta:SetPoint("LEFT", b.who, "RIGHT", 6, 0)
+    b.box:SetPoint("TOPLEFT", b.face, "TOPRIGHT", 6, -16)
+    b.action:SetPoint("LEFT", b.meta, "RIGHT", 6, 0)
+  end
+  b.box:SetSize(boxW, boxH)
+  local bg = mine and C.user or kind == "error" and C.error or { 0.02, 0.02, 0.02, 0.75 }
+  panel(b.box, kind == "error" and { 0.8, 0.3, 0.25, 0.9 } or EDGE_GOLD, bg, 12)
+  b.text:SetTextColor(1, 1, 1)
+  if kind == "pending" then b.text:SetTextColor(0.75, 0.75, 0.75) end
+  b.pending = kind == "pending"
+  b.meta:SetText(metaValue or "")
+  b.action:SetShown(onAction ~= nil)
+  if onAction then
+    b.action.label:SetText(actionLabel)
+    b.action:SetScript("OnClick", onAction)
+  end
+
+  local h = 16 + boxH + 6
+  b:SetSize(width - 4, h)
+  b:ClearAllPoints()
+  b:SetPoint("TOPLEFT", self.content, "TOPLEFT", 2, -y)
+  b:Show()
+  return h
+end
+
+function UI:ShowWelcome()
+  if not self.welcome then
+    local w = CreateFrame("Frame", nil, self.content)
+    local portrait = ringedPortrait(w, 70)
+    portrait:SetPoint("TOP", 0, -10)
+    portrait:SetScript("OnClick", function() UI:ShowChooser() end)
+    w.portrait = portrait
+    local online = w:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    online:SetPoint("TOP", 0, -88)
+    w.online = online
+    local hello = w:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    hello:SetPoint("TOP", online, "BOTTOM", 0, -8)
+    w.hello = hello
+    local sub = w:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    sub:SetPoint("TOP", hello, "BOTTOM", 0, -10)
+    sub:SetJustifyH("CENTER")
+    w.sub = sub
+    -- Suggestions look like quest dialog options.
+    w.chips = {}
+    for i, text in ipairs(SUGGESTIONS) do
+      local chip = newFrame("Button", nil, w)
+      panel(chip, EDGE_DIM, { 0, 0, 0, 0.55 }, 12)
+      local icon = chip:CreateTexture(nil, "ARTWORK")
+      icon:SetSize(14, 14)
+      icon:SetPoint("LEFT", 10, 0)
+      icon:SetTexture("Interface\\GossipFrame\\GossipGossipIcon")
+      local fs = chip:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+      fs:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+      fs:SetPoint("RIGHT", -10, 0)
+      fs:SetJustifyH("LEFT")
+      if fs.SetWordWrap then fs:SetWordWrap(true) end
+      fs:SetText(text)
+      local hl = chip:CreateTexture(nil, "HIGHLIGHT")
+      hl:SetPoint("TOPLEFT", 3, -3)
+      hl:SetPoint("BOTTOMRIGHT", -3, 3)
+      hl:SetTexture(ART.rowLight)
+      if hl.SetBlendMode then hl:SetBlendMode("ADD") end
+      hl:SetVertexColor(1, 0.82, 0.3, 0.4)
+      chip:SetScript("OnClick", function() ns.Core:Ask(text) end)
+      w.chips[i] = chip
+    end
+    local hint = w:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetText("Cada chat recuerda su propia conversación: usa uno por tema.")
+    w.hint = hint
+    self.welcome = w
+    self:ApplyPersona(true)
+  end
+  local w = self.welcome
+  local p = persona()
+  local width = self.content:GetWidth()
+  local name = UnitName and UnitName("player") or nil
+  w.hello:SetText(name and string.format(p.hello, name) or p.helloNoName)
+  local cols = width > 520 and 2 or 1
+  local chipW = floor((min(width, 640) - (cols - 1) * 10) / cols)
+  local left = floor((width - (chipW * cols + (cols - 1) * 10)) / 2)
+  local top = 186
+  for i, chip in ipairs(w.chips) do
+    local col, rowN = (i - 1) % cols, floor((i - 1) / cols)
+    chip:SetSize(chipW, 40)
+    chip:ClearAllPoints()
+    chip:SetPoint("TOPLEFT", w, "TOPLEFT", left + col * (chipW + 10), -(top + rowN * 46))
+  end
+  local rows = math.ceil(#w.chips / cols)
+  w.hint:ClearAllPoints()
+  w.hint:SetPoint("TOP", w, "TOP", 0, -(top + 8 + rows * 46))
+  w:ClearAllPoints()
+  w:SetPoint("TOPLEFT")
+  w:SetSize(width, top + 36 + rows * 46)
+  w:Show()
+  return top + 36 + rows * 46
+end
+
+-- Assistant chooser ------------------------------------------------------------
+-- Shown the first time a character opens the window, and when clicking the
+-- assistant's portrait or name.
+
+function UI:ShowChooser()
+  self.choosing = true
+  self:Show()
+  self:Refresh()
+end
+
+local CARD_H = 262
+
+local function chooserCard(parent, p)
+  local card = newFrame("Frame", nil, parent)
+  panel(card, EDGE_GOLD, { 0, 0, 0, 0.55 }, 14)
+  local top = card:CreateTexture(nil, "BORDER")
+  top:SetPoint("TOPLEFT", 4, -4)
+  top:SetPoint("TOPRIGHT", -4, -4)
+  top:SetHeight(3)
+  top:SetColorTexture(p.colors.accent[1], p.colors.accent[2], p.colors.accent[3], 0.9)
+
+  local portrait = ringedPortrait(card, 76)
+  portrait:SetPoint("TOP", 0, -12)
+  ns.Personas.SetPortrait(portrait.icon, p)
+  portrait:SetScript("OnClick", function() UI:PickPersona(p.id) end)
+
+  local name = card:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  name:SetPoint("TOP", 0, -96)
+  name:SetText(p.nameColor .. p.fullName .. "|r")
+  local role = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  role:SetPoint("TOP", name, "BOTTOM", 0, -3)
+  card.role = role
+  local pitch = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  pitch:SetPoint("TOP", role, "BOTTOM", 0, -10)
+  pitch:SetJustifyH("CENTER")
+  if pitch.SetWordWrap then pitch:SetWordWrap(true) end
+  pitch:SetText(p.pitch)
+  card.pitch = pitch
+  local sample = card:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  sample:SetPoint("TOP", pitch, "BOTTOM", 0, -8)
+  sample:SetJustifyH("CENTER")
+  if sample.SetWordWrap then sample:SetWordWrap(true) end
+  sample:SetText(p.sample)
+  card.sample = sample
+
+  local pick = panelButton(card, "Elegir a " .. p.name, 150, 26)
+  pick:SetPoint("BOTTOM", 0, 14)
+  pick:SetScript("OnClick", function() UI:PickPersona(p.id) end)
+  card.pick = pick
+  return card
+end
+
+function UI:PickPersona(id)
+  self.choosing = false
+  ns.Personas:Set(id)
+  local p = persona()
+  if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_QUEST_LIST_SELECT or 875) end
+  self:SetStatus(p.nameColor .. p.name .. "|r es ahora tu asistente.")
+  self:Refresh()
+  if self.input then self.input:SetFocus() end
+end
+
+function UI:LayoutChooser()
+  if not self.chooser then
+    local ch = CreateFrame("Frame", nil, self.content)
+    local title = ch:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    title:SetPoint("TOP", 0, -14)
+    title:SetText("Elige a tu asistente en Azeroth")
+    local sub = ch:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    sub:SetPoint("TOP", title, "BOTTOM", 0, -8)
+    sub:SetJustifyH("CENTER")
+    sub:SetText("Te acompañará en tus aventuras y responderá tus preguntas.\nPuedes cambiarlo cuando quieras haciendo clic en su retrato, arriba a la izquierda.")
+    ch.cards = {}
+    for i, id in ipairs(ns.Personas.ORDER) do
+      ch.cards[i] = chooserCard(ch, ns.Personas.list[id])
+      ch.cards[i].persona = ns.Personas.list[id]
+    end
+    local back = linkButton(ch, "Volver al chat", 120, 22, "GameFontNormal")
+    back:SetScript("OnClick", function() UI.choosing = false; UI:Refresh() end)
+    ch.back = back
+    self.chooser = ch
+  end
+  local ch = self.chooser
+  local width = self.content:GetWidth()
+  local cols = width >= 480 and 2 or 1
+  local cardW = floor((min(width, 620) - (cols - 1) * 14) / cols)
+  local left = floor((width - (cardW * cols + (cols - 1) * 14)) / 2)
+  local suggested = ns.Personas:Suggested().id
+  for i, card in ipairs(ch.cards) do
+    local col, rowN = (i - 1) % cols, floor((i - 1) / cols)
+    card:SetSize(cardW, CARD_H)
+    card:ClearAllPoints()
+    card:SetPoint("TOPLEFT", ch, "TOPLEFT", left + col * (cardW + 14), -(84 + rowN * (CARD_H + 14)))
+    card.pitch:SetWidth(cardW - 28)
+    card.sample:SetWidth(cardW - 28)
+    local p = card.persona
+    card.role:SetText(p.role .. " · " .. p.factionLabel
+      .. (p.id == suggested and "  |cff66dd66(tu facción)|r" or ""))
+  end
+  local rows = math.ceil(#ch.cards / cols)
+  local h = 84 + rows * (CARD_H + 14)
+  ch.back:ClearAllPoints()
+  ch.back:SetPoint("TOP", ch, "TOP", 0, -h)
+  ch.back:SetShown(ns.Personas:Chosen())
+  ch:ClearAllPoints()
+  ch:SetPoint("TOPLEFT")
+  ch:SetSize(width, h + 34)
+  ch:Show()
+  return h + 34
+end
+
+function UI:RefreshConversation()
+  if not self.frame or not self.frame:IsShown() then return end
+  local width = max(200, (self.scroll:GetWidth() or 400) - 4)
+  self.content:SetWidth(width)
+  local current = ns.Chats:Get(ns.db.currentChat)
+
+  -- First time on this character (or the player asked): pick an assistant.
+  if self.choosing or not ns.Personas:Chosen() then
+    self.title:SetText("Tu asistente")
+    self.deleteButton:Hide()
+    if self.welcome then self.welcome:Hide() end
+    for i = 1, #self.bubbles do self.bubbles[i]:Hide() end
+    self.content:SetHeight(max(10, self:LayoutChooser()))
+    self.scroll:SetVerticalScroll(0)
+    return
+  end
+  if self.chooser then self.chooser:Hide() end
+
+  self.title:SetText(escape(current and current.title or ns.Chats.DEFAULT_TITLE))
+  self.deleteButton:SetShown(current ~= nil and #current.messages > 0)
+
+  local messages = current and current.messages or {}
+  local p = persona()
+  local y, n = 8, 0
+  if #messages == 0 then
+    y = y + self:ShowWelcome()
+  elseif self.welcome then
+    self.welcome:Hide()
+  end
+  for _, e in ipairs(messages) do
+    n = n + 1
+    y = y + self:PlaceBubble(n, y, "user", escape(e.question), stamp(e.t)) + 6
+    n = n + 1
+    if e.status == "pending" then
+      y = y + self:PlaceBubble(n, y, "pending", ns.Personas:ThinkingText(0), nil) + 12
+    elseif e.status == "done" then
+      local answer = e.answer
+      y = y + self:PlaceBubble(n, y, "ai", escape(answer), stamp(e.t),
+        function() UI:ShowCopy(answer) end, "Copiar") + 12
+    else
+      y = y + self:PlaceBubble(n, y, "error",
+        p.errorIntro .. "\n|cffffb0b0" .. escape(e.answer or "Algo salió mal.") .. "|r", stamp(e.t),
+        function() UI:Retry(e, current) end, "Reintentar") + 12
+    end
+  end
+  for i = n + 1, #self.bubbles do self.bubbles[i]:Hide() end
+  self.content:SetHeight(max(10, y))
+  C_Timer.After(0, function()
+    UI.scroll:SetVerticalScroll(UI.scroll:GetVerticalScrollRange())
+  end)
+end
+
+function UI:Retry(entry, chatData)
+  if ns.Core.working or ns.Uplink.busy then
+    self:SetStatus("Espera un momento: todavía estoy enviando otra pregunta.")
+    return
+  end
+  for i, m in ipairs(chatData.messages) do
+    if m == entry then table.remove(chatData.messages, i) break end
+  end
+  ns.Core:Ask(entry.question, nil, chatData.id)
+end
+
+-- Connection line under the chat title: how questions travel and whether the
+-- app is answering.
+function UI:RefreshStatusBar()
+  if not self.dot then return end
+  local waitingLong = false
+  ns.Chats:EachEntry(function(e)
+    if e.status == "pending" and time() - (e.t or time()) > 30 then waitingLong = true end
+  end)
+  local p = persona()
+  if waitingLong then
+    fill(self.dot, C.warn)
+    self.channel:SetText("Sin señal de la app compañera... ¿está abierta en tu PC?")
+  elseif ns.Voice and ns.Voice:Find() and not ns.Voice.broken then
+    fill(self.dot, C.ok)
+    self.channel:SetText(p.name .. " · " .. p.statusOnline .. " · envío invisible")
+  else
+    fill(self.dot, C.ok)
+    self.channel:SetText(p.name .. " · " .. p.statusOnline .. " · envío por línea en pantalla")
+  end
+end
+
+function UI:Refresh()
+  if not self.frame or not self.frame:IsShown() then return end
+  if self.side:IsShown() then self:RefreshList() end
+  self:RefreshConversation()
+  self:RefreshStatusBar()
+end
+
+function UI:Submit()
+  local q = self.input:GetText()
+  if q and q:match("%S") then
+    self.input:SetText("")
+    ns.Core:Ask(q)
+  end
+end
+
+function UI:SetStatus(msg)
+  self:Build()
+  self.status:SetText(msg or "")
+end
+
+function UI:Show()
+  self:Build()
+  self.frame:Show()
+end
+
+function UI:Toggle()
+  self:Build()
+  self.frame:SetShown(not self.frame:IsShown())
+end
+
+function UI:IsShown()
+  return self.frame and self.frame:IsShown()
+end
+
+-- Copyable text window (answers, character data), same dialog look.
+function UI:ShowCopy(text, heading)
+  if not self.copyFrame then
+    local f = newFrame("Frame", "AzerothIACopyFrame", UIParent)
+    f:SetSize(580, 420)
+    f:SetPoint("CENTER", 40, -30)
+    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:SetClampedToScreen(true)
+    dialog(f)
+    tinsert(UISpecialFrames, "AzerothIACopyFrame")
+    local banner = f:CreateTexture(nil, "ARTWORK")
+    banner:SetTexture(ART.banner)
+    banner:SetSize(360, 64)
+    banner:SetPoint("TOP", 0, 12)
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", banner, "TOP", 0, -14)
+    f.title = title
+    local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("TOPLEFT", 18, -30)
+    hint:SetText("Ctrl+C para copiar")
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -3, -3)
+    local inset = newFrame("Frame", nil, f)
+    inset:SetPoint("TOPLEFT", 12, -48)
+    inset:SetPoint("BOTTOMRIGHT", -12, 12)
+    panel(inset)
+    local scroll = CreateFrame("ScrollFrame", "AzerothIACopyScroll", inset, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 10, -10)
+    scroll:SetPoint("BOTTOMRIGHT", -30, 10)
+    local edit = CreateFrame("EditBox", nil, scroll)
+    edit:SetMultiLine(true)
+    edit:SetFontObject(ChatFontNormal)
+    edit:SetWidth(500)
+    edit:SetAutoFocus(false)
+    edit:SetScript("OnEscapePressed", function() f:Hide() end)
+    scroll:SetScrollChild(edit)
+    f.edit = edit
+    self.copyFrame = f
+  end
+  local f = self.copyFrame
+  f.title:SetText(heading or "Copiar respuesta")
+  f.edit:SetText(text or "")
+  f:Show()
+  f.edit:SetFocus()
+  f.edit:HighlightText()
+end
+
+-- The JSON the AI receives (also handy to paste into any AI chat).
+function UI:ShowContext()
+  local ok, snap = pcall(ns.Collect.Snapshot, ns.Collect)
+  local json = ok and ns.Json.Encode(snap) or ("Error: " .. tostring(snap))
+  self:ShowCopy(json, "Datos de tu personaje que recibe " .. persona().name)
+end

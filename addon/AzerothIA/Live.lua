@@ -1,0 +1,155 @@
+-- Companion -> game transport, without /reload.
+-- The installer creates SLOTS LoadOnDemand addons (AzerothIA_S01..). Each
+-- contains Inbox.lua, which the companion rewrites with the latest answers.
+-- LoadAddOn() reads the file from disk, so loading a not-yet-used slot
+-- delivers fresh data. Each slot can only be loaded once per UI session.
+--
+-- To know *when* to load a slot, the companion "rings" signal files
+-- sig/NNN.wav: an empty file cannot be played, a short silent WAV can.
+-- WoW only sees files that existed at startup, so all of them are created
+-- empty by the installer and only their content changes afterwards.
+local _, ns = ...
+
+local Live = {}
+ns.Live = Live
+
+Live.SLOTS = 50
+Live.SIGNALS = 500
+local TICK = 2
+local SIG_PATH = "Interface\\AddOns\\AzerothIA\\sig\\%03d.wav"
+local OK_PATH = "Interface\\AddOns\\AzerothIA\\sig\\ok.wav"
+-- Seconds after sending at which a slot is loaded anyway.
+local SCHEDULE_NO_SOUND = { 8, 20, 40, 75, 120, 240 } -- sound disabled: no signals
+local SCHEDULE_SAFETY = { 90, 240 }                   -- signals on: only as a safety net
+
+local LoadAddOn = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
+local IsAddOnLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+local EnableAddOn = (C_AddOns and C_AddOns.EnableAddOn) or EnableAddOn
+
+local function playable(path)
+  local ok, willPlay, handle = pcall(PlaySoundFile, path, "Master")
+  if ok and willPlay then
+    if handle and StopSound then StopSound(handle) end
+    return true
+  end
+  return false
+end
+
+local function slotName(i)
+  return string.format("AzerothIA_S%02d", i)
+end
+
+function Live:Init()
+  local db = ns.db
+  db.nextSig = db.nextSig or 1
+  self.failed = {}
+  self.soundOK = playable(OK_PATH)
+  -- Skip signals that were rung while we were offline / before a /reload.
+  if self.soundOK and not db.sigWait then
+    while db.nextSig <= self.SIGNALS and playable(SIG_PATH:format(db.nextSig)) do
+      db.nextSig = db.nextSig + 1
+    end
+  end
+  -- Pick up anything answered while we were away.
+  if ns.Core:HasPending() then self:LoadNextSlot() end
+  C_Timer.NewTicker(TICK, function() Live:Tick() end)
+end
+
+-- Fields every request carries so the companion knows which signal to ring.
+function Live:RequestFields()
+  local db = ns.db
+  if db.nextSig > self.SIGNALS then
+    -- All signal files used: ask the companion to empty them and start over.
+    db.nextSig = 1
+    db.sigWait = true
+    db.pendingReset = true
+  end
+  return db.nextSig, db.pendingReset or nil
+end
+
+function Live:OnSent()
+  self.sentAt = GetTime()
+  self.scheduleIndex = 1
+end
+
+function Live:OnAnswer()
+  ns.db.sigWait = nil
+  ns.db.pendingReset = nil
+end
+
+function Live:Tick()
+  if not ns.Core:HasPending() then return end
+  local db = ns.db
+  self.soundOK = playable(OK_PATH)
+  local useSignals = self.soundOK and not db.sigWait and db.nextSig <= self.SIGNALS
+
+  if useSignals and playable(SIG_PATH:format(db.nextSig)) then
+    db.nextSig = db.nextSig + 1
+    self:LoadNextSlot()
+    return
+  end
+
+  if self.sentAt then
+    local schedule = useSignals and SCHEDULE_SAFETY or SCHEDULE_NO_SOUND
+    local due = schedule[self.scheduleIndex]
+    if not due then due = schedule[#schedule] + 240 * (self.scheduleIndex - #schedule) end
+    if GetTime() - self.sentAt >= due then
+      self.scheduleIndex = self.scheduleIndex + 1
+      self:LoadNextSlot()
+    end
+  end
+end
+
+function Live:LoadNextSlot()
+  for i = 1, self.SLOTS do
+    local name = slotName(i)
+    if not IsAddOnLoaded(name) and not self.failed[name] then
+      _G.AzerothIA_Inbox = nil
+      local loaded, reason = LoadAddOn(name)
+      if not loaded and reason == "DISABLED" and EnableAddOn then
+        pcall(EnableAddOn, name)
+        loaded, reason = LoadAddOn(name)
+      end
+      if loaded then
+        self.usedSlots = i
+        ns.Core:ApplyInbox(_G.AzerothIA_Inbox)
+        return true
+      end
+      self.failed[name] = reason or "?"
+      if reason == "MISSING" then
+        ns.UI:SetStatus("|cffff6060Faltan los buzones del addon. Ejecuta 'npm run install-addon' y reinicia WoW.|r")
+        return false
+      end
+    end
+  end
+  ns.UI:SetStatus("|cffff6060Se acabaron los buzones de esta sesión. Escribe /reload para recibir más respuestas.|r")
+  return false
+end
+
+function Live:Status()
+  local db = ns.db
+  local s = string.format("versión %s · sonido=%s, señal siguiente=%d/%d, buzones usados=%d/%d",
+    (C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata or function() return "?" end)("AzerothIA", "Version") or "?",
+    self.soundOK and "sí" or "no", db.nextSig or 0, self.SIGNALS, self.usedSlots or 0, self.SLOTS)
+  local p = ns.Personas:Current()
+  s = s .. string.format(" · asistente: %s (retrato: %s)", p.name, ns.Personas.PortraitName(p))
+  s = s .. string.format(" · canal: %s (envío invisible %s)", ns.Core.lastChannel or "-",
+    ns.Voice:Find() and "instalada" or "no instalada")
+  local enc = ns.Core.lastEncode
+  if enc then
+    s = s .. (enc.failed and (" · preparación fallida: " .. enc.failed)
+      or string.format(" · preparación: recorte %d, %d bytes, datos %s ms + codificación %s ms en %s fotogramas",
+        enc.level, enc.bytes, tostring(enc.collectMs), tostring(enc.encodeMs), tostring(enc.frames)))
+  end
+  if ns.Uplink.textures then
+    s = s .. string.format(" · cuadritos creados: %d", #ns.Uplink.textures)
+  end
+  local ok, w, h = pcall(GetPhysicalScreenSize)
+  if ok and w then s = s .. string.format(" · pantalla %dx%d", w, h) end
+  local last = ns.Uplink.last
+  if last then
+    s = s .. string.format(" · último envío: %d bytes, %dx%d celdas, visible %s fotogramas",
+      last.bytes, last.cols, last.rows, tostring(last.shownFrames))
+  end
+  return s
+end
