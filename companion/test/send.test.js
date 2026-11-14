@@ -766,3 +766,82 @@ test('the "thinking" bubble is big enough for every phrase it cycles through', (
   assert.equal(pending, 'true');
   assert.ok(Number(worst) <= 0, `a phrase is ${worst} px taller than its box`);
 });
+
+test('a linked item goes in the context; the question keeps only its name; recipes are remembered', () => {
+  const out = runLua(`
+    START()
+    GetTradeSkillLine = function() return "Cocina", 40, 75 end
+    GetNumTradeSkills = function() return 1 end
+    GetTradeSkillInfo = function() return "Lobo asado", "medium", 0 end
+    ns.Core:RememberRecipes("trade")
+    local dump = ASK("Is |cff1eff00|Hitem:9999::::|h[Anillo del alba]|h|r better?")
+    RESULT = dump .. "#" .. ns.Chats:Current().messages[1].question
+  `, {}, FILES, FAKE_UI + PRELUDE_DRIVE);
+  const [dump, shownQuestion] = out.split('#');
+  const { req } = decodeDump(dump);
+  assert.equal(req.question, 'Is [Anillo del alba] better?');
+  assert.equal(shownQuestion, 'Is [Anillo del alba] better?');
+  assert.equal(req.context.linkedItems[0].name, 'Anillo del alba');
+  assert.equal(req.context.knownRecipes[0].profession, 'Cocina');
+  assert.equal(req.context.knownRecipes[0].recipes[0].difficulty, 'yellow');
+});
+
+test('a big vendor list is shortened so the question still fits the on-screen strip', () => {
+  const out = runLua(`
+    START()
+    GetMerchantNumItems = function() return 60 end
+    GetMerchantItemInfo = function(i) return "Espada larga de mercader número " .. i, 0, 1000 + i, 1, -1, true, true, false end
+    GetMerchantItemLink = function() return nil end
+    ns.Collect.open.merchant = true
+    RESULT = ASK("¿Qué le compro?")
+  `, {}, FILES, FAKE_UI + PRELUDE_DRIVE);
+  const { req } = decodeDump(out);
+  const items = req.context.screen.merchant.items;
+  assert.ok(items.length >= 1 && items.length <= 60, `${items.length} vendor items`);
+  assert.equal(items[0].name, 'Espada larga de mercader número 1');
+  assert.equal(req.question, '¿Qué le compro?');
+});
+
+test('links in the question bubble keep their color and open the item like in the chat', () => {
+  const out = runLua(`
+    START()
+    ns.Personas:Set("fizzi")
+    ns.UI:Show()
+    local REFS = {}
+    SetItemRef = function(link, text, button) REFS[#REFS + 1] = link .. "/" .. button end
+    ASK("Is |cnIQ3:|Hitem:9999::::|h[Anillo del alba]|h|r better than |cff1eff00|Hitem:3000|h[Arco]|h|r? 50|50")
+    ns.UI:Refresh()
+    local b = ns.UI.bubbles[1]
+    b.box.scripts.OnHyperlinkClick(b.box, "item:9999::::", "[Anillo del alba]", "LeftButton")
+    RESULT = b.text.textValue .. "#" .. ns.Chats:Current().messages[1].question .. "#" .. table.concat(REFS, ",")
+  `, {}, ALL_FILES, RECORD_TEXT + PRELUDE_DRIVE);
+  const [bubble, question, refs] = out.split('#');
+  assert.equal(bubble, 'Is |cnIQ3:|Hitem:9999::::|h[Anillo del alba]|h|r better than |cff1eff00|Hitem:3000|h[Arco]|h|r? 50||50',
+    'links stay working, any other "|" is shown literally');
+  assert.equal(question, 'Is [Anillo del alba] better than [Arco]? 50|50', 'the AI and the chat list get plain text');
+  assert.equal(refs, 'item:9999::::/LeftButton', 'clicking opens it like a chat link');
+});
+
+test('items in the AI answer become links only when the id really is that item', () => {
+  const items = `
+    C_Item = {
+      GetItemInfo = function(id)
+        if id == 9999 then return "Anillo del alba", "|cff0070dd|Hitem:9999::::|h[Anillo del alba]|h|r" end
+        if id == 1234 then return "Espada de bronce", "|cffffffff|Hitem:1234::::|h[Espada de bronce]|h|r" end
+        return nil
+      end,
+      RequestLoadItemDataByID = function(id) REQUESTED = id end,
+    }
+  `;
+  const out = runLua(`
+    local answer = "Usa {{item:9999|anillo del alba}}, no {{item:1234|Hacha}}, y {{item:5555|Capa}}. 5|5"
+    RESULT = ns.UI.RenderAnswer(answer) .. "#" .. tostring(ns.UI.waitingItems) .. "#" .. tostring(REQUESTED)
+      .. "#" .. ns.UI.PlainAnswer(answer)
+  `, {}, ALL_FILES, items + RECORD_TEXT + PRELUDE_DRIVE);
+  const [shown, waiting, requested, plain] = out.split('#');
+  assert.equal(shown, 'Usa |cff0070dd|Hitem:9999::::|h[Anillo del alba]|h|r, no Hacha, y Capa. 5||5',
+    'right id: a link; wrong id or not loaded yet: just the name; other "|" shown literally');
+  assert.equal(waiting, 'true', 'refreshes once the game loads the missing item');
+  assert.equal(requested, '5555');
+  assert.equal(plain, 'Usa [anillo del alba], no [Hacha], y [Capa]. 5|5');
+});

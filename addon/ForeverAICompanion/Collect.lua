@@ -66,6 +66,7 @@ end
 local function clean(s)
   if type(s) ~= "string" then return s end
   s = s:gsub("|c%x%x%x%x%x%x%x%x", "")
+  s = s:gsub("|cn[%w_]*:", "") -- newer clients color by name: "|cnIQ1:" = item quality 1
   s = s:gsub("|r", "")
   s = s:gsub("|T.-|t", "")
   s = s:gsub("|A.-|a", "")
@@ -124,6 +125,53 @@ local function describeItem(link, full)
   if reqLevel and reqLevel > 1 then item.reqLevel = reqLevel end
   if full and equippable then item.stats = itemStats(link) end
   return item
+end
+Collect.DescribeItem = describeItem
+
+-- Gear slots (names as in "gear") an equippable item would go in.
+local SLOTS_FOR = {
+  INVTYPE_HEAD = { "head" }, INVTYPE_NECK = { "neck" }, INVTYPE_SHOULDER = { "shoulder" },
+  INVTYPE_CLOAK = { "back" }, INVTYPE_CHEST = { "chest" }, INVTYPE_ROBE = { "chest" },
+  INVTYPE_WRIST = { "wrist" }, INVTYPE_HAND = { "hands" }, INVTYPE_WAIST = { "waist" },
+  INVTYPE_LEGS = { "legs" }, INVTYPE_FEET = { "feet" }, INVTYPE_FINGER = { "finger1", "finger2" },
+  INVTYPE_TRINKET = { "trinket1", "trinket2" }, INVTYPE_WEAPON = { "mainHand", "offHand" },
+  INVTYPE_2HWEAPON = { "mainHand", "offHand" }, INVTYPE_WEAPONMAINHAND = { "mainHand" },
+  INVTYPE_WEAPONOFFHAND = { "offHand" }, INVTYPE_SHIELD = { "offHand" }, INVTYPE_HOLDABLE = { "offHand" },
+  INVTYPE_RANGED = { "ranged" }, INVTYPE_RANGEDRIGHT = { "ranged" }, INVTYPE_THROWN = { "ranged" },
+  INVTYPE_RELIC = { "ranged" },
+}
+
+-- An item with everything needed to judge it: stats, and for gear the slots
+-- it would replace (to compare with "gear").
+local function fullItem(link)
+  local item = describeItem(link, true)
+  item.slots = item.equipSlot and SLOTS_FOR[item.equipSlot]
+  return item
+end
+
+-- Links the player put in the question (shift-click on an item, spell,
+-- quest...). Items come with their stats and the gear slots they would
+-- replace; anything else just with its kind and name.
+local MAX_LINKS = 5
+function Collect:Links(text)
+  if type(text) ~= "string" then return nil end
+  local out, seen = {}, {}
+  for data, shown in text:gmatch("|H(.-)|h(.-)|h") do
+    if #out >= MAX_LINKS then break end
+    local kind = data:match("^(%a+):")
+    local name = clean(shown):gsub("^%[", ""):gsub("%]$", "")
+    if kind and not seen[data] then
+      seen[data] = true
+      if kind == "item" then
+        local item = safe(fullItem, data) or {}
+        item.name = item.name or name
+        out[#out + 1] = item
+      else
+        out[#out + 1] = { kind = kind, name = name, id = tonumber(data:match("^%a+:(%d+)")) }
+      end
+    end
+  end
+  return #out > 0 and out or nil
 end
 
 -- Character -----------------------------------------------------------------
@@ -847,6 +895,311 @@ local function client()
 end
 
 
+-- Windows open on screen ---------------------------------------------------------
+-- What the player is looking at while asking: a quest being offered or turned
+-- in, an NPC's dialogue, a vendor, a trainer, the loot window. Only sent while
+-- that window is open, so it costs nothing the rest of the time.
+
+local open = {} -- window -> true, from the game's open/close events
+local OPEN_EVENTS = {
+  MERCHANT_SHOW = { "merchant", true }, MERCHANT_CLOSED = { "merchant", false },
+  TRAINER_SHOW = { "trainer", true }, TRAINER_CLOSED = { "trainer", false },
+  GOSSIP_SHOW = { "gossip", true }, GOSSIP_CLOSED = { "gossip", false },
+  LOOT_OPENED = { "loot", true }, LOOT_CLOSED = { "loot", false },
+  QUEST_GREETING = { "quest", "greeting" }, QUEST_DETAIL = { "quest", "detail" },
+  QUEST_PROGRESS = { "quest", "progress" }, QUEST_COMPLETE = { "quest", "complete" },
+  QUEST_FINISHED = { "quest", false },
+}
+Collect.open = open
+local openWatcher = CreateFrame and CreateFrame("Frame")
+if openWatcher then
+  for e in pairs(OPEN_EVENTS) do pcall(openWatcher.RegisterEvent, openWatcher, e) end
+  openWatcher:SetScript("OnEvent", function(_, event)
+    local w = OPEN_EVENTS[event]
+    if w then open[w[1]] = w[2] or nil end
+  end)
+end
+
+-- The window may have been closed without its event (e.g. a /reload).
+local function shown(frameName)
+  local f = _G[frameName]
+  return not f or not f.IsShown or f:IsShown()
+end
+
+local MAX_TEXT = 700
+local function text(s)
+  s = clean(s)
+  if type(s) ~= "string" or s == "" then return nil end
+  return #s > MAX_TEXT and (s:sub(1, MAX_TEXT) .. "...") or s
+end
+
+-- Rewards shown in the quest window ("reward" items, "choice" items to pick one).
+local function questWindowRewards()
+  local r = {}
+  put(r, "xp", function() local xp = num(GetRewardXP()); return xp and xp > 0 and xp or nil end)
+  put(r, "money", function() local m = num(GetRewardMoney()); return m and m > 0 and money(m) or nil end)
+  local function items(kind, count)
+    local list = {}
+    for i = 1, math.min(num(count) or 0, 10) do
+      local link = GetQuestItemLink(kind, i)
+      local _, _, n = GetQuestItemInfo(kind, i)
+      local item = link and safe(fullItem, link) or { name = (GetQuestItemInfo(kind, i)) }
+      if n and n > 1 then item.count = n end
+      list[#list + 1] = item
+    end
+    return #list > 0 and list or nil
+  end
+  put(r, "items", function() return items("reward", GetNumQuestRewards()) end)
+  put(r, "choices", function() return items("choice", GetNumQuestChoices()) end)
+  return next(r) and r or nil
+end
+
+local function questWindow()
+  local state = open.quest
+  if not state or not shown("QuestFrame") then return nil end
+  local q = { npc = safe(UnitName, "npc") }
+  if state == "greeting" then
+    local available, active = {}, {}
+    for i = 1, num(GetNumAvailableQuests and GetNumAvailableQuests()) or 0 do available[#available + 1] = GetAvailableTitle(i) end
+    for i = 1, num(GetNumActiveQuests and GetNumActiveQuests()) or 0 do active[#active + 1] = GetActiveTitle(i) end
+    q.availableQuests = #available > 0 and available or nil
+    q.activeQuests = #active > 0 and active or nil
+    return { questGreeting = q }
+  end
+  put(q, "title", function() return clean(GetTitleText()) end)
+  put(q, "questId", function() local id = num(GetQuestID()); return id and id > 0 and id or nil end)
+  if state == "detail" then
+    put(q, "text", function() return text(GetQuestText()) end)
+    put(q, "objectives", function() return text(GetObjectiveText()) end)
+    q.rewards = questWindowRewards()
+    return { questOffer = q }
+  elseif state == "progress" then
+    put(q, "text", function() return text(GetProgressText()) end)
+    put(q, "canComplete", function() return IsQuestCompletable() and true or false end)
+    local needed = {}
+    for i = 1, num(GetNumQuestItems and GetNumQuestItems()) or 0 do
+      local name, _, count = GetQuestItemInfo("required", i)
+      if name then needed[#needed + 1] = { name = name, count = count } end
+    end
+    q.requiredItems = #needed > 0 and needed or nil
+    return { questProgress = q }
+  elseif state == "complete" then
+    put(q, "text", function() return text(GetRewardText()) end)
+    q.rewards = questWindowRewards()
+    return { questReward = q }
+  end
+end
+
+local function gossipWindow()
+  if not open.gossip or not shown("GossipFrame") or not C_GossipInfo then return nil end
+  local g = { npc = safe(UnitName, "npc") }
+  put(g, "text", function() return text(C_GossipInfo.GetText()) end)
+  put(g, "options", function()
+    local list = {}
+    for _, o in ipairs(C_GossipInfo.GetOptions() or {}) do list[#list + 1] = clean(o.name) end
+    return #list > 0 and list or nil
+  end)
+  put(g, "availableQuests", function()
+    local list = {}
+    for _, q in ipairs(C_GossipInfo.GetAvailableQuests() or {}) do
+      list[#list + 1] = { title = q.title, level = q.questLevel, trivial = q.isTrivial or nil }
+    end
+    return #list > 0 and list or nil
+  end)
+  put(g, "activeQuests", function()
+    local list = {}
+    for _, q in ipairs(C_GossipInfo.GetActiveQuests() or {}) do
+      list[#list + 1] = { title = q.title, complete = q.isComplete or nil }
+    end
+    return #list > 0 and list or nil
+  end)
+  return g
+end
+
+local MAX_MERCHANT = 60
+local function merchantWindow()
+  if not open.merchant or not shown("MerchantFrame") then return nil end
+  local m = { npc = safe(UnitName, "npc"), items = {} }
+  for i = 1, math.min(num(GetMerchantNumItems()) or 0, MAX_MERCHANT) do
+    local name, price, stack, available, usable, extended
+    if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
+      local info = C_MerchantFrame.GetItemInfo(i)
+      if info then
+        name, price, stack, available, usable, extended =
+          info.name, info.price, info.stackCount, info.numAvailable, info.isUsable, info.hasExtendedCost
+      end
+    else
+      local _
+      name, _, price, stack, available, _, usable, extended = GetMerchantItemInfo(i)
+    end
+    local link = GetMerchantItemLink(i)
+    local item = link and safe(fullItem, link) or { name = name }
+    if name or item.name then
+      item.price = (num(price) and price > 0) and money(price) or nil
+      if extended then item.otherCost = true end
+      if num(stack) and stack > 1 then item.stack = stack end
+      if num(available) and available >= 0 then item.limited = available end
+      if usable == false then item.usable = false end
+      m.items[#m.items + 1] = item
+    end
+  end
+  put(m, "canRepair", function() return CanMerchantRepair() and true or nil end)
+  if m.canRepair then
+    put(m, "repairAllCost", function() local c = num(GetRepairAllCost()); return c and c > 0 and money(c) or nil end)
+  end
+  return m
+end
+
+local MAX_TRAINER = 80
+local function trainerWindow()
+  if not open.trainer or not GetNumTrainerServices then return nil end
+  local t = { npc = safe(UnitName, "npc"), services = {} }
+  for i = 1, num(GetNumTrainerServices()) or 0 do
+    local name, sub, status = GetTrainerServiceInfo(i)
+    if name and (status == "available" or status == "unavailable") then
+      local s = { name = name, rank = (sub ~= "" and sub) or nil, status = status }
+      put(s, "cost", function() return money(num(GetTrainerServiceCost(i))) end)
+      put(s, "level", function() local l = num(GetTrainerServiceLevelReq(i)); return l and l > 1 and l or nil end)
+      put(s, "needsSkill", function()
+        local skill, rank, has = GetTrainerServiceSkillReq(i)
+        return (skill and not has) and (skill .. " " .. tostring(rank)) or nil
+      end)
+      t.services[#t.services + 1] = s
+      if #t.services >= MAX_TRAINER then break end
+    end
+  end
+  return t
+end
+
+local function lootWindow()
+  if not open.loot or not GetNumLootItems then return nil end
+  local list = {}
+  for i = 1, math.min(num(GetNumLootItems()) or 0, 20) do
+    local link = GetLootSlotLink(i)
+    local _, name, count = GetLootSlotInfo(i)
+    local item = link and safe(fullItem, link) or { name = name }
+    if num(count) and count > 1 then item.count = count end
+    if item.name then list[#list + 1] = item end
+  end
+  return #list > 0 and list or nil
+end
+
+local function screen()
+  local s = {}
+  local quest = safe(questWindow)
+  if quest then for k, v in pairs(quest) do s[k] = v end end
+  s.gossip = safe(gossipWindow)
+  s.merchant = safe(merchantWindow)
+  s.trainer = safe(trainerWindow)
+  s.loot = safe(lootWindow)
+  return next(s) and s or nil
+end
+
+-- Recipes ------------------------------------------------------------------------
+-- The game only lists a profession's recipes while its window is open, so they
+-- are read then and remembered (Core:RememberRecipes), like the bank.
+
+-- Chance to skill up, from the color the game shows.
+local DIFFICULTY = { optimal = "orange", medium = "yellow", easy = "green", trivial = "grey" }
+local MAX_RECIPES = 250
+Collect.DIFFICULTY = DIFFICULTY
+
+local function reagentText(parts)
+  return #parts > 0 and table.concat(parts, ", ") or nil
+end
+
+-- Classic-style window (GetTradeSkillInfo).
+local function classicRecipes()
+  local profession, rank, max = GetTradeSkillLine()
+  if not profession or profession == "UNKNOWN" then return nil end
+  local list = {}
+  for i = 1, num(GetNumTradeSkills()) or 0 do
+    local name, kind, available = GetTradeSkillInfo(i)
+    if name and kind ~= "header" and kind ~= "subheader" then
+      local r = { name = name, difficulty = DIFFICULTY[kind] or kind }
+      if num(available) and available > 0 then r.canMake = available end
+      if kind ~= "trivial" and GetTradeSkillNumReagents then
+        local parts = {}
+        for j = 1, num(GetTradeSkillNumReagents(i)) or 0 do
+          local reagent, _, need = GetTradeSkillReagentInfo(i, j)
+          if reagent then parts[#parts + 1] = (need or 1) .. "x " .. reagent end
+        end
+        r.reagents = reagentText(parts)
+      end
+      list[#list + 1] = r
+      if #list >= MAX_RECIPES then break end
+    end
+  end
+  return { profession = profession, rank = num(rank), max = num(max), recipes = list }
+end
+
+-- Classic enchanting-style window (GetCraftInfo).
+local function classicCrafts()
+  if not GetCraftDisplaySkillLine then return nil end
+  local profession, rank, max = GetCraftDisplaySkillLine()
+  if not profession then return nil end -- e.g. the hunter's beast training
+  local list = {}
+  for i = 1, num(GetNumCrafts()) or 0 do
+    local name, _, kind, available = GetCraftInfo(i)
+    if name and kind ~= "header" then
+      local r = { name = name, difficulty = DIFFICULTY[kind] or kind }
+      if num(available) and available > 0 then r.canMake = available end
+      if kind ~= "trivial" and GetCraftNumReagents then
+        local parts = {}
+        for j = 1, num(GetCraftNumReagents(i)) or 0 do
+          local reagent, _, need = GetCraftReagentInfo(i, j)
+          if reagent then parts[#parts + 1] = (need or 1) .. "x " .. reagent end
+        end
+        r.reagents = reagentText(parts)
+      end
+      list[#list + 1] = r
+      if #list >= MAX_RECIPES then break end
+    end
+  end
+  return { profession = profession, rank = num(rank), max = num(max), recipes = list }
+end
+
+-- Modern window (C_TradeSkillUI).
+local MODERN_DIFFICULTY = { [0] = "orange", "yellow", "green", "grey" }
+local function modernRecipes()
+  local T = C_TradeSkillUI
+  local info = (T.GetChildProfessionInfo and T.GetChildProfessionInfo()) or (T.GetBaseProfessionInfo and T.GetBaseProfessionInfo())
+  local profession = info and (info.professionName or info.parentProfessionName)
+  if not profession or profession == "" then return nil end
+  local list = {}
+  for _, id in ipairs(T.GetAllRecipeIDs() or {}) do
+    local r = T.GetRecipeInfo(id)
+    if r and r.learned and r.name then
+      local entry = { name = r.name, difficulty = MODERN_DIFFICULTY[r.relativeDifficulty] }
+      if num(r.numAvailable) and r.numAvailable > 0 then entry.canMake = r.numAvailable end
+      if entry.difficulty ~= "grey" and T.GetRecipeSchematic then
+        local parts = {}
+        local schematic = safe(T.GetRecipeSchematic, id, false)
+        for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
+          local reagent = slot.reagents and slot.reagents[1]
+          local itemName = reagent and reagent.itemID and GetItemInfo(reagent.itemID)
+          if itemName then parts[#parts + 1] = (slot.quantityRequired or 1) .. "x " .. itemName end
+        end
+        entry.reagents = reagentText(parts)
+      end
+      list[#list + 1] = entry
+      if #list >= MAX_RECIPES then break end
+    end
+  end
+  return { profession = profession, rank = num(info.skillLevel), max = num(info.maxSkillLevel), recipes = list }
+end
+
+-- The profession whose window is open: { profession, rank, max, recipes }.
+-- kind: "craft" for the classic enchanting-style window.
+function Collect:Recipes(kind)
+  if kind == "craft" then return safe(classicCrafts) end
+  if C_TradeSkillUI and C_TradeSkillUI.GetAllRecipeIDs then
+    local modern = safe(modernRecipes)
+    if modern and #modern.recipes > 0 then return modern end
+  end
+  if GetTradeSkillLine and GetNumTradeSkills then return safe(classicRecipes) end
+end
+
 -- Data the addon remembers between sessions (bank, flight paths, quests turned in).
 local function remembered()
   local out = {}
@@ -862,6 +1215,12 @@ local function remembered()
     out.knownFlightPaths = names
   end
   if data.turnedIn and #data.turnedIn > 0 then out.recentlyCompletedQuests = data.turnedIn end
+  if data.recipes and next(data.recipes) then
+    local list = {}
+    for _, p in pairs(data.recipes) do list[#list + 1] = p end
+    table.sort(list, function(a, b) return tostring(a.profession) < tostring(b.profession) end)
+    out.knownRecipes = list
+  end
   return out
 end
 
@@ -904,6 +1263,7 @@ local SECTIONS = {
   { "pet", one("pet", pet) },
   { "group", one("group", group) },
   { "target", one("target", target) },
+  { "screen", one("screen", screen) },
   { "remembered", remembered },
 }
 

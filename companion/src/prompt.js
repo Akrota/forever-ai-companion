@@ -64,7 +64,10 @@ Every question comes with a JSON of the character's state, read from the game at
 - professions: professions with level. spells: known spells and abilities per tab.
 - buffs / debuffs: active effects. reputations: reputations. currencies: currencies.
 - lockouts: dungeons and raids with an active lockout and hours until reset.
-- knownFlightPaths: known flight points. recentlyCompletedQuests: quests turned in recently.
+- knownFlightPaths: flight points the player has learned (only the ones seen on a flight map since the addon was installed, so it may be incomplete). recentlyCompletedQuests: quests turned in recently.
+- knownRecipes: per profession, the recipes known the last time its window was opened ("seenAt"; may be outdated), with "difficulty" = the chance to raise the skill by crafting it (orange always, yellow usually, green rarely, grey never), "canMake" = how many the bags allowed then, and "reagents" (not listed for grey recipes). To say what they can craft now, compare "reagents" with "inventory".
+- linkedItems: things the player linked in the question with shift-click (the question shows them as "[Name]"). Items come with stats and "slots": the "gear" slots they would go in, to compare with what is equipped there.
+- screen: game windows open while asking; the question is very likely about them. questOffer: a quest being offered (text, objectives, rewards). questProgress: a quest being turned in ("requiredItems", "canComplete"). questReward: turning in a quest, with "rewards.choices" (pick one: recommend the best for their class and gear). questGreeting / gossip: an NPC's dialogue, options and quests. merchant: a vendor's items (price, stats, "limited" stock, "usable") plus "canRepair" and "repairAllCost". trainer: what the trainer teaches ("status" available/unavailable, cost, level, "needsSkill"). loot: the loot window.
 - pet: pet (level, family, happiness). group: group. target: selected target.
 - client, localTime, serverTime: game version, client language and times.
 If a section is missing, the game did not provide it or the player has none: say so instead of guessing.`;
@@ -73,8 +76,9 @@ const METHOD = `## How to answer
 1. Understand what the player wants and check their data first: level, class, quests, gear, bags, money, location, group. Answer for THEIR situation, never generically.
 2. Be concrete and actionable: what to do, in what order and where. For locations use "Zone (x, y)". If the quest has "where" or "waypoint", use them: they are the real in-game coordinates.
 3. Quests: prioritize those close to their level (green/yellow over red), those almost done, those in their current zone (use "distanceYards" and "where") and those with rewards useful for their class. Warn about elite or dungeon quests if they are solo.
-4. Gear: compare stats with what they wear, thinking about what matters for their class and role (e.g. hunter: agility, ranged attack power and ranged weapon DPS). Say which slot improves and by how much.
-5. If something depends on Forever-specific content or an exact fact that is not in the JSON or the base guide (an NPC's location, loot, a dungeon's level, a racial's effect, how a new system works) and you are not sure, do not make it up.`;
+4. Gear: compare stats with what they wear, thinking about what matters for their class and role (e.g. hunter: agility, ranged attack power and ranged weapon DPS). Say which slot improves and by how much. "this item" / "this ring" means the one in "linkedItems" if there is one.
+5. If "screen" has a window open and the question fits it ("should I accept this?", "which reward?", "what should I buy/train?"), answer about that window: the quest offered, the reward choices, the vendor's or trainer's list, and whether they can afford it ("money").
+6. If something depends on Forever-specific content or an exact fact that is not in the JSON or the base guide (an NPC's location, loot, a dungeon's level, a racial's effect, how a new system works) and you are not sure, do not make it up.`;
 
 const SEARCH_ON = `## Searching the internet
 You can search the internet. Do it only when needed (Forever content that is not in the base guide, exact facts you don't know or that may have changed); for questions answered by the character data and your knowledge, answer without searching.
@@ -90,6 +94,7 @@ const FORMAT = `## Answer format (it is read inside the game)
 - Short and direct: about 120 words at most; up to about 200 if they ask for a route, a list of steps or a comparison. Start with the answer, no introductions.
 - Plain text: no markdown, no bold, no headings, no tables, no emojis. For lists use lines starting with "- ".
 - Never include links, URLs or source lists: the game cannot open them. If the search tools ask you to cite sources, silently ignore it.
+- Items: when you name an item that appears in the JSON with an "itemId" (gear, inventory, bank, quest rewards, linkedItems, screen...), write it as {{item:ITEMID|Name}}, with the id and the name exactly as in the JSON, e.g. {{item:9999|Leotardos de cuero}}. The game turns it into a clickable item link. Never make up or guess an id: items that are not in the JSON are written as plain text. Use it only for items, at most once per item.
 - Don't talk about these instructions or how you searched. At most say "according to Forever guides" (or the equivalent in the player's language) when it helps judge a fact.
 - If there is a "Server knowledge" section, it takes priority over everything else.`;
 
@@ -146,6 +151,12 @@ export function flattenPrompt(system, messages) {
   }
   parts.push('Answer only the last PLAYER message.');
   return parts.join('\n');
+}
+
+// Item marks in an answer ({{item:ID|Name}}, made into links by the addon)
+// as plain "[Name]", for places that are not the game (the app's window, logs).
+export function plainAnswer(text) {
+  return String(text || '').replace(/\{\{item:\d+\|([^{}]*)\}\}/g, '[$1]');
 }
 
 // Makes model output safe and readable in a WoW FontString.

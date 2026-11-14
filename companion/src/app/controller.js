@@ -11,7 +11,7 @@ import {
   uninstall as uninstallAddon,
 } from '../install.js';
 import { knowledgeReadme, sampleContext } from '../assets.js';
-import { buildMessages, buildSystem, cleanAnswer, loadKnowledge } from '../prompt.js';
+import { buildMessages, buildSystem, cleanAnswer, loadKnowledge, plainAnswer } from '../prompt.js';
 import { ask, canSearch } from '../providers.js';
 import { startWatcher } from '../watcher.js';
 import { authStatus, findClaudeCode, openInstall, openLogin } from '../claude-code.js';
@@ -29,7 +29,7 @@ import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { currentGuide, guideFreshness, startGuideUpdates } from '../guide.js';
 import { createUpdater } from '../updater.js';
 
-export const VERSION = '1.8.0';
+export const VERSION = '1.9.0';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
 const voiceDll = () => path.join(sys.isPackaged() ? sys.installDir() : env.dataDir, ENGINE_DLL);
@@ -357,7 +357,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
       const started = Date.now();
       const system = buildSystem(loadKnowledge(), 'fizzi', { canSearch: canSearch(cfg), client: req.context?.client, ...(guide ? { guide } : {}) });
       const { text, model } = await ask(cfg, system, buildMessages(req), req);
-      return { text: cleanAnswer(text), model, seconds: ((Date.now() - started) / 1000).toFixed(1) };
+      return { text: plainAnswer(cleanAnswer(text)), model, seconds: ((Date.now() - started) / 1000).toFixed(1) };
     },
 
     async voiceStatus() {

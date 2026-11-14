@@ -91,6 +91,92 @@ local function escape(s)
   return (tostring(s or ""):gsub("|", "||"))
 end
 
+-- The player's question with its links working (colored, hover and click as
+-- in the chat); everything else escaped like escape().
+local function withLinks(s)
+  s = tostring(s or "")
+  local out, pos = {}, 1
+  while true do
+    local a, b, data, shown = s:find("|H(.-)|h(.-)|h", pos)
+    if not a then break end
+    local before = s:sub(pos, a - 1)
+    -- The link's color code sits right before it: "|cffRRGGBB" or, on newer
+    -- clients, "|cnIQ1:" (the color of item quality 1).
+    local color = before:match("|c%x%x%x%x%x%x%x%x$") or before:match("|cn[%w_]*:$") or ""
+    before = before:sub(1, #before - #color)
+    local after = b + 1
+    if s:sub(after, after + 1) == "|r" then after = after + 2 end
+    out[#out + 1] = escape(before)
+    out[#out + 1] = color .. "|H" .. data .. "|h" .. shown:gsub("|", "") .. "|h" .. (color ~= "" and "|r" or "")
+    pos = after
+  end
+  out[#out + 1] = escape(s:sub(pos))
+  return table.concat(out)
+end
+UI.WithLinks = withLinks
+
+-- Items in the AI's answers: it writes {{item:ID|Name}} for items it saw in
+-- the character data, and they become real item links (color, tooltip, click).
+-- The id must really be that item (same name in the game), so a mistaken id
+-- never shows the wrong item: then, or while the game hasn't loaded the item
+-- yet, just the name is shown.
+local ITEM_TOKEN = "{{item:(%d+)|(.-)}}"
+local GetItemInfoFn = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+
+local function sameName(a, b)
+  local function norm(s) return (tostring(s or ""):lower():gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")) end
+  return norm(a) == norm(b)
+end
+
+-- link, false (that id is another item) or nil (not loaded yet: asked for it).
+local function answerItemLink(id, name)
+  if not GetItemInfoFn then return false end
+  local ok, realName, link = pcall(GetItemInfoFn, tonumber(id))
+  if not ok then return false end
+  if not realName then
+    if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, tonumber(id)) end
+    UI.waitingItems = true
+    return nil
+  end
+  return sameName(realName, name) and link or false
+end
+
+-- The answer as shown in its bubble: item links working, the rest escaped.
+local function renderAnswer(s)
+  s = tostring(s or "")
+  local out, pos = {}, 1
+  while true do
+    local a, b, id, name = s:find(ITEM_TOKEN, pos)
+    if not a then break end
+    out[#out + 1] = escape(s:sub(pos, a - 1))
+    out[#out + 1] = answerItemLink(id, name) or escape(name)
+    pos = b + 1
+  end
+  out[#out + 1] = escape(s:sub(pos))
+  return table.concat(out)
+end
+UI.RenderAnswer = renderAnswer
+
+-- The answer as plain text (copy window, notifications): "[Name]" for items.
+function UI.PlainAnswer(s)
+  return (tostring(s or ""):gsub(ITEM_TOKEN, "[%2]"))
+end
+
+-- Items the game was still loading: show them as links once they arrive.
+local itemWatcher = CreateFrame and CreateFrame("Frame")
+if itemWatcher then
+  pcall(itemWatcher.RegisterEvent, itemWatcher, "GET_ITEM_INFO_RECEIVED")
+  itemWatcher:SetScript("OnEvent", function()
+    if not UI.waitingItems or UI.itemRefreshQueued then return end
+    UI.itemRefreshQueued = true
+    C_Timer.After(0.3, function()
+      UI.itemRefreshQueued = nil
+      UI.waitingItems = nil
+      if UI:IsShown() then UI:RefreshConversation() end
+    end)
+  end)
+end
+
 local function fill(region, color)
   region:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
   painted[region] = color
@@ -469,7 +555,16 @@ function UI:Build()
   input:SetHeight(28)
   input:SetFontObject(UI.fonts.Body)
   input:SetAutoFocus(false)
-  input:SetMaxLetters(500)
+  input:SetMaxLetters(1000) -- room for a few item links (each is ~100 characters)
+  -- Shift-click on an item (bags, gear, a vendor, a quest reward...) while
+  -- typing puts its link in the question, as in the chat box.
+  local function insertLink(link)
+    if type(link) == "string" and input:HasFocus() then input:Insert(link) end
+  end
+  if hooksecurefunc then
+    if ChatEdit_InsertLink then pcall(hooksecurefunc, "ChatEdit_InsertLink", insertLink) end
+    if ChatFrameUtil and ChatFrameUtil.InsertLink then pcall(hooksecurefunc, ChatFrameUtil, "InsertLink", insertLink) end
+  end
   local placeholder = input:CreateFontString(nil, "OVERLAY", "GameFontDisable")
   placeholder:SetPoint("LEFT", 2, 0)
   self.placeholder = placeholder
@@ -742,6 +837,20 @@ function UI:Bubble(i)
   b.meta = meta
   local box = newFrame("Frame", nil, b)
   b.box = box
+  -- Links in the player's questions work as in the chat: hover shows the
+  -- item's tooltip, click opens it (shift-click pastes it, ctrl-click previews).
+  if box.SetHyperlinksEnabled then
+    pcall(box.SetHyperlinksEnabled, box, true)
+    box:SetScript("OnHyperlinkClick", function(self, link, linkText, button)
+      if SetItemRef then pcall(SetItemRef, link, linkText, button, self) end
+    end)
+    box:SetScript("OnHyperlinkEnter", function(self, link)
+      if not GameTooltip then return end
+      GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+      if pcall(GameTooltip.SetHyperlink, GameTooltip, link) then GameTooltip:Show() else GameTooltip:Hide() end
+    end)
+    box:SetScript("OnHyperlinkLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+  end
   local text = box:CreateFontString(nil, "OVERLAY")
   text:SetJustifyH("LEFT")
   text:SetJustifyV("TOP")
@@ -1052,14 +1161,14 @@ function UI:RefreshConversation()
   end
   for _, e in ipairs(messages) do
     n = n + 1
-    y = y + self:PlaceBubble(n, y, "user", escape(e.question), stamp(e.t)) + 6
+    y = y + self:PlaceBubble(n, y, "user", e.shown and withLinks(e.shown) or escape(e.question), stamp(e.t)) + 6
     n = n + 1
     if e.status == "pending" then
       y = y + self:PlaceBubble(n, y, "pending", ns.Personas:ThinkingText(0), nil) + 12
     elseif e.status == "done" then
       local answer = e.answer
-      y = y + self:PlaceBubble(n, y, "ai", escape(answer), stamp(e.t),
-        function() UI:ShowCopy(answer) end, L.COPY) + 12
+      y = y + self:PlaceBubble(n, y, "ai", renderAnswer(answer), stamp(e.t),
+        function() UI:ShowCopy(UI.PlainAnswer(answer)) end, L.COPY) + 12
     else
       y = y + self:PlaceBubble(n, y, "error",
         p.errorIntro .. "\n|cffffb0b0" .. escape(e.answer or L.SOMETHING_WRONG) .. "|r", stamp(e.t),
@@ -1081,7 +1190,7 @@ function UI:Retry(entry, chatData)
   for i, m in ipairs(chatData.messages) do
     if m == entry then table.remove(chatData.messages, i) break end
   end
-  ns.Core:Ask(entry.question, nil, chatData.id)
+  ns.Core:Ask(entry.shown or entry.question, nil, chatData.id)
 end
 
 -- What the line under the chat title shows for each state of the app (see

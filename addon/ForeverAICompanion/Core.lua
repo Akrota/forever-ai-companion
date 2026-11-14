@@ -29,7 +29,7 @@ function Core:HasPending()
       e.status = "error"
       e.answer = L.VOICE_LOST
       ns.Voice.broken = true
-      resend = { question = e.question, chatId = c.id }
+      resend = { question = e.shown or e.question, chatId = c.id }
       ns.UI:Refresh()
     elseif e.status == "pending" then
       if now - (e.t or now) > PENDING_TIMEOUT then
@@ -101,8 +101,51 @@ end
 
 -- Successive reductions if a request does not fit. Each one replaces whole
 -- sections with smaller copies.
+-- Known recipes without the ones that no longer give skill, and without reagents.
+local function slimRecipes(list)
+  if type(list) ~= "table" then return list end
+  local out = {}
+  for _, p in ipairs(list) do
+    local copy = {}
+    for k, v in pairs(p) do copy[k] = v end
+    copy.recipes = without(p.recipes, { "reagents" }, function(r) return r.difficulty ~= "grey" end)
+    out[#out + 1] = copy
+  end
+  return out
+end
+
+-- Open windows with shorter lists: vendor and loot items without their stats,
+-- and at most 25 vendor items / 30 trainer services.
+local function slimScreen(screen)
+  if type(screen) ~= "table" then return screen end
+  local out = {}
+  for k, v in pairs(screen) do out[k] = v end
+  local function first(list, n)
+    if type(list) ~= "table" then return list end
+    local cut = {}
+    for i = 1, math.min(#list, n) do cut[i] = list[i] end
+    return cut
+  end
+  if type(screen.merchant) == "table" then
+    local m = {}
+    for k, v in pairs(screen.merchant) do m[k] = v end
+    m.items = first(without(screen.merchant.items, { "stats" }), 25)
+    out.merchant = m
+  end
+  if type(screen.trainer) == "table" then
+    local t = {}
+    for k, v in pairs(screen.trainer) do t[k] = v end
+    t.services = first(screen.trainer.services, 30)
+    out.trainer = t
+  end
+  out.loot = without(screen.loot, { "stats" })
+  return out
+end
+
 local TRIMS = {
   function(ctx) ctx.bank = nil end,
+  function(ctx) ctx.knownRecipes = slimRecipes(ctx.knownRecipes) end,
+  function(ctx) ctx.screen = slimScreen(ctx.screen) end,
   function(ctx, req) req.history = nil end,
   function(ctx) ctx.quests = without(ctx.quests, { "rewardItems", "rewardChoices" }) end,
   function(ctx)
@@ -114,6 +157,7 @@ local TRIMS = {
     ctx.gear = without(ctx.gear, { "stats" })
     ctx.quests = without(ctx.quests, { "objectives" })
   end,
+  function(ctx) ctx.knownRecipes = nil end,
   function(ctx) ctx.quests, ctx.professions, ctx.inventory = nil, nil, nil end,
 }
 
@@ -136,11 +180,13 @@ end
 -- confirmed (it answered a request that carried them) go as { name = hash }
 -- in `same`, and the companion fills them in from its cache.
 -- maxBytes: size limit for channels without the screen's limits (voice).
-function Core:BuildFrame(req, step, maxBytes)
+-- extra: more context for this question only (e.g. the items linked in it).
+function Core:BuildFrame(req, step, maxBytes, extra)
   local fits = maxBytes and function(len) return len <= maxBytes end
     or function(len) return ns.Uplink:Fits(len) end
   local t0 = now()
   local snap, meta, errors = ns.Collect:Gather(step)
+  for k, v in pairs(extra or {}) do snap[k] = v end
   local t1 = now()
   local acked = self:CharData().acked or {}
   local ctx, encoded, hashes, same = {}, {}, {}, {}
@@ -215,6 +261,18 @@ function Core:RememberFlightPaths()
   end
 end
 
+-- The open profession window's recipes, remembered per character and
+-- profession (the game only lists them while the window is open).
+-- kind: "craft" for the classic enchanting-style window.
+function Core:RememberRecipes(kind)
+  local p = ns.Collect:Recipes(kind)
+  if not p or not p.profession or #p.recipes == 0 then return end
+  p.seenAt = date("%Y-%m-%d %H:%M")
+  local data = self:CharData()
+  data.recipes = data.recipes or {}
+  data.recipes[p.profession] = p
+end
+
 function Core:RememberTurnIn(questID)
   local title = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(questID)
   if not title then return end
@@ -227,7 +285,11 @@ end
 -- `extra`: additional request fields (used by the channel probe).
 -- `chatId`: chat the question belongs to (default: the open one).
 function Core:Ask(question, extra, chatId)
-  question = strtrim(question or "")
+  -- Items (and spells, quests...) linked with shift-click go along with their
+  -- full description; the question itself keeps just their "[Name]".
+  local linked = ns.Collect:Links(question)
+  local shown = linked and strtrim(question) or nil -- with the links, for the chat bubble
+  question = strtrim(ns.Collect.Clean(question or "") or "")
   if question == "" then return end
   ns.UI:Show()
   if InCombatLockdown() or UnitAffectingCombat("player") then
@@ -260,7 +322,7 @@ function Core:Ask(question, extra, chatId)
   }
   for k, v in pairs(extra or {}) do req[k] = v end
 
-  local entry = { id = id, question = question, status = "pending", t = time() }
+  local entry = { id = id, question = question, shown = shown, status = "pending", t = time() }
   ns.Chats:AddMessage(chatData, entry)
   req.chat = { id = chatData.id, title = chatData.title }
 
@@ -278,16 +340,17 @@ function Core:Ask(question, extra, chatId)
 
   -- The preparation runs a few milliseconds per frame (see Core.step).
   -- Invisible voice channel when available; otherwise the strip on screen.
+  local context = linked and { linkedItems = linked } or nil
   local co = coroutine.create(function()
     if ns.Voice:Available() then
-      local frame = Core:BuildFrame(req, Core.step, ns.Voice.MAX_FRAME_BYTES)
+      local frame = Core:BuildFrame(req, Core.step, ns.Voice.MAX_FRAME_BYTES, context)
       if frame and ns.Voice:Send(frame, req.id, Core.step) then
         Core.lastChannel = "voice"
         return true, "voice"
       end
     end
     Core.lastChannel = "strip"
-    local frame, why = Core:BuildFrame(req, Core.step)
+    local frame, why = Core:BuildFrame(req, Core.step, nil, context)
     if not frame then return false, why end
     return ns.Uplink:Prepare(frame, Core.step)
   end)
@@ -384,9 +447,27 @@ end
 
 local events = CreateFrame("Frame")
 for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "BANKFRAME_OPENED", "BANKFRAME_CLOSED",
-                     "PLAYERBANKSLOTS_CHANGED", "TAXIMAP_OPENED", "QUEST_TURNED_IN" }) do
+                     "PLAYERBANKSLOTS_CHANGED", "TAXIMAP_OPENED", "QUEST_TURNED_IN",
+                     "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "TRADE_SKILL_LIST_UPDATE",
+                     "CRAFT_SHOW", "CRAFT_UPDATE" }) do
   pcall(events.RegisterEvent, events, e)
 end
+
+-- Profession windows fire their update events in bursts: read once it settles.
+local RECIPE_EVENTS = {
+  TRADE_SKILL_SHOW = "trade", TRADE_SKILL_UPDATE = "trade", TRADE_SKILL_LIST_UPDATE = "trade",
+  CRAFT_SHOW = "craft", CRAFT_UPDATE = "craft",
+}
+local recipesPending = {}
+local function rememberRecipesSoon(kind)
+  if recipesPending[kind] then return end
+  recipesPending[kind] = true
+  C_Timer.After(0.5, function()
+    recipesPending[kind] = nil
+    pcall(Core.RememberRecipes, Core, kind)
+  end)
+end
+
 events:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == ADDON then
     ForeverAICompanion_DB = ForeverAICompanion_DB or {}
@@ -408,6 +489,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
     pcall(Core.RememberFlightPaths, Core)
   elseif event == "QUEST_TURNED_IN" then
     pcall(Core.RememberTurnIn, Core, arg1)
+  elseif RECIPE_EVENTS[event] then
+    rememberRecipesSoon(RECIPE_EVENTS[event])
   end
 end)
 

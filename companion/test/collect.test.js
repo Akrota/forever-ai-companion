@@ -194,3 +194,96 @@ test('quests carry the game map coordinates; items, race and lockouts are includ
   assert.equal(snap.character.raceToken, 'Skyborne');
   assert.deepEqual(snap.lockouts, [{ name: 'La Ciudad Anegada', players: 5, difficulty: 'Normal', resetHours: 2 }]);
 });
+// --- Linked items, open windows and recipes ------------------------------------
+
+test('items linked in the question come with stats and the slots they replace', () => {
+  const out = runLua(`
+    local q = "Is " .. "|cff1eff00|Hitem:3000::::::::33:::::|h[Repetidora]|h|r" .. " better than "
+      .. "|cff1eff00|Hitem:9999::::::::33:::::|h[Leotardos]|h|r" .. "? Or |cff71d5ff|Hspell:3044|h[Disparo arcano]|h|r"
+    RESULT = ns.Json.Encode(ns.Collect:Links(q)) .. "#" .. ns.Collect.Clean(q)
+  `, {}, ['Json.lua', 'Collect.lua'], FAKE_WOW);
+  const [json, clean] = out.split('#');
+  const links = JSON.parse(json);
+  assert.equal(links.length, 3);
+  assert.equal(links[0].name, 'Repetidora de púas sepulcral');
+  assert.deepEqual(links[0].slots, ['ranged']);
+  assert.equal(links[0].stats.AGILITY, 4);
+  assert.deepEqual(links[1].slots, ['legs']);
+  assert.deepEqual(links[2], { kind: 'spell', name: 'Disparo arcano', id: 3044 });
+  assert.equal(clean, 'Is [Repetidora] better than [Leotardos]? Or [Disparo arcano]');
+});
+
+test('links colored the newer way ("|cnIQ1:") are cleaned too', () => {
+  // Exactly what WoW Forever put in the question box.
+  const out = runLua(`
+    local q = "que es esto? |cnIQ1:|Hitem:4306::::::::33:::::|h[Simple Wood]|h|r"
+    local links = ns.Collect:Links(q)
+    RESULT = ns.Collect.Clean(q) .. "#" .. links[1].name .. "#" .. tostring(links[1].itemId)
+  `, {}, ['Json.lua', 'Collect.lua'], FAKE_WOW);
+  assert.equal(out, 'que es esto? [Simple Wood]#Paño de seda#4306');
+});
+
+test('open windows: vendor with prices and repair, quest reward choices; nothing when closed', () => {
+  const extra = `
+    GetMerchantNumItems = function() return 2 end
+    GetMerchantItemInfo = function(i)
+      if i == 1 then return "Repetidora de púas sepulcral", 0, 12345, 1, -1, true, true, false end
+      return "Agua refrescante", 0, 25, 5, 3, true, true, false
+    end
+    GetMerchantItemLink = function(i) return i == 1 and "|Hitem:3000::::::::33:::::|h[x]|h" or nil end
+    CanMerchantRepair = function() return true end
+    GetRepairAllCost = function() return 5000 end
+    GetTitleText = function() return "Excavadoras" end
+    GetQuestID = function() return 2928 end
+    GetRewardText = function() return "¡Gracias, |cffffff00amigo|r!" end
+    GetRewardXP = function() return 3100 end
+    GetRewardMoney = function() return 0 end
+    GetNumQuestRewards = function() return 0 end
+    GetNumQuestChoices = function() return 2 end
+    GetQuestItemLink = function(kind, i) return i == 1 and "|Hitem:9999|h[a]|h" or "|Hitem:3000|h[b]|h" end
+    GetQuestItemInfo = function(kind, i) return "x", 0, 1 end
+  `;
+  const out = runLua(`
+    local closed = ns.Json.Encode(ns.Collect:Snapshot().screen or "none")
+    ns.Collect.cache = {}
+    ns.Collect.open.merchant = true
+    ns.Collect.open.quest = "complete"
+    RESULT = closed .. "#" .. ns.Json.Encode(ns.Collect:Snapshot().screen)
+  `, {}, ['Json.lua', 'Collect.lua'], FAKE_WOW + extra);
+  const [closed, json] = out.split('#');
+  assert.equal(closed, '"none"', 'nothing is sent while no window is open');
+  const screen = JSON.parse(json);
+  assert.equal(screen.merchant.items.length, 2);
+  assert.equal(screen.merchant.items[0].price, '1g 23s 45c');
+  assert.deepEqual(screen.merchant.items[0].slots, ['ranged']);
+  assert.deepEqual(screen.merchant.items[1], { name: 'Agua refrescante', price: '0g 0s 25c', stack: 5, limited: 3 });
+  assert.equal(screen.merchant.canRepair, true);
+  assert.equal(screen.merchant.repairAllCost, '0g 50s 0c');
+  assert.equal(screen.questReward.title, 'Excavadoras');
+  assert.equal(screen.questReward.text, '¡Gracias, amigo!');
+  assert.equal(screen.questReward.rewards.xp, 3100);
+  assert.deepEqual(screen.questReward.rewards.choices.map((c) => c.slots[0]), ['legs', 'ranged']);
+});
+
+test('recipes of the open profession window, with skill-up color and reagents', () => {
+  const extra = `
+    GetTradeSkillLine = function() return "Herrería", 75, 150 end
+    local lines = {
+      { "Hojas", "header" },
+      { "Espada de cobre", "optimal", 2, { { "Barra de cobre", 6 }, { "Piedra de afilar", 1 } } },
+      { "Barra de cobre pulida", "trivial", 10 },
+    }
+    GetNumTradeSkills = function() return #lines end
+    GetTradeSkillInfo = function(i) return lines[i][1], lines[i][2], lines[i][3] or 0 end
+    GetTradeSkillNumReagents = function(i) return lines[i][4] and #lines[i][4] or 0 end
+    GetTradeSkillReagentInfo = function(i, j) local r = lines[i][4][j]; return r[1], 0, r[2] end
+  `;
+  const json = runLua('RESULT = ns.Json.Encode(ns.Collect:Recipes())', {}, ['Json.lua', 'Collect.lua'], FAKE_WOW + extra);
+  assert.deepEqual(JSON.parse(json), {
+    profession: 'Herrería', rank: 75, max: 150,
+    recipes: [
+      { name: 'Espada de cobre', difficulty: 'orange', canMake: 2, reagents: '6x Barra de cobre, 1x Piedra de afilar' },
+      { name: 'Barra de cobre pulida', difficulty: 'grey', canMake: 10 },
+    ],
+  });
+});

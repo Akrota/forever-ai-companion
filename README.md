@@ -16,9 +16,9 @@
 <p align="center"><sub>English and Spanish · Inglés y español</sub></p>
 
 <p align="center">
-  <img src="docs/in-game-chat-v2.webp" width="900" alt="The Forever AI Companion window in WoW Forever: asked which dungeon to run, Fizzi suggests Gnomeregan using the player's level, quests, rested experience, location, bags and gear durability">
+  <img src="docs/in-game-item-links.webp" width="900" alt="The Forever AI Companion window in WoW Forever: the player links the Naga Heartpiercer and asks if their equipped weapon is better; Fizzi answers with clickable item links, compares weapon DPS and stats, and suggests the Shrapnel Blaster quest reward">
   <br>
-  <sub>Asking Fizzi which dungeon to run: the answer uses your own level, quests, location, bags and gear.</sub>
+  <sub>Ask Fizzi anything: the answer uses your own level, quests, location, bags and gear. Link items with shift-click, and the assistant links items back in its answers.</sub>
 </p>
 
 ---
@@ -54,7 +54,8 @@ With every question the AI receives, without you having to explain anything:
 - your **gear** slot by slot, what's in your **bags** and your bank;
 - **where you are**: zone and coordinates;
 - your **quests** with progress, rewards and the real coordinates of where to do them;
-- **professions**, reputations, dungeon lockouts, group and target.
+- **professions**, reputations, dungeon lockouts, group and target;
+- the **items you link** in the question, the **window you have open** (a quest, a vendor, a trainer, loot) and your **recipes**.
 
 So you can ask things like *"What should I do now?"*, *"Is this ring better?"* or *"Which dungeon should I run?"* and get an answer for **your** character.
 
@@ -110,6 +111,10 @@ Coming from version 1.5.0 or earlier, the app and the addon move to new folder n
 3. **Type your question** and click Send. The answer arrives in a few seconds; if the window was closed, you get a notification.
 
 - **Chats by topic**: each chat remembers its conversation (gear, quests, dungeons…). Right-click the floating button to start a new chat.
+- **Ask about a specific item**: while typing, shift-click an item (in your bags, a vendor, a quest reward…) to put it in the question, like in the chat box: *"Is [this ring] better than mine?"*. The AI gets its full stats, and the link stays clickable in your message.
+- **Clickable items in the answers**: when the assistant names an item from your gear, bags, bank, quest rewards or an open vendor, it shows up as a real item link. Hover it for the tooltip, click to open it, shift-click to paste it in the chat or ctrl-click to try it on. Items that aren't in your data (for example, dungeon loot) are written as plain text.
+- **Ask about what's open**: with a quest, vendor, trainer or loot window open, the AI sees it. Try *"Should I accept this quest?"*, *"Which reward should I pick?"*, *"What should I buy here?"* or *"What should I train first?"*.
+- **Professions**: open each profession window once and the addon remembers your recipes, so you can ask *"What can I craft with what I have?"* or *"Which recipe should I make to level up?"*.
 - **Is the app ready?** The line under the chat title tells you. Green: the app is open and ready. Red: questions won't be answered yet, and it says why (the app is closed or not responding, no AI is chosen, or your AI needs you to sign in). Hover it for what to do.
 - **See what is sent**: in the window click **See the data I send**.
 - **In combat** you can't ask (on purpose): wait until combat ends.
@@ -199,7 +204,7 @@ sequenceDiagram
 | Requirements | Administrator permission once (Windows only allows adding voices that way) | WoW visible when asking (not minimized or covered) |
 | What gets installed | A silent voice in Windows' voice list | Nothing |
 
-Technically, the voice is a small SAPI engine that the app compiles on your PC with the C# compiler included in Windows. When the game asks it to speak, it saves the text in `%APPDATA%\ForeverAICompanion\tts-inbox\` instead of producing audio. Messages travel in chunks of up to 16,000 characters (`FAIC:<id>:<part>/<total>:<data>`) and the app joins them back.
+Technically, the voice is a small SAPI engine that the app compiles on your PC with the C# compiler included in Windows. When the game asks it to speak, it saves the text in `%APPDATA%\ForeverAICompanion\tts-inbox\` instead of producing audio. Messages travel in chunks of up to 24,000 characters (a normal question is a single one) (`FAIC:<id>:<part>/<total>:<data>`) and the app joins them back.
 
 ### Coming back: from the app to the game
 
@@ -212,7 +217,7 @@ That's why you need to **restart WoW** after installing: the game only sees file
 
 ### What the AI receives
 
-- **The assistant's instructions**: Fizzi's or Rizzik's personality, how to read the data and how to answer (short, with coordinates, no links because the game can't open them).
+- **The assistant's instructions**: Fizzi's or Rizzik's personality, how to read the data and how to answer (short, with coordinates, no web links because the game can't open them). Items it saw in your data come back marked with their id (`{{item:ID|Name}}`) and the addon turns them into item links, only if that id really is the item with that name in your game.
 - **Today's date and the game version**, to reason about the calendar and patches.
 - **The WoW Forever guide** (see below).
 - **Your data and the question**, plus the earlier questions of the same chat.
@@ -303,7 +308,8 @@ Open the app and, under **More options**, click **Uninstall**. It removes the ad
 ```
 addon/ForeverAICompanion/   Addon (Lua 5.1, modern client, interface 16001)
   Locale.lua                English and Spanish texts (by the client's language)
-  Collect.lua               Reads the character's data (each section separately)
+  Collect.lua               Reads the character's data (each section separately),
+                            linked items, open windows and recipes
   Uplink.lua                Game → app: builds the package and picks the path
   Voice.lua                 Invisible path (text to speech with the silent voice)
   Live.lua                  App → game: inboxes and bell
@@ -320,6 +326,8 @@ companion/
   src/screen-reader.js      Reads the on-screen line
   src/grid.js image.js      Decodes the line
   src/inbox.js              Inboxes and bell
+  src/beacon.js             Tells the game whether the app is open and ready
+  src/updater.js            Updates the app from GitHub releases
   src/prompt.js             Instructions for the AI
   src/guide.js              WoW Forever guide: date, version and downloads
   src/providers.js          Claude, OpenAI/Gemini/Ollama, Claude Code, Codex, test

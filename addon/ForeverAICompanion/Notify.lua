@@ -21,6 +21,7 @@ end
 
 -- Plain one-paragraph preview of an answer.
 local function preview(text, chars)
+  if ns.UI and ns.UI.PlainAnswer then text = ns.UI.PlainAnswer(text) end
   text = tostring(text or ""):gsub("\n+", " "):gsub("%s+", " ")
   text = text:gsub("|", "||")
   if #text <= chars then return text end

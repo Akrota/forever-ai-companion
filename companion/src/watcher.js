@@ -10,7 +10,7 @@ import { wowPaths } from './config.js';
 import { decodeImage } from './image.js';
 import { GridUnreadableError, decodeGrid } from './grid.js';
 import { publishInbox, resetSignals, ringSignal } from './inbox.js';
-import { buildMessages, buildSystem, cleanAnswer, loadKnowledge, playerLang } from './prompt.js';
+import { buildMessages, buildSystem, cleanAnswer, loadKnowledge, plainAnswer, playerLang } from './prompt.js';
 import { guideFreshness } from './guide.js';
 import { ask, canSearch } from './providers.js';
 import { loadState, saveState } from './state.js';
@@ -87,7 +87,7 @@ export async function handleRequest(req, {
     answer = { id: req.id, ok: false, answer: `Error: ${e.message}` };
     log(`Error: ${e.message}`);
   }
-  onEvent({ type: 'answer', id: req.id, who, question: req.question, ok: answer.ok, answer: answer.answer });
+  onEvent({ type: 'answer', id: req.id, who, question: req.question, ok: answer.ok, answer: plainAnswer(answer.answer) });
 
   state.answers.push(answer);
   publishInbox(paths, cfg, state.answers, extra);
