@@ -1,12 +1,13 @@
 -- Floating button: drag it anywhere; its position is remembered.
 --   Left click: open / close the chats.   Right click: new chat.
---   Shift + right click: hide it (/ia boton brings it back).
+--   Shift + right click: hide it (/ia button brings it back).
 -- Round, like the minimap buttons of other addons: the assistant's portrait
 -- (Fizzi or Rizzik) inside a ring lit in its color, with its gadget (gear or
 -- coin) on the side. The ring glows on hover, the gadget spins and the ring
 -- pulses while the answer is on its way, the portrait hops when it arrives,
 -- and a round badge counts chats with unread answers.
 local _, ns = ...
+local L = ns.L
 
 local Button = {}
 ns.Button = Button
@@ -50,7 +51,7 @@ end
 
 function Button:Init()
   if self.frame then return end
-  local b = CreateFrame("Button", "AzerothIAFloatingButton", UIParent)
+  local b = CreateFrame("Button", "ForeverAICompanionFloatingButton", UIParent)
   b:SetSize(SIZE, SIZE)
   b:SetFrameStrata("MEDIUM")
   b:SetFrameLevel(20)
@@ -136,7 +137,7 @@ function Button:Init()
     if mouse == "RightButton" then
       if IsShiftKeyDown and IsShiftKeyDown() then
         Button:SetShown(false)
-        print("|cff66ccffForever AI:|r botón oculto. Escribe /ia boton para mostrarlo de nuevo.")
+        print("|cff66ccffForever AI:|r " .. L.BUTTON_HIDDEN)
         return
       end
       ns.Chats:New()
@@ -159,13 +160,13 @@ function Button:Init()
     local unread, pending = Button:Counts()
     if pending > 0 then GameTooltip:AddLine(p.tooltipThinking, 1, 0.82, 0.35) end
     if unread > 0 then
-      GameTooltip:AddLine(string.format("%d %s con respuestas nuevas", unread, unread == 1 and "chat" or "chats"), 0.4, 0.75, 1)
+      GameTooltip:AddLine(string.format(unread == 1 and L.UNREAD_ONE or L.UNREAD_MANY, unread), 0.4, 0.75, 1)
     end
     GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine("Clic", "abrir chats", 1, 1, 1, 0.7, 0.7, 0.7)
-    GameTooltip:AddDoubleLine("Clic derecho", "nuevo chat", 1, 1, 1, 0.7, 0.7, 0.7)
-    GameTooltip:AddDoubleLine("Arrastrar", "mover", 1, 1, 1, 0.7, 0.7, 0.7)
-    GameTooltip:AddDoubleLine("Shift + clic derecho", "ocultar", 1, 1, 1, 0.7, 0.7, 0.7)
+    GameTooltip:AddDoubleLine(L.TIP_CLICK, L.TIP_OPEN_CHATS, 1, 1, 1, 0.7, 0.7, 0.7)
+    GameTooltip:AddDoubleLine(L.TIP_RIGHT_CLICK, L.TIP_NEW_CHAT, 1, 1, 1, 0.7, 0.7, 0.7)
+    GameTooltip:AddDoubleLine(L.TIP_DRAG, L.TIP_MOVE, 1, 1, 1, 0.7, 0.7, 0.7)
+    GameTooltip:AddDoubleLine(L.TIP_SHIFT_RIGHT_CLICK, L.TIP_HIDE, 1, 1, 1, 0.7, 0.7, 0.7)
     GameTooltip:Show()
   end)
   b:SetScript("OnLeave", function(self)

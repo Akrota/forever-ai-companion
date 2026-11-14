@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import readline from 'node:readline';
+import { err, t } from './i18n.js';
 
 const CSC = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';
 export const TRAY_EXE = 'ForeverAICompanionTray.exe';
@@ -26,7 +27,7 @@ export async function ensureTrayExe({ source, dir, icoPath }) {
   const hash = crypto.createHash('sha256').update(source).update(fs.readFileSync(icoPath)).digest('hex');
   const hashFile = `${exe}.source-sha256`;
   if (fs.existsSync(exe) && fs.existsSync(hashFile) && fs.readFileSync(hashFile, 'utf8') === hash) return exe;
-  if (!fs.existsSync(CSC)) throw new Error('No se encontró el compilador de C# de Windows (.NET Framework 4).');
+  if (!fs.existsSync(CSC)) throw err('noCsc');
   fs.mkdirSync(dir, { recursive: true });
   const src = path.join(dir, 'Tray.cs');
   fs.writeFileSync(src, source);
@@ -52,15 +53,27 @@ export async function ensureTrayExe({ source, dir, icoPath }) {
 }
 
 // Starts the helper. Returns { ask(), balloon(text), stop() } or null.
+// The helper's texts in the app's language, as base64 "key=value" lines
+// (no quoting problems on the command line).
+export function trayTexts() {
+  const keys = {
+    running: 'trayRunning', open: 'trayOpen', close: 'trayClose', stillRunning: 'trayStillRunning',
+    clickHint: 'trayClickHint', askTitle: 'trayAskTitle', askText: 'trayAskText', remember: 'trayRemember',
+    keep: 'trayKeep', quit: 'trayQuit',
+  };
+  const lines = Object.entries(keys).map(([k, key]) => `${k}=${t(key).replace(/\\/g, '\\\\').replace(/\n/g, '\\n')}`);
+  return Buffer.from(lines.join('\n'), 'utf8').toString('base64');
+}
+
 export function startTray({ exe, icoPath, onOpen = () => {}, onQuit = () => {}, onChoice = () => {}, log = () => {} }) {
   let child;
   try {
-    child = spawn(exe, [icoPath], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: false });
+    child = spawn(exe, [icoPath, trayTexts()], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: false });
   } catch (e) {
-    log(`Ícono de la bandeja: ${e.message}`);
+    log(`Tray icon: ${e.message}`);
     return null;
   }
-  child.on('error', (e) => log(`Ícono de la bandeja: ${e.message}`));
+  child.on('error', (e) => log(`Tray icon: ${e.message}`));
   child.stdin.on('error', () => {});
   readline.createInterface({ input: child.stdout }).on('line', (line) => {
     const [cmd, a, b] = line.trim().split(/\s+/);

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { flattenPrompt } from './prompt.js';
 import { findClaudeCode, spawnArgs } from './claude-code.js';
+import { err, t } from './i18n.js';
 import {
   CODEX_DISABLE, CODEX_MODELS, codexArgs, codexAuthStatus, findCodex, friendlyCodexError, parseCodexEvents, shellQuote,
 } from './codex.js';
@@ -52,20 +53,20 @@ async function anthropic(cfg, system, messages) {
     }
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError) {
-      throw new Error('La clave de Claude no es válida. Revisa que la copiaste completa (empieza con sk-ant-).');
+      throw err('claudeBadKey');
     } else if (error instanceof Anthropic.PermissionDeniedError) {
-      throw new Error('Tu cuenta de Claude no tiene permiso para usar este modelo.');
+      throw err('claudeNoPermission');
     } else if (error instanceof Anthropic.RateLimitError) {
-      throw new Error('Se alcanzó el límite de uso de la API. Espera un momento o revisa tu crédito.');
+      throw err('apiRateLimit');
     } else if (error instanceof Anthropic.BadRequestError) {
-      throw new Error(`Petición rechazada por la API: ${error.message}`);
+      throw err('apiRejected', { error: error.message });
     } else if (error instanceof Anthropic.APIError) {
-      throw new Error(`Error de la API de Anthropic (${error.status ?? 'red'}): ${error.message}`);
+      throw err('anthropicError', { status: error.status ?? 'network', error: error.message });
     }
     throw error;
   }
   if (response.stop_reason === 'refusal') {
-    throw new Error('La IA no quiso responder a esa pregunta.');
+    throw err('refused');
   }
   // With web search the answer comes in several text blocks (one per citation).
   let text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
@@ -83,13 +84,13 @@ async function openaiCompatible(cfg, system, messages) {
     signal: AbortSignal.timeout(cfg.timeoutMs),
   });
   if (res.status === 401 || res.status === 403 || (res.status === 400 && /api[_ ]?key/i.test(await res.clone().text()))) {
-    throw new Error('La clave de API no es válida. Revisa que la copiaste completa.');
+    throw err('badKey');
   }
-  if (res.status === 429) throw new Error('Se alcanzó el límite de uso de la API. Espera un momento o revisa tu crédito.');
+  if (res.status === 429) throw err('apiRateLimit');
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = await res.json();
   const text = json.choices?.[0]?.message?.content;
-  if (!text) throw new Error('La API no devolvió texto.');
+  if (!text) throw err('noText');
   return { text, model: json.model || c.model };
 }
 
@@ -100,22 +101,22 @@ function run(bin, args, input, timeoutMs, cwd, shell = process.platform === 'win
     let stderr = '';
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`${bin} tardó demasiado en responder.`));
+      reject(err('tooSlow', { bin }));
     }, timeoutMs);
     child.stdout.on('data', (d) => { stdout += d; });
     child.stderr.on('data', (d) => { stderr += d; });
     child.on('error', (e) => {
       clearTimeout(timer);
-      reject(new Error(`No se pudo ejecutar "${bin}": ${e.message}. ¿Está instalado y en el PATH?`));
+      reject(err('cannotRun', { bin, error: e.message }));
     });
     child.on('close', (code) => {
       clearTimeout(timer);
       if (code === 0) resolve(stdout);
       else {
-        const err = new Error(`${bin} terminó con código ${code}: ${(stderr || stdout).slice(0, 300)}`);
-        err.stdout = stdout;
-        err.stderr = stderr;
-        reject(err);
+        const e = err('exitCode', { bin, code, output: (stderr || stdout).slice(0, 300) });
+        e.stdout = stdout;
+        e.stderr = stderr;
+        reject(e);
       }
     });
     child.stdin.end(input);
@@ -124,7 +125,7 @@ function run(bin, args, input, timeoutMs, cwd, shell = process.platform === 'win
 
 // An empty working folder so CLI agents have nothing local to read or edit.
 function sandboxDir() {
-  const dir = path.join(os.tmpdir(), 'azeroth-ia-cli');
+  const dir = path.join(os.tmpdir(), 'forever-ai-companion-cli');
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -164,7 +165,7 @@ async function claudeCode(cfg, system, messages) {
   const c = cfg.claudeCode;
   const found = findClaudeCode(c.bin);
   if (!found) {
-    throw new Error('Claude Code no está instalado. Pulsa "Instalar Claude Code" en la ventana de Forever AI Companion.');
+    throw err('claudeMissing');
   }
   const { file, shell } = spawnArgs(found.path);
   // The system prompt goes in a file: with the server knowledge it can be far
@@ -186,21 +187,21 @@ async function claudeCode(cfg, system, messages) {
   try {
     json = JSON.parse(out);
   } catch {
-    throw new Error(`Respuesta inesperada de Claude Code: ${String(out).slice(0, 200)}`);
+    throw err('claudeUnexpected', { output: String(out).slice(0, 200) });
   }
   if (json.is_error) {
     if (/not logged in|\/login/i.test(json.result || '')) {
-      throw new Error('Claude Code no tiene la sesión iniciada. Pulsa "Iniciar sesión" en la ventana de Forever AI Companion.');
+      throw err('claudeSignedOut');
     }
-    throw new Error(`Claude Code: ${json.result || 'error'}`);
+    throw err('claudeError', { error: json.result || 'error' });
   }
   const used = Object.keys(json.modelUsage || {})[0];
-  return { text: json.result, model: used ? `${prettyModel(used)} · tu suscripción` : 'tu suscripción de Claude' };
+  return { text: json.result, model: used ? `${prettyModel(used)} · ${t('yourSubscription')}` : t('yourClaudeSubscription') };
 }
 
 // Codex only: it still offers its agent tools, so say they are not for this.
-const CODEX_NOTE = `## Herramientas
-No ejecutes comandos ni leas o escribas archivos: en este PC no hay nada útil para responder. Responde directamente con los datos del personaje, la guía y, si está permitido arriba, una búsqueda en internet.`;
+const CODEX_NOTE = `## Tools
+Do not run commands or read or write files: nothing on this PC helps answer. Answer directly from the character data, the guide and, if allowed above, a web search.`;
 
 let codexLogin = { ok: false, at: 0 };
 
@@ -209,7 +210,7 @@ async function codex(cfg, system, messages) {
   const c = cfg.codex;
   const found = findCodex(c.bin);
   if (!found) {
-    throw new Error('Codex no está instalado. Pulsa "Instalar Codex" en la ventana de Forever AI Companion.');
+    throw err('codexMissing');
   }
   // Signed out, Codex retries for ~30 s before failing: check first (cheap, local).
   if (!codexLogin.ok || Date.now() - codexLogin.at > 10 * 60000) {
@@ -251,9 +252,9 @@ async function codex(cfg, system, messages) {
   let text = parsed.text;
   try { text = fs.readFileSync(outFile, 'utf8') || text; } catch { /* use the event stream */ }
   fs.rmSync(outFile, { force: true });
-  if (!text.trim()) throw new Error(parsed.error ? friendlyCodexError(parsed.error) : 'Codex no devolvió ninguna respuesta.');
+  if (!text.trim()) throw new Error(parsed.error ? friendlyCodexError(parsed.error) : t('codexNoAnswer'));
   const name = CODEX_MODELS[c.model];
-  return { text, model: `${name || 'ChatGPT'} · tu suscripción` };
+  return { text, model: `${name || 'ChatGPT'} · ${t('yourSubscription')}` };
 }
 
 // No AI: echoes what arrived. Use it to test the in-game round trip for free.
@@ -265,12 +266,12 @@ async function echo(cfg, system, messages, req) {
   return {
     model: 'echo',
     text: [
-      'Prueba de conexión OK. Esto no es una IA: la app recibió tu pregunta y estos datos.',
-      `- Pregunta: ${req.question}`,
-      `- Personaje: ${ch.name ?? '?'}, ${ch.race ?? '?'} ${ch.class ?? '?'} nivel ${ch.level ?? '?'}`,
-      `- Posición: ${pos.zone ?? '?'}${pos.subzone ? ' - ' + pos.subzone : ''}${coords}`,
-      `- Objetos equipados: ${(ctx.gear || []).length} · Misiones: ${(ctx.quests || []).length}`,
-      'Para respuestas de verdad, elige una IA en la ventana de Forever AI Companion.',
+      t('echoIntro'),
+      t('echoQuestion', { q: req.question }),
+      t('echoCharacter', { name: ch.name ?? '?', race: ch.race ?? '?', cls: ch.class ?? '?', level: ch.level ?? '?' }),
+      t('echoPosition', { where: `${pos.zone ?? '?'}${pos.subzone ? ' - ' + pos.subzone : ''}${coords}` }),
+      t('echoCounts', { gear: (ctx.gear || []).length, quests: (ctx.quests || []).length }),
+      t('echoPick'),
     ].join('\n'),
   };
 }
@@ -279,6 +280,6 @@ const PROVIDERS = { anthropic, openai: openaiCompatible, 'claude-code': claudeCo
 
 export async function ask(cfg, system, messages, req) {
   const fn = PROVIDERS[cfg.provider];
-  if (!fn) throw new Error(`Proveedor desconocido "${cfg.provider}". Usa: ${Object.keys(PROVIDERS).join(', ')}`);
+  if (!fn) throw new Error(`Unknown provider "${cfg.provider}". Use: ${Object.keys(PROVIDERS).join(', ')}`);
   return fn(cfg, system, messages, req);
 }

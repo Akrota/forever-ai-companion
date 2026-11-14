@@ -1,9 +1,9 @@
 -- Invisible channel: the game's text-to-speech API with the silent
--- "AzerothIA" Windows voice installed by the companion app. Windows hands the
+-- "ForeverAICompanion" Windows voice installed by the companion app. Windows hands the
 -- "spoken" text to that voice, which passes it to the app: nothing is drawn
 -- and nothing is heard. Used whenever the voice exists; otherwise the strip.
 --
--- Messages: "AZIA:<request id>:<part>/<parts>:<base64 chunk of the frame>".
+-- Messages: "FAIC:<request id>:<part>/<parts>:<base64 chunk of the frame>".
 local _, ns = ...
 
 local Voice = {}
@@ -37,7 +37,8 @@ function Voice:Find()
   local get = C_VoiceChat and C_VoiceChat.GetTtsVoices
   if not get then return nil end
   local ok, list = pcall(get)
-  -- "ForeverAICompanion"; "AzerothIA" is its first name (older installs).
+  -- "ForeverAICompanion". Installs from before the rename still have the voice
+  -- under the project's previous name; it keeps working until the app updates it.
   local legacy
   for _, v in ipairs(ok and type(list) == "table" and list or {}) do
     if type(v.name) == "string" then
@@ -76,36 +77,37 @@ function Voice:Speak(text, volume)
   return false
 end
 
--- /ia probar-voz: what the game sees and whether speaking works.
+-- /ia test-voice (probar-voz): what the game sees and whether speaking works.
 function Voice:Diagnose()
-  local say = function(msg) print("|cff66ccffForever AI · envío invisible:|r " .. msg) end
+  local L = ns.L
+  local say = function(msg) print("|cff66ccff" .. L.VOICE_PREFIX .. "|r " .. msg) end
   local get = C_VoiceChat and C_VoiceChat.GetTtsVoices
-  if not get then say("el juego no tiene C_VoiceChat.GetTtsVoices") return end
+  if not get then say(L.VOICE_NO_API) return end
   local ok, list = pcall(get)
-  if not ok then say("GetTtsVoices falló: " .. tostring(list)) return end
-  for _, v in ipairs(list or {}) do say(string.format("voz %s: %s", tostring(v.voiceID), tostring(v.name))) end
+  if not ok then say(string.format(L.VOICE_LIST_FAILED, tostring(list))) return end
+  for _, v in ipairs(list or {}) do say(string.format(L.VOICE_ITEM, tostring(v.voiceID), tostring(v.name))) end
   self.broken = nil
   if not self:Available() then
-    say("NO veo la voz del envío invisible. ¿Activaste el envío invisible y reiniciaste WoW por completo?")
+    say(L.VOICE_NOT_FOUND)
     return
   end
-  local spoken = self:Speak("AZIA-VOZ-PRUEBA volumen100 " .. time(), 100)
+  local spoken = self:Speak("FAIC-VOICE-TEST volume100 " .. time(), 100)
   if not spoken then
-    say("SpeakText falló con las dos firmas conocidas")
+    say(L.VOICE_SPEAK_FAILED)
     return
   end
-  say("firma " .. tostring(self.signature) .. ". Enviando pruebas de volumen 0 y de frases largas (unos 6 s)...")
+  say(string.format(L.VOICE_TESTING, tostring(self.signature)))
   -- Does the voice still get the text at volume 0? How long can one phrase be?
   local tests = {
-    function() self:Speak("AZIA-VOZ-PRUEBA volumen0 " .. time(), 0) end,
-    function() self:Speak("AZIA-VOZ-LARGO 4000 " .. string.rep("x", 4000), 0) end,
-    function() self:Speak("AZIA-VOZ-LARGO 16000 " .. string.rep("x", 16000), 0) end,
-    function() self:Speak("AZIA-VOZ-LARGO 64000 " .. string.rep("x", 64000), 0) end,
+    function() self:Speak("FAIC-VOICE-TEST volume0 " .. time(), 0) end,
+    function() self:Speak("FAIC-VOICE-LONG 4000 " .. string.rep("x", 4000), 0) end,
+    function() self:Speak("FAIC-VOICE-LONG 16000 " .. string.rep("x", 16000), 0) end,
+    function() self:Speak("FAIC-VOICE-LONG 64000 " .. string.rep("x", 64000), 0) end,
   }
   for i, fn in ipairs(tests) do
     C_Timer.After(i * 1.5, function()
       fn()
-      if i == #tests then say("pruebas enviadas; avísale a Claude para que revise el registro de la app") end
+      if i == #tests then say(L.VOICE_DONE) end
     end)
   end
 end
@@ -116,7 +118,7 @@ function Voice:Send(frame, id, step)
   local parts = ceil(#data / self.CHUNK)
   for i = 1, parts do
     local chunk = data:sub((i - 1) * self.CHUNK + 1, i * self.CHUNK)
-    if not self:Speak(string.format("AZIA:%s:%d/%d:%s", id, i, parts, chunk)) then
+    if not self:Speak(string.format("FAIC:%s:%d/%d:%s", id, i, parts, chunk)) then
       self.broken = true
       return false
     end

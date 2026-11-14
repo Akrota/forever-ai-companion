@@ -1,13 +1,18 @@
 // Local web server for the app window. Listens on 127.0.0.1 only.
 // Protection against other websites poking at it:
 //  - the Host header must be our own address (blocks DNS rebinding);
-//  - every POST needs the X-AzerothIA header, which a cross-site page can
-//    only send after a CORS preflight that we never approve.
+//  - every POST needs the X-Forever-AI-Companion header, which a cross-site
+//    page can only send after a CORS preflight that we never approve.
 import http from 'node:http';
 import { appIconPng, uiHtml } from '../assets.js';
+import { APP_ID, LEGACY_NAME } from '../config.js';
 
 export const BASE_PORT = 47365;
 export const PORT_RANGE = 10;
+const HEADER = 'x-forever-ai-companion';
+// Copies from before the rename answer /api/ping with the previous name and
+// expect the previous header: still recognized, to close them when updating.
+const LEGACY_HEADER = `x-${LEGACY_NAME.toLowerCase()}`;
 
 export function createServer(controller, { onQuit = () => {}, onWindowClosed = () => {}, closeDelayMs = 1000, log = () => {} } = {}) {
   // Open windows: each one has an id and asks for the status every 2 s.
@@ -68,7 +73,7 @@ export function createServer(controller, { onQuit = () => {}, onWindowClosed = (
       const url = new URL(req.url, `http://${host}`);
       if (req.method === 'GET' && url.pathname === '/') return send(200, html, 'text/html; charset=utf-8');
       if (req.method === 'GET' && url.pathname === '/icon.png') return send(200, icon, 'image/png');
-      if (req.method === 'GET' && url.pathname === '/api/ping') return send(200, { app: 'AzerothIA' });
+      if (req.method === 'GET' && url.pathname === '/api/ping') return send(200, { app: APP_ID });
       if (req.method === 'GET' && url.pathname === '/api/status') {
         pages.set(url.searchParams.get('page') || 'unknown', Date.now());
         return send(200, await controller.status());
@@ -76,11 +81,12 @@ export function createServer(controller, { onQuit = () => {}, onWindowClosed = (
 
       const m = url.pathname.match(/^\/api\/([a-z-]+)$/);
       if (req.method === 'POST' && m && actions[m[1]]) {
-        if (req.headers['x-azerothia'] !== '1') return send(403, { error: 'forbidden' });
+        // (An app window left open from before the rename sends the old header.)
+        if (req.headers[HEADER] !== '1' && req.headers[LEGACY_HEADER] !== '1') return send(403, { error: 'forbidden' });
         let raw = '';
         for await (const chunk of req) {
           raw += chunk;
-          if (raw.length > 100000) throw new Error('Petición demasiado grande');
+          if (raw.length > 100000) throw new Error('Request too large');
         }
         const body = raw ? JSON.parse(raw) : {};
         return send(200, await actions[m[1]](body));
@@ -108,21 +114,31 @@ export function listen(server) {
   });
 }
 
-// Finds an already running AzerothIA window server. Returns its URL or null.
-export async function findRunningInstance() {
+// Finds an already running copy of the app (this version or one from before
+// the rename). Returns { url, legacy } or null.
+export async function findRunning() {
   for (let port = BASE_PORT; port < BASE_PORT + PORT_RANGE; port++) {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/api/ping`, { signal: AbortSignal.timeout(500) });
       const json = await res.json();
-      if (json.app === 'AzerothIA') return `http://127.0.0.1:${port}/`;
+      if (json.app === APP_ID || json.app === LEGACY_NAME) {
+        return { url: `http://127.0.0.1:${port}/`, legacy: json.app === LEGACY_NAME };
+      }
     } catch { /* not here */ }
   }
   return null;
 }
 
+// URL of a running copy of the app, or null.
+export async function findRunningInstance() {
+  return (await findRunning())?.url || null;
+}
+
 export async function quitRunningInstance(url) {
   try {
-    await fetch(`${url}api/quit`, { method: 'POST', headers: { 'x-azerothia': '1' }, signal: AbortSignal.timeout(2000) });
+    await fetch(`${url}api/quit`, {
+      method: 'POST', headers: { [HEADER]: '1', [LEGACY_HEADER]: '1' }, signal: AbortSignal.timeout(2000),
+    });
   } catch { /* already gone */ }
   for (let i = 0; i < 20; i++) {
     if (!(await findRunningInstance())) return;

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile, execFileSync, spawn } from 'node:child_process';
+import { t } from './i18n.js';
 
 const isWin = process.platform === 'win32';
 
@@ -77,7 +78,7 @@ export function authStatus(bin) {
         const s = JSON.parse(stdout);
         resolve({ loggedIn: Boolean(s.loggedIn), method: s.authMethod || null });
       } catch {
-        resolve({ loggedIn: false, method: null, error: 'No se pudo consultar Claude Code.' });
+        resolve({ loggedIn: false, method: null, error: t('claudeStatusFailed') });
       }
     });
   });
@@ -86,7 +87,7 @@ export function authStatus(bin) {
 // Opens a visible console window running `command` so the player sees progress
 // (the sign-in also opens the browser).
 export function visibleConsole(title, commandLine) {
-  if (!isWin) throw new Error('Solo disponible en Windows.');
+  if (!isWin) throw new Error('Windows only.');
   const child = spawn('cmd.exe', [`/d /c start "${title}" ${commandLine}`], {
     detached: true, stdio: 'ignore', windowsVerbatimArguments: true,
   });
@@ -95,7 +96,7 @@ export function visibleConsole(title, commandLine) {
 }
 
 export function openLogin(bin) {
-  visibleConsole('Iniciar sesion en Claude', `cmd /k ""${bin}" auth login --claudeai && echo. && echo Listo. Ya puedes cerrar esta ventana y volver a Forever AI Companion."`);
+  visibleConsole(t('consoleSignInClaude'), `cmd /k ""${bin}" auth login --claudeai && echo. && echo ${t('consoleDone')}"`);
 }
 
 // Installs the official native build. If the desktop app's copy exists it can
@@ -103,9 +104,9 @@ export function openLogin(bin) {
 export function openInstall() {
   const bundled = desktopAppCopies()[0];
   if (bundled) {
-    visibleConsole('Instalar Claude Code', `cmd /k ""${bundled}" install && echo. && echo Listo. Ya puedes cerrar esta ventana y volver a Forever AI Companion."`);
+    visibleConsole(t('consoleInstallClaude'), `cmd /k ""${bundled}" install && echo. && echo ${t('consoleDone')}"`);
   } else {
-    visibleConsole('Instalar Claude Code',
-      'powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm https://claude.ai/install.ps1 | iex; Write-Host; Write-Host \'Listo. Ya puedes cerrar esta ventana y volver a Forever AI Companion.\'"');
+    visibleConsole(t('consoleInstallClaude'),
+      `powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm https://claude.ai/install.ps1 | iex; Write-Host; Write-Host '${t('consoleDone')}'"`);
   }
 }

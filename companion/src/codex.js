@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
 import { spawnArgs, visibleConsole } from './claude-code.js';
+import { t } from './i18n.js';
 
 const isWin = process.platform === 'win32';
 
@@ -56,7 +57,7 @@ export function codexAuthStatus(bin) {
     execFile(file, ['login', 'status'], { shell, windowsHide: true, timeout: 20000, encoding: 'utf8' }, (err, stdout, stderr) => {
       const text = `${stdout || ''}\n${stderr || ''}`;
       if (err && !/logged in/i.test(text)) {
-        resolve({ loggedIn: false, method: null, error: 'No se pudo consultar Codex.' });
+        resolve({ loggedIn: false, method: null, error: t('codexStatusFailed') });
       } else {
         resolve(parseLoginStatus(text));
       }
@@ -65,13 +66,13 @@ export function codexAuthStatus(bin) {
 }
 
 export function openCodexLogin(bin) {
-  visibleConsole('Iniciar sesion en ChatGPT', `cmd /k ""${bin}" login && echo. && echo Listo. Ya puedes cerrar esta ventana y volver a Forever AI Companion."`);
+  visibleConsole(t('consoleSignInChatGPT'), `cmd /k ""${bin}" login && echo. && echo ${t('consoleDone')}"`);
 }
 
 // OpenAI's official installer (no Node.js needed).
 export function openCodexInstall() {
-  visibleConsole('Instalar Codex',
-    'powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm https://chatgpt.com/codex/install.ps1 | iex; Write-Host; Write-Host \'Listo. Ya puedes cerrar esta ventana y volver a Forever AI Companion.\'"');
+  visibleConsole(t('consoleInstallCodex'),
+    `powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm https://chatgpt.com/codex/install.ps1 | iex; Write-Host; Write-Host '${t('consoleDone')}'"`);
 }
 
 // Codex features that only matter to a coding agent. Unknown names are an
@@ -133,13 +134,13 @@ export function parseCodexEvents(stdout) {
 export function friendlyCodexError(message) {
   const m = String(message || '');
   if (/401|unauthori[sz]ed|not logged in|login/i.test(m)) {
-    return 'Codex no tiene la sesión iniciada. Pulsa "Iniciar sesión" en la ventana de Forever AI Companion.';
+    return t('codexSignedOut');
   }
   if (/usage limit|rate limit|429|quota/i.test(m)) {
-    return 'Llegaste al límite de uso de tu plan de ChatGPT. Espera un rato o elige otra IA en la ventana de Forever AI Companion.';
+    return t('codexLimit');
   }
   if (/model.*(not (supported|available|found))|does not exist|access to model/i.test(m)) {
-    return 'Tu plan de ChatGPT no incluye ese modelo. Elige "El de tu plan" en la ventana de Forever AI Companion.';
+    return t('codexModel');
   }
-  return `Codex: ${m.slice(0, 300)}`;
+  return t('codexError', { error: m.slice(0, 300) });
 }

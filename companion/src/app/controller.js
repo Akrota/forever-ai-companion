@@ -4,41 +4,51 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PRESETS, env, loadConfig, saveConfig } from '../config.js';
-import { findWowDirs, isWowRunning, normalizeWowDir } from '../detect.js';
+import { findWowDirs, isWowRunning, isWowRunningAsync, normalizeWowDir } from '../detect.js';
 import {
-  addonVersion, install, installedAddonVersion, isAddonInstalled, uninstall as uninstallAddon, writeAddonFiles,
+  bundledAddonVersion, ensureAddon, finishLegacyMigration, hasLegacyAddon, install, installedAddonVersion, isAddonInstalled,
+  uninstall as uninstallAddon,
 } from '../install.js';
-import { addonFiles, knowledgeReadme, sampleContext } from '../assets.js';
+import { knowledgeReadme, sampleContext } from '../assets.js';
 import { buildMessages, buildSystem, cleanAnswer, loadKnowledge } from '../prompt.js';
 import { ask, canSearch } from '../providers.js';
 import { startWatcher } from '../watcher.js';
 import { authStatus, findClaudeCode, openInstall, openLogin } from '../claude-code.js';
 import { codexAuthStatus, findCodex, openCodexInstall, openCodexLogin } from '../codex.js';
 import { ttsEngineSource } from '../assets.js';
-import { compileEngine, installVoiceMachineWide, isLegacyVoiceVisible, isVoiceVisible, uninstallVoiceMachineWide } from '../tts-voice.js';
+import {
+  ENGINE_DLL, compileEngine, installVoiceMachineWide, isLegacyEngineRegistered, isLegacyVoiceVisible, isVoiceVisible,
+  uninstallVoiceMachineWide,
+} from '../tts-voice.js';
+import { removeLegacyInstallDir } from '../migrate.js';
 import * as sys from './system.js';
+import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { currentGuide, guideFreshness, startGuideUpdates } from '../guide.js';
 
-export const VERSION = '1.5.0';
+export const VERSION = '1.6.0';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
-const voiceDll = () => path.join(sys.isPackaged() ? sys.installDir() : env.dataDir, 'AzerothIATts.dll');
+const voiceDll = () => path.join(sys.isPackaged() ? sys.installDir() : env.dataDir, ENGINE_DLL);
+// How often to check whether the game was closed, while the addon under the
+// project's previous name is still in the AddOns folder.
+const LEGACY_ADDON_CHECK_MS = 10000;
 
 export function createController({ log = () => {} } = {}) {
   let cfg = loadConfig();
+  setAppLang(cfg.language && cfg.language !== 'auto' ? cfg.language : null);
   let watcher = null;
   let watcherError = null;
   let autostart; // cached: reading it spawns reg.exe
   let trayReady = false; // icon next to the Windows clock is running
   const events = [];
-  const bundledVersion = addonVersion(addonFiles()['AzerothIA.toc']);
+  const bundledVersion = bundledAddonVersion();
 
   const knowledgeDir = () => path.join(env.dataDir, 'knowledge');
   const ensureKnowledgeDir = () => {
     const dir = knowledgeDir();
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'LEEME.md'), knowledgeReadme());
+      fs.writeFileSync(path.join(dir, 'README.md'), knowledgeReadme());
     }
   };
   ensureKnowledgeDir();
@@ -56,7 +66,7 @@ export function createController({ log = () => {} } = {}) {
 
   function addEvent(e) {
     if (e.type === 'problem') {
-      events.push({ id: `p${Date.now()}`, who: 'Forever AI Companion', question: '(pregunta ilegible)', ok: false, answer: e.message, pending: false, time: new Date().toISOString() });
+      events.push({ id: `p${Date.now()}`, who: 'Forever AI Companion', question: t('unreadableQuestion'), ok: false, answer: e.message, pending: false, time: new Date().toISOString() });
       while (events.length > 20) events.shift();
       return;
     }
@@ -69,23 +79,50 @@ export function createController({ log = () => {} } = {}) {
     while (events.length > 20) events.shift();
   }
 
+  // The addon under the project's previous name stays while the game runs (it
+  // may have it loaded); once the game is closed it is removed and the saved
+  // chats are copied again if the game saved them since.
+  let legacyTimer = null;
+  let legacyChecking = false;
+  function watchLegacyAddon() {
+    if (legacyTimer || !wowDirValid() || !hasLegacyAddon(cfg.wowDir)) return;
+    legacyTimer = setInterval(async () => {
+      if (legacyChecking) return;
+      legacyChecking = true;
+      try {
+        const dir = cfg.wowDir;
+        if (!dir || !fs.existsSync(dir) || !hasLegacyAddon(dir)) { clearInterval(legacyTimer); legacyTimer = null; return; }
+        const running = await isWowRunningAsync();
+        if (finishLegacyMigration(dir, { wowRunning: running, log })) { clearInterval(legacyTimer); legacyTimer = null; }
+      } catch (e) {
+        log(`Addon with the previous name: ${e.message}`);
+      } finally {
+        legacyChecking = false;
+      }
+    }, LEGACY_ADDON_CHECK_MS);
+    legacyTimer.unref?.();
+  }
+
   function restartWatcher() {
     if (watcher) watcher.stop();
     watcher = null;
     watcherError = null;
-    if (!wowDirValid()) { watcherError = 'Falta elegir la carpeta del juego.'; return; }
-    if (!addonOk()) { watcherError = 'Falta instalar el addon.'; return; }
+    if (!wowDirValid()) { watcherError = t('needGameFolder'); return; }
     try {
-      // Keep the in-game addon up to date with this app's version.
-      if (installedAddonVersion(cfg.wowDir) !== bundledVersion) {
-        writeAddonFiles(cfg.wowDir);
-        log(`Addon actualizado a ${bundledVersion}`);
-      }
+      // Keep the in-game addon up to date with this app's version; coming
+      // from before the rename, install it under its current name.
+      ensureAddon(cfg, { wowDir: cfg.wowDir, log });
+    } catch (e) {
+      log(`Could not update the addon: ${e.message}`);
+    }
+    watchLegacyAddon();
+    if (!addonOk()) { watcherError = t('needAddon'); return; }
+    try {
       watcher = startWatcher({ cfg, wowDir: cfg.wowDir, log, onEvent: addEvent, guides });
-      log(`Esperando preguntas (${cfg.provider}) en ${cfg.wowDir}`);
+      log(`Waiting for questions (${cfg.provider}) in ${cfg.wowDir}`);
     } catch (e) {
       watcherError = e.message;
-      log(`No se pudo iniciar: ${e.message}`);
+      log(`Could not start: ${e.message}`);
     }
   }
 
@@ -103,18 +140,18 @@ export function createController({ log = () => {} } = {}) {
     const hashFile = `${dll}.source-sha256`;
     const current = fs.existsSync(hashFile) ? fs.readFileSync(hashFile, 'utf8') : null;
     if (!force && current === hash && fs.existsSync(dll)) return dll;
-    const src = path.join(env.dataDir, 'AzerothIATts.cs');
+    const src = path.join(env.dataDir, ENGINE_DLL.replace(/\.dll$/i, '.cs'));
     fs.mkdirSync(env.dataDir, { recursive: true });
     fs.writeFileSync(src, source);
     await compileEngine(src, dll);
     fs.writeFileSync(hashFile, hash);
-    log('Voz invisible actualizada.');
+    log('Invisible voice updated.');
     return dll;
   }
   if (sys.isWindows) {
     Promise.all([isVoiceVisible(), isLegacyVoiceVisible()])
       .then(([active, legacy]) => (active || legacy ? refreshVoiceDll() : null))
-      .catch((e) => log(`No se pudo actualizar la voz invisible: ${e.message}`));
+      .catch((e) => log(`Could not update the invisible voice: ${e.message}`));
   }
 
   // First run: find the game on our own.
@@ -122,7 +159,7 @@ export function createController({ log = () => {} } = {}) {
     const [found] = findWowDirs();
     if (found) {
       cfg = saveConfig({ wowDir: found });
-      log(`WoW Forever encontrado en ${found}`);
+      log(`WoW Forever found in ${found}`);
     }
   }
   restartWatcher();
@@ -134,6 +171,7 @@ export function createController({ log = () => {} } = {}) {
       const preset = cfg.preset || (cfg.provider === 'echo' ? 'echo' : null);
       return {
         version: VERSION,
+        lang: getAppLang(),
         packaged: sys.isPackaged(),
         wow: {
           dir: cfg.wowDir,
@@ -157,7 +195,7 @@ export function createController({ log = () => {} } = {}) {
         closeAction: cfg.closeAction || 'ask',
         tray: trayReady,
         guide: guide ? {
-          date: guide.meta.fecha,
+          date: guide.meta.date,
           source: guide.source,
           age: guideFreshness(guide).age,
           stale: guideFreshness(guide).stale,
@@ -168,7 +206,7 @@ export function createController({ log = () => {} } = {}) {
 
     async checkGuide() {
       const updated = await guideUpdates.check('manual');
-      return { updated, date: guide?.meta.fecha || null };
+      return { updated, date: guide?.meta.date || null };
     },
 
     setTrayReady(v) { trayReady = Boolean(v); },
@@ -178,7 +216,7 @@ export function createController({ log = () => {} } = {}) {
     },
     closeAction() { return cfg.closeAction || 'ask'; },
     setCloseAction({ action }) {
-      if (!['ask', 'tray', 'quit'].includes(action)) throw new Error('Opción desconocida.');
+      if (!['ask', 'tray', 'quit'].includes(action)) throw err('unknownOption');
       save({ closeAction: action });
       return { closeAction: action };
     },
@@ -193,32 +231,32 @@ export function createController({ log = () => {} } = {}) {
       const chosen = await sys.pickFolder();
       if (!chosen) return { cancelled: true };
       const dir = normalizeWowDir(chosen);
-      if (!dir) throw new Error('En esa carpeta no está WoW Forever. Elige la carpeta "World of Warcraft" o la carpeta "_forever_" que está dentro.');
+      if (!dir) throw err('notForeverFolder');
       save({ wowDir: dir });
       return { dir };
     },
 
     installAddon() {
-      if (!wowDirValid()) throw new Error('Primero elige la carpeta del juego.');
+      if (!wowDirValid()) throw err('needGameFolder');
       install(cfg, { wowDir: cfg.wowDir, log });
       restartWatcher();
       return { wowRunning: isWowRunning() };
     },
 
     setAI({ preset, apiKey, model }) {
-      if (!PRESETS[preset]) throw new Error('Opción de IA desconocida.');
+      if (!PRESETS[preset]) throw err('unknownAI');
       const patch = { preset };
       if (typeof apiKey === 'string' && apiKey.trim()) patch.keys = { [preset]: apiKey.trim() };
       if (typeof model === 'string') patch.models = { [preset]: model.trim() || null };
       if (PRESETS[preset].needsKey && !patch.keys && !cfg.keys?.[preset]) {
-        throw new Error('Pega tu clave de API para esta opción.');
+        throw err('pasteKey');
       }
       save(patch);
       return {};
     },
 
     async testAI() {
-      const req = { id: 'test', question: '¿Qué mazmorra me recomiendas ahora? Responde en dos frases.', context: sampleContext(), history: [] };
+      const req = { id: 'test', question: t('testQuestion'), context: sampleContext(), history: [] };
       const started = Date.now();
       const system = buildSystem(loadKnowledge(), 'fizzi', { canSearch: canSearch(cfg), client: req.context?.client, ...(guide ? { guide } : {}) });
       const { text, model } = await ask(cfg, system, buildMessages(req), req);
@@ -228,22 +266,28 @@ export function createController({ log = () => {} } = {}) {
     async voiceStatus() {
       if (!sys.isWindows) return { supported: false };
       const active = await isVoiceVisible();
-      // Old name: it keeps working, but the window offers to rename it.
-      const legacy = !active && await isLegacyVoiceVisible();
-      return { supported: true, active: active || legacy, legacy, dll: fs.existsSync(voiceDll()) };
+      // Set up by a version from before the rename (the voice's previous name,
+      // or its engine still the previous name's DLL): it keeps working, but the
+      // window offers to update it (one administrator prompt).
+      const legacyName = !active && await isLegacyVoiceVisible();
+      const legacyEngine = (active || legacyName) && await isLegacyEngineRegistered();
+      const legacy = legacyName || legacyEngine;
+      return { supported: true, active: active || legacyName, legacy, dll: fs.existsSync(voiceDll()) };
     },
 
     // Compiles the silent voice and registers it (one administrator prompt).
     async installVoice() {
       const dll = await refreshVoiceDll(true);
       await installVoiceMachineWide(dll, env.dataDir);
-      log('Voz invisible activada.');
+      log('Invisible voice enabled.');
+      // The old install folder was kept only for the previous voice's DLL.
+      if (sys.isPackaged()) removeLegacyInstallDir(sys.legacyInstallDir());
       return { active: await isVoiceVisible(), wowRunning: isWowRunning() };
     },
 
     async uninstallVoice() {
       await uninstallVoiceMachineWide(env.dataDir);
-      log('Voz invisible desactivada.');
+      log('Invisible voice disabled.');
       return { active: await isVoiceVisible() };
     },
 
@@ -260,7 +304,7 @@ export function createController({ log = () => {} } = {}) {
 
     claudeLogin() {
       const found = findClaudeCode(cfg.claudeCode.bin);
-      if (!found) throw new Error('Primero instala Claude Code.');
+      if (!found) throw err('installClaudeFirst');
       openLogin(found.path);
       return {};
     },
@@ -278,7 +322,7 @@ export function createController({ log = () => {} } = {}) {
 
     codexLogin() {
       const found = findCodex(cfg.codex.bin);
-      if (!found) throw new Error('Primero instala Codex.');
+      if (!found) throw err('installCodexFirst');
       openCodexLogin(found.path);
       return {};
     },
@@ -296,6 +340,8 @@ export function createController({ log = () => {} } = {}) {
 
     stop() {
       guideUpdates.stop();
+      if (legacyTimer) clearInterval(legacyTimer);
+      legacyTimer = null;
       if (watcher) watcher.stop();
       watcher = null;
     },
@@ -310,7 +356,12 @@ export function createController({ log = () => {} } = {}) {
         await sys.removeShortcuts().catch(() => {});
       }
       fs.rmSync(env.dataDir, { recursive: true, force: true });
-      if (sys.isPackaged()) sys.scheduleSelfDelete(sys.installDir());
+      if (sys.isPackaged()) {
+        // Leftovers of the project's previous name, if any.
+        removeLegacyInstallDir(sys.legacyInstallDir());
+        try { fs.rmSync(sys.legacyAppDataDir(), { recursive: true, force: true }); } catch { /* in use */ }
+        sys.scheduleSelfDelete(sys.installDir());
+      }
       return {};
     },
   };

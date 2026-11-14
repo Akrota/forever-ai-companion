@@ -11,14 +11,19 @@ import {
 import { buildSystem } from '../src/prompt.js';
 
 const builtin = parseGuide(foreverGuide());
-const guideText = (fecha, extra = '') => `---\nfecha: ${fecha}\nversionJuego: 1.61.0\nbuild: 71500\n---\n## Guía base de World of Warcraft: Forever\n${extra}${'Datos de Forever. '.repeat(80)}`;
+const guideText = (date, extra = '') => `---\ndate: ${date}\ngameVersion: 1.61.0\nbuild: 71500\n---\n## World of Warcraft: Forever base guide\n${extra}${'Forever facts. '.repeat(80)}`;
 
 test('the built-in guide has a date and the game build it describes', () => {
   assert.ok(builtin, 'header parsed');
-  assert.match(builtin.meta.fecha, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(builtin.meta.date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(builtin.meta.build, 70938);
   assert.ok(!builtin.body.startsWith('---'), 'the header is not sent to the AI');
-  assert.match(builtin.body, /9 de diciembre de 2026/);
+  assert.match(builtin.body, /December 9, 2026/);
+  assert.match(builtin.body, /es: "La Ciudad Anegada"/, 'Spanish client names for Spanish players');
+  // The first published guides used Spanish keys.
+  const legacy = parseGuide('---\nfecha: 2026-11-13\nversionJuego: 1.60.1\nbuild: 70938\n---\nbody');
+  assert.equal(legacy.meta.date, '2026-11-13');
+  assert.equal(legacy.meta.gameVersion, '1.60.1');
 });
 
 test('the AI knows today\'s date, the guide\'s age and when the game is newer', () => {
@@ -28,19 +33,19 @@ test('the AI knows today\'s date, the guide\'s age and when the game is newer', 
   assert.equal(fresh.gameNewer, false);
 
   const system = buildSystem('', 'fizzi', { now, client: { build: 71500, version: '1.61.0' } });
-  assert.match(system, /Hoy es 20 de diciembre de 2026/);
-  assert.match(system, /La guía base de Forever se revisó el 13 de noviembre de 2026/);
-  assert.match(system, /versión 1\.61\.0 \(build 71500\)/);
-  assert.match(system, /Blizzard actualizó el juego después de la guía/);
-  assert.match(system, /lo más reciente manda/);
-  assert.ok(!system.includes('fecha: 2026'), 'no raw header in the prompt');
+  assert.match(system, /Today is December 20, 2026/);
+  assert.match(system, /The WoW Forever base guide was last reviewed on November 13, 2026/);
+  assert.match(system, /version 1\.61\.0 \(build 71500\)/);
+  assert.match(system, /Blizzard updated the game after the guide/);
+  assert.match(system, /the most recent information wins/);
+  assert.ok(!system.includes('date: 2026'), 'no raw header in the prompt');
 
   // Old guide, same game: still warns.
   const old = freshnessSection(builtin, { now: new Date(2027, 0, 30), client: { build: 70938 } });
-  assert.match(old, /la guía tiene \d+ días/);
+  assert.match(old, /the guide is \d+ days old/);
   // Fresh guide, same game: no warning.
   const ok = freshnessSection(builtin, { now: new Date(2026, 10, 14), client: { build: 70938 } });
-  assert.doesNotMatch(ok, /Atención/);
+  assert.doesNotMatch(ok, /Warning/);
 });
 
 test('only a real, newer guide replaces the one the app has', async (t) => {
@@ -65,7 +70,7 @@ test('only a real, newer guide replaces the one the app has', async (t) => {
   t.after(() => u.stop());
 
   assert.equal(await u.check('manual'), true);
-  assert.equal(updated.meta.fecha, '2026-12-01');
+  assert.equal(updated.meta.date, '2026-12-01');
   const now = currentGuide(dir);
   assert.equal(now.source, 'descargada');
   assert.equal(now.meta.build, 71500);
@@ -74,12 +79,12 @@ test('only a real, newer guide replaces the one the app has', async (t) => {
   assert.equal(await u.check('manual'), false);
   served = guideText('2026-11-01');
   assert.equal(await u.check('manual'), false);
-  assert.equal(currentGuide(dir).meta.fecha, '2026-12-01');
+  assert.equal(currentGuide(dir).meta.date, '2026-12-01');
 
   // A broken download keeps the last good guide.
   served = 'Service Unavailable';
   assert.equal(await u.check('manual'), false);
-  assert.equal(currentGuide(dir).meta.fecha, '2026-12-01');
+  assert.equal(currentGuide(dir).meta.date, '2026-12-01');
 
   // The game patched: check right away, but at most every 30 minutes.
   const before = calls;

@@ -1,7 +1,7 @@
--- /ia probar-canales: tries every "invisible" way the game might have to hand
+-- /ia probe (probar-canales): tries every "invisible" way the game might have to hand
 -- data to the companion app, and lets the app measure which ones work here.
 --
--- Each probe writes a marker "AZIA-PROBE-<token>" somewhere the WoW client
+-- Each probe writes a marker "FAIC-PROBE-<token>" somewhere the WoW client
 -- may save to disk (a custom CVar, a macro, the addon list, the chat log) and
 -- reports what the text-to-speech API offers. The companion app watches those
 -- files; after WAIT seconds the addon undoes its changes and sends the results
@@ -12,12 +12,12 @@ local Probe = {}
 ns.Probe = Probe
 
 local WAIT = 25
-local MACRO = "AZIAPROBE"
-local SLOT = "AzerothIA_S50"
-local PREFIX = "AZIAPROBE"
+local MACRO = "FAICPROBE"
+local SLOT = "ForeverAICompanion_S50"
+local PREFIX = "FAICPROBE"
 
 local function try(fn, ...)
-  if type(fn) ~= "function" then return false, "no existe" end
+  if type(fn) ~= "function" then return false, ns.L.PROBE_NO_API end
   local ok, err = pcall(fn, ...)
   if ok then return true end
   return false, tostring(err):gsub("^.-:%d+: ", ""):sub(1, 80)
@@ -41,30 +41,31 @@ local function enableAddOn(name, on)
 end
 
 function Probe:Run()
+  local L = ns.L
   if self.running then
-    ns.UI:SetStatus("La prueba de canales ya está en marcha.")
+    ns.UI:SetStatus(L.PROBE_RUNNING)
     return
   end
   if InCombatLockdown() or UnitAffectingCombat("player") then
-    ns.UI:SetStatus("|cffff6060Sal del combate para hacer la prueba.|r")
+    ns.UI:SetStatus("|cffff6060" .. L.PROBE_COMBAT .. "|r")
     return
   end
   self.running = true
   ns.UI:Show()
-  ns.UI:SetStatus(string.format("Probando canales invisibles (%d s)...", WAIT))
+  ns.UI:SetStatus(string.format(L.PROBE_STARTED, WAIT))
 
   local token = tostring(time()) .. tostring(math.random(1000, 9999))
-  local marker = "AZIA-PROBE-" .. token
+  local marker = "FAIC-PROBE-" .. token
   local r = { token = token, actions = {}, results = {} }
   local function did(name, ok, err)
     r.actions[name] = time()
-    r.results[name] = ok and "ok" or (err or "falló")
+    r.results[name] = ok and "ok" or (err or L.PROBE_FAILED)
   end
 
   -- 1. Custom CVar (Config.wtf).
-  try(RegisterCVar, "aziaProbe", "")
+  try(RegisterCVar, "faicProbe", "")
   local setCVar = api("C_CVar.SetCVar") or SetCVar
-  did("cvar", try(setCVar, "aziaProbe", marker))
+  did("cvar", try(setCVar, "faicProbe", marker))
 
   -- 2. Addon list (AddOns.txt): disable the last mailbox and save.
   did("addons", enableAddOn(SLOT, false))
@@ -101,11 +102,11 @@ function Probe:Run()
   local speak = api("C_VoiceChat.SpeakText")
   if speak and voices[1] then
     -- Volume 0: nothing is heard. Two known signatures across game versions.
-    local ok, err = try(speak, voices[1].id, "AzerothIA", 0, 0, false)
-    if not ok then ok, err = try(speak, voices[1].id, "AzerothIA", 1, 0, 0) end
+    local ok, err = try(speak, voices[1].id, "ForeverAICompanion", 0, 0, false)
+    if not ok then ok, err = try(speak, voices[1].id, "ForeverAICompanion", 1, 0, 0) end
     did("tts", ok, err)
   else
-    did("tts", false, speak and "sin voces" or "no existe")
+    did("tts", false, speak and L.PROBE_NO_VOICES or L.PROBE_NO_API)
   end
 
   -- 6. Taskbar icon flash (a 1-bit signal).
@@ -116,9 +117,9 @@ function Probe:Run()
     enableAddOn(SLOT, true)
     local idx = GetMacroIndexByName and GetMacroIndexByName(MACRO) or 0
     if idx and idx > 0 then try(DeleteMacro, idx) end
-    try(setCVar, "aziaProbe", "")
+    try(setCVar, "faicProbe", "")
     if LoggingChat and r.chatLoggingBefore ~= nil then try(LoggingChat, r.chatLoggingBefore) end
     Probe.running = false
-    ns.Core:Ask("Prueba de canales invisibles", { probe = r })
+    ns.Core:Ask(L.PROBE_QUESTION, { probe = r })
   end)
 end

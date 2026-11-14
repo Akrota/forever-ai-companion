@@ -1,10 +1,11 @@
--- AzerothIA window, home of the player's assistant (Fizzi the gnome or Rizzik
+-- Forever AI Companion window, home of the player's assistant (Fizzi the gnome or Rizzik
 -- the goblin, see Personas.lua). Built from the game's own art so it looks
 -- like part of the real UI: gold dialog border over dark rock, the classic
 -- title banner, a round portrait with a gold ring in the corner, the red close
 -- button and red panel buttons. Chats on the left; on the right the
 -- conversation as messages with avatars, like the in-game messengers.
 local _, ns = ...
+local L = ns.L
 
 local UI = {}
 ns.UI = UI
@@ -75,14 +76,7 @@ local TOP_H = 64          -- room for the banner, the portrait and the tools
 local ROW_H = 44
 local AVATAR = 28
 
-local SUGGESTIONS = {
-  "¿Qué mazmorra me conviene hacer ahora?",
-  "Revisa mi equipo: ¿qué debería mejorar primero?",
-  "¿Qué misiones me conviene terminar primero?",
-  "¿Dónde subo de nivel más rápido?",
-  "¿Qué hago con lo que llevo en las bolsas?",
-  "Dame consejos para jugar mejor mi clase.",
-}
+local SUGGESTIONS = L.SUGGESTIONS
 
 local function settings()
   ns.db.ui = ns.db.ui or {}
@@ -225,10 +219,10 @@ end
 local function dayGroup(t)
   t = t or 0
   local today = date("%Y-%m-%d")
-  if date("%Y-%m-%d", t) == today then return "Hoy" end
-  if date("%Y-%m-%d", t + 86400) == today then return "Ayer" end
-  if time() - t < 7 * 86400 then return "Esta semana" end
-  return "Anteriores"
+  if date("%Y-%m-%d", t) == today then return L.TODAY end
+  if date("%Y-%m-%d", t + 86400) == today then return L.YESTERDAY end
+  if time() - t < 7 * 86400 then return L.THIS_WEEK end
+  return L.OLDER
 end
 
 -- The player's own face (for their messages).
@@ -244,7 +238,7 @@ end
 local function makeFonts(size)
   UI.fonts = UI.fonts or {}
   local function font(name, base, delta)
-    local f = UI.fonts[name] or CreateFont("AzerothIAFont" .. name)
+    local f = UI.fonts[name] or CreateFont("ForeverAICompanionFont" .. name)
     UI.fonts[name] = f
     if base and base.GetFont then
       local file, _, flags = base:GetFont()
@@ -265,7 +259,7 @@ function UI:Build()
   makeFonts(s.fontSize)
   loadPalette(persona())
 
-  local f = newFrame("Frame", "AzerothIAFrame", UIParent)
+  local f = newFrame("Frame", "ForeverAICompanionFrame", UIParent)
   f:SetSize(s.width, s.height)
   if s.point then
     f:SetPoint(s.point, UIParent, s.relPoint or s.point, s.x or 0, s.y or 0)
@@ -282,7 +276,7 @@ function UI:Build()
   f:RegisterForDrag("LeftButton")
   f:Hide()
   dialog(f)
-  tinsert(UISpecialFrames, "AzerothIAFrame")
+  tinsert(UISpecialFrames, "ForeverAICompanionFrame")
 
   local function savePosition()
     local point, _, relPoint, x, y = f:GetPoint(1)
@@ -299,7 +293,7 @@ function UI:Build()
   banner:SetPoint("TOP", 0, 12)
   local bannerTitle = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   bannerTitle:SetPoint("TOP", banner, "TOP", 0, -14)
-  bannerTitle:SetText("Forever AI Companion")
+  bannerTitle:SetText(L.WINDOW_TITLE)
 
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -3, -3)
@@ -311,7 +305,7 @@ function UI:Build()
   portrait:SetPoint("TOPLEFT", -22, 20)
   portrait:SetFrameLevel((f:GetFrameLevel() or 1) + 10)
   portrait:SetScript("OnClick", function() UI:ShowChooser() end)
-  tooltip(portrait, "Cambiar de asistente", "Elige entre Fizzi (gnoma, Alianza) y Rizzik (goblin, Horda).")
+  tooltip(portrait, L.CHANGE_ASSISTANT, L.CHANGE_ASSISTANT_TIP)
   local who = CreateFrame("Button", nil, f)
   who:SetPoint("TOPLEFT", 66, -26)
   who:SetSize(240, 32)
@@ -320,22 +314,22 @@ function UI:Build()
   local tagline = who:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   tagline:SetPoint("TOPLEFT", appName, "BOTTOMLEFT", 0, -2)
   who:SetScript("OnClick", function() UI:ShowChooser() end)
-  tooltip(who, "Cambiar de asistente", "Elige entre Fizzi (gnoma, Alianza) y Rizzik (goblin, Horda).")
+  tooltip(who, L.CHANGE_ASSISTANT, L.CHANGE_ASSISTANT_TIP)
   self.logo, self.appName, self.tagline = portrait.icon, appName, tagline
 
   -- Tools on the right of the top bar.
   local bigger = panelButton(f, "A+", 34, 22)
   bigger:SetPoint("TOPRIGHT", -36, -32)
   bigger:SetScript("OnClick", function() UI:SetFontSize(s.fontSize + 1) end)
-  tooltip(bigger, "Letra más grande")
+  tooltip(bigger, L.FONT_BIGGER)
   local smaller = panelButton(f, "A-", 34, 22)
   smaller:SetPoint("RIGHT", bigger, "LEFT", -2, 0)
   smaller:SetScript("OnClick", function() UI:SetFontSize(s.fontSize - 1) end)
-  tooltip(smaller, "Letra más pequeña")
-  local toggleSide = panelButton(f, "Chats", 70, 22)
+  tooltip(smaller, L.FONT_SMALLER)
+  local toggleSide = panelButton(f, L.CHATS, 70, 22)
   toggleSide:SetPoint("RIGHT", smaller, "LEFT", -8, 0)
   toggleSide:SetScript("OnClick", function() UI:SetSidebar(not s.sidebar) end)
-  tooltip(toggleSide, "Mostrar u ocultar la lista de chats")
+  tooltip(toggleSide, L.CHATS_TIP)
 
   -- Sidebar --------------------------------------------------------------------
   local side = newFrame("Frame", nil, f)
@@ -344,7 +338,7 @@ function UI:Build()
   side:SetWidth(SIDEBAR_W)
   panel(side)
 
-  local newChat = panelButton(side, "+ Nuevo chat", SIDEBAR_W - 20, 26)
+  local newChat = panelButton(side, L.NEW_CHAT_BUTTON, SIDEBAR_W - 20, 26)
   newChat:SetPoint("TOP", 0, -10)
   newChat:SetScript("OnClick", function()
     ns.Chats:New()
@@ -353,17 +347,17 @@ function UI:Build()
     UI.input:SetFocus()
   end)
 
-  local listScroll = CreateFrame("ScrollFrame", "AzerothIAChatList", side, "UIPanelScrollFrameTemplate")
+  local listScroll = CreateFrame("ScrollFrame", "ForeverAICompanionChatList", side, "UIPanelScrollFrameTemplate")
   listScroll:SetPoint("TOPLEFT", 6, -44)
   listScroll:SetPoint("BOTTOMRIGHT", -26, 34)
   local list = CreateFrame("Frame", nil, listScroll)
   list:SetSize(SIDEBAR_W - 34, 10)
   listScroll:SetScrollChild(list)
 
-  local myData = linkButton(side, "Ver los datos que envío", SIDEBAR_W - 20, 22)
+  local myData = linkButton(side, L.MY_DATA, SIDEBAR_W - 20, 22)
   myData:SetPoint("BOTTOM", 0, 8)
   myData:SetScript("OnClick", function() UI:ShowContext() end)
-  tooltip(myData, "Datos de tu personaje", "Lo que tu asistente recibe con cada pregunta: equipo, misiones, posición...")
+  tooltip(myData, L.MY_DATA_TIP_TITLE, L.MY_DATA_TIP)
 
   -- Main area ------------------------------------------------------------------
   local main = newFrame("Frame", nil, f)
@@ -385,7 +379,7 @@ function UI:Build()
   local titleHl = titleBtn:CreateTexture(nil, "HIGHLIGHT")
   titleHl:SetAllPoints()
   titleHl:SetColorTexture(1, 0.82, 0, 0.06)
-  tooltip(titleBtn, "Renombrar chat", "Haz clic para cambiar el nombre.")
+  tooltip(titleBtn, L.RENAME_CHAT, L.RENAME_CHAT_TIP)
 
   local renameBox = newFrame("EditBox", nil, main)
   renameBox:SetAllPoints(titleBtn)
@@ -421,7 +415,7 @@ function UI:Build()
   local channel = main:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   channel:SetPoint("LEFT", dot, "RIGHT", 6, 0)
 
-  local deleteChat = panelButton(main, "Borrar chat", 96, 22)
+  local deleteChat = panelButton(main, L.DELETE_CHAT, 96, 22)
   deleteChat:SetPoint("TOPRIGHT", -10, -10)
   deleteChat:SetScript("OnClick", function(self) UI:ConfirmDelete(self, ns.db.currentChat) end)
 
@@ -432,7 +426,7 @@ function UI:Build()
   headerLine:SetColorTexture(EDGE_GOLD[1], EDGE_GOLD[2], EDGE_GOLD[3], 0.35)
 
   -- Messages.
-  local scroll = CreateFrame("ScrollFrame", "AzerothIAScroll", main, "UIPanelScrollFrameTemplate")
+  local scroll = CreateFrame("ScrollFrame", "ForeverAICompanionScroll", main, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", 8, -60)
   scroll:SetPoint("BOTTOMRIGHT", -28, 66)
   local content = CreateFrame("Frame", nil, scroll)
@@ -440,18 +434,18 @@ function UI:Build()
   scroll:SetScrollChild(content)
   scroll:SetScript("OnSizeChanged", function() UI:RefreshConversation() end)
 
-  -- Composer: gold-edged text box and the red "Enviar" button.
+  -- Composer: gold-edged text box and the red "Send" button.
   local composer = newFrame("Frame", nil, main)
   composer:SetPoint("BOTTOMLEFT", 10, 28)
   composer:SetPoint("BOTTOMRIGHT", -100, 28)
   composer:SetHeight(32)
   panel(composer, EDGE_GOLD, { 0, 0, 0, 0.65 }, 12)
 
-  local send = panelButton(main, "Enviar", 84, 28)
+  local send = panelButton(main, L.SEND, 84, 28)
   send:SetPoint("LEFT", composer, "RIGHT", 6, 0)
   send:SetScript("OnClick", function() UI:Submit() end)
 
-  local input = CreateFrame("EditBox", "AzerothIAInput", composer)
+  local input = CreateFrame("EditBox", "ForeverAICompanionInput", composer)
   input:SetPoint("LEFT", 10, 0)
   input:SetPoint("RIGHT", -8, 0)
   input:SetHeight(28)
@@ -566,17 +560,17 @@ end
 function UI:ConfirmDelete(btn, chatId)
   if btn.confirmFor == chatId then
     btn.confirmFor = nil
-    btn:SetText("Borrar chat")
+    btn:SetText(L.DELETE_CHAT)
     ns.Chats:Delete(chatId)
     self:Refresh()
     return
   end
   btn.confirmFor = chatId
-  btn:SetText("¿Seguro?")
+  btn:SetText(L.CONFIRM_DELETE)
   C_Timer.After(3, function()
     if btn.confirmFor == chatId then
       btn.confirmFor = nil
-      btn:SetText("Borrar chat")
+      btn:SetText(L.DELETE_CHAT)
     end
   end)
 end
@@ -646,10 +640,10 @@ function UI:Row(i)
       return
     end
     self.confirm = true
-    row.info:SetText("|cffff6060Clic otra vez para borrar|r")
+    row.info:SetText("|cffff6060" .. L.CLICK_AGAIN_DELETE .. "|r")
     C_Timer.After(3, function() self.confirm = nil; UI:RefreshList() end)
   end)
-  tooltip(x, "Borrar chat")
+  tooltip(x, L.DELETE_CHAT)
   row.deleteBtn = x
   local function hover(on)
     x:SetShown(on or x.confirm)
@@ -698,8 +692,8 @@ function UI:RefreshList()
     local pending = false
     for _, m in ipairs(c.messages) do if m.status == "pending" then pending = true break end end
     if not row.deleteBtn.confirm then
-      row.info:SetText(pending and ("|cffffd100" .. p.name .. " está escribiendo...|r")
-        or string.format("%s · %d %s", stamp(c.updated), #c.messages, #c.messages == 1 and "mensaje" or "mensajes"))
+      row.info:SetText(pending and ("|cffffd100" .. string.format(L.IS_TYPING, p.name) .. "|r")
+        or string.format("%s · %d %s", stamp(c.updated), #c.messages, #c.messages == 1 and L.MESSAGE_ONE or L.MESSAGE_MANY))
     end
     local isCurrent = c.id == ns.db.currentChat
     row.selected:SetShown(isCurrent)
@@ -714,7 +708,7 @@ function UI:RefreshList()
 end
 
 -- Conversation ---------------------------------------------------------------
--- A message: avatar, a "name · time" line (with Copiar / Reintentar) and the
+-- A message: avatar, a "name · time" line (with Copy / Retry) and the
 -- text in a tooltip-style box. The player's messages go on the right.
 
 function UI:Bubble(i)
@@ -735,7 +729,7 @@ function UI:Bubble(i)
   text:SetSpacing(3)
   if text.SetWordWrap then text:SetWordWrap(true) end
   b.text = text
-  local action = linkButton(b, "Copiar", 70, 16)
+  local action = linkButton(b, L.COPY, 70, 16)
   b.action = action
   self.bubbles[i] = b
   return b
@@ -770,7 +764,7 @@ function UI:PlaceBubble(i, y, kind, textValue, metaValue, onAction, actionLabel)
     setPlayerPortrait(b.face)
     b.face:SetPoint("TOPRIGHT", b, "TOPRIGHT", -2, -2)
     b.who:SetPoint("TOPRIGHT", b.face, "TOPLEFT", -8, 0)
-    b.who:SetText("Tú")
+    b.who:SetText(L.YOU)
     b.meta:SetPoint("RIGHT", b.who, "LEFT", -6, 0)
     b.box:SetPoint("TOPRIGHT", b.face, "TOPLEFT", -6, -16)
     b.action:SetPoint("RIGHT", b.meta, "LEFT", -6, 0)
@@ -846,7 +840,7 @@ function UI:ShowWelcome()
       w.chips[i] = chip
     end
     local hint = w:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetText("Cada chat recuerda su propia conversación: usa uno por tema.")
+    hint:SetText(L.WELCOME_HINT)
     w.hint = hint
     self.welcome = w
     self:ApplyPersona(true)
@@ -921,7 +915,7 @@ local function chooserCard(parent, p)
   sample:SetText(p.sample)
   card.sample = sample
 
-  local pick = panelButton(card, "Elegir a " .. p.name, 150, 26)
+  local pick = panelButton(card, string.format(L.PICK_PERSONA, p.name), 150, 26)
   pick:SetPoint("BOTTOM", 0, 14)
   pick:SetScript("OnClick", function() UI:PickPersona(p.id) end)
   card.pick = pick
@@ -933,7 +927,7 @@ function UI:PickPersona(id)
   ns.Personas:Set(id)
   local p = persona()
   if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_QUEST_LIST_SELECT or 875) end
-  self:SetStatus(p.nameColor .. p.name .. "|r es ahora tu asistente.")
+  self:SetStatus(string.format(L.NOW_YOUR_ASSISTANT, p.nameColor .. p.name .. "|r"))
   self:Refresh()
   if self.input then self.input:SetFocus() end
 end
@@ -943,17 +937,17 @@ function UI:LayoutChooser()
     local ch = CreateFrame("Frame", nil, self.content)
     local title = ch:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
     title:SetPoint("TOP", 0, -14)
-    title:SetText("Elige a tu asistente en Azeroth")
+    title:SetText(L.CHOOSER_TITLE)
     local sub = ch:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     sub:SetPoint("TOP", title, "BOTTOM", 0, -8)
     sub:SetJustifyH("CENTER")
-    sub:SetText("Te acompañará en tus aventuras y responderá tus preguntas.\nPuedes cambiarlo cuando quieras haciendo clic en su retrato, arriba a la izquierda.")
+    sub:SetText(L.CHOOSER_SUB)
     ch.cards = {}
     for i, id in ipairs(ns.Personas.ORDER) do
       ch.cards[i] = chooserCard(ch, ns.Personas.list[id])
       ch.cards[i].persona = ns.Personas.list[id]
     end
-    local back = linkButton(ch, "Volver al chat", 120, 22, "GameFontNormal")
+    local back = linkButton(ch, L.BACK_TO_CHAT, 120, 22, "GameFontNormal")
     back:SetScript("OnClick", function() UI.choosing = false; UI:Refresh() end)
     ch.back = back
     self.chooser = ch
@@ -973,7 +967,7 @@ function UI:LayoutChooser()
     card.sample:SetWidth(cardW - 28)
     local p = card.persona
     card.role:SetText(p.role .. " · " .. p.factionLabel
-      .. (p.id == suggested and "  |cff66dd66(tu facción)|r" or ""))
+      .. (p.id == suggested and ("  |cff66dd66" .. L.YOUR_FACTION .. "|r") or ""))
   end
   local rows = math.ceil(#ch.cards / cols)
   local h = 84 + rows * (CARD_H + 14)
@@ -995,7 +989,7 @@ function UI:RefreshConversation()
 
   -- First time on this character (or the player asked): pick an assistant.
   if self.choosing or not ns.Personas:Chosen() then
-    self.title:SetText("Tu asistente")
+    self.title:SetText(L.YOUR_ASSISTANT)
     self.deleteButton:Hide()
     if self.welcome then self.welcome:Hide() end
     for i = 1, #self.bubbles do self.bubbles[i]:Hide() end
@@ -1025,11 +1019,11 @@ function UI:RefreshConversation()
     elseif e.status == "done" then
       local answer = e.answer
       y = y + self:PlaceBubble(n, y, "ai", escape(answer), stamp(e.t),
-        function() UI:ShowCopy(answer) end, "Copiar") + 12
+        function() UI:ShowCopy(answer) end, L.COPY) + 12
     else
       y = y + self:PlaceBubble(n, y, "error",
-        p.errorIntro .. "\n|cffffb0b0" .. escape(e.answer or "Algo salió mal.") .. "|r", stamp(e.t),
-        function() UI:Retry(e, current) end, "Reintentar") + 12
+        p.errorIntro .. "\n|cffffb0b0" .. escape(e.answer or L.SOMETHING_WRONG) .. "|r", stamp(e.t),
+        function() UI:Retry(e, current) end, L.RETRY) + 12
     end
   end
   for i = n + 1, #self.bubbles do self.bubbles[i]:Hide() end
@@ -1041,7 +1035,7 @@ end
 
 function UI:Retry(entry, chatData)
   if ns.Core.working or ns.Uplink.busy then
-    self:SetStatus("Espera un momento: todavía estoy enviando otra pregunta.")
+    self:SetStatus(L.WAIT_OTHER)
     return
   end
   for i, m in ipairs(chatData.messages) do
@@ -1061,13 +1055,13 @@ function UI:RefreshStatusBar()
   local p = persona()
   if waitingLong then
     fill(self.dot, C.warn)
-    self.channel:SetText("Sin señal de la app compañera... ¿está abierta en tu PC?")
+    self.channel:SetText(L.NO_SIGNAL)
   elseif ns.Voice and ns.Voice:Find() and not ns.Voice.broken then
     fill(self.dot, C.ok)
-    self.channel:SetText(p.name .. " · " .. p.statusOnline .. " · envío invisible")
+    self.channel:SetText(p.name .. " · " .. p.statusOnline .. " · " .. L.VIA_VOICE)
   else
     fill(self.dot, C.ok)
-    self.channel:SetText(p.name .. " · " .. p.statusOnline .. " · envío por línea en pantalla")
+    self.channel:SetText(p.name .. " · " .. p.statusOnline .. " · " .. L.VIA_STRIP)
   end
 end
 
@@ -1108,7 +1102,7 @@ end
 -- Copyable text window (answers, character data), same dialog look.
 function UI:ShowCopy(text, heading)
   if not self.copyFrame then
-    local f = newFrame("Frame", "AzerothIACopyFrame", UIParent)
+    local f = newFrame("Frame", "ForeverAICompanionCopyFrame", UIParent)
     f:SetSize(580, 420)
     f:SetPoint("CENTER", 40, -30)
     f:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -1119,7 +1113,7 @@ function UI:ShowCopy(text, heading)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
     f:SetClampedToScreen(true)
     dialog(f)
-    tinsert(UISpecialFrames, "AzerothIACopyFrame")
+    tinsert(UISpecialFrames, "ForeverAICompanionCopyFrame")
     local banner = f:CreateTexture(nil, "ARTWORK")
     banner:SetTexture(ART.banner)
     banner:SetSize(360, 64)
@@ -1129,14 +1123,14 @@ function UI:ShowCopy(text, heading)
     f.title = title
     local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetPoint("TOPLEFT", 18, -30)
-    hint:SetText("Ctrl+C para copiar")
+    hint:SetText(L.COPY_HINT)
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -3, -3)
     local inset = newFrame("Frame", nil, f)
     inset:SetPoint("TOPLEFT", 12, -48)
     inset:SetPoint("BOTTOMRIGHT", -12, 12)
     panel(inset)
-    local scroll = CreateFrame("ScrollFrame", "AzerothIACopyScroll", inset, "UIPanelScrollFrameTemplate")
+    local scroll = CreateFrame("ScrollFrame", "ForeverAICompanionCopyScroll", inset, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 10, -10)
     scroll:SetPoint("BOTTOMRIGHT", -30, 10)
     local edit = CreateFrame("EditBox", nil, scroll)
@@ -1150,7 +1144,7 @@ function UI:ShowCopy(text, heading)
     self.copyFrame = f
   end
   local f = self.copyFrame
-  f.title:SetText(heading or "Copiar respuesta")
+  f.title:SetText(heading or L.COPY_ANSWER)
   f.edit:SetText(text or "")
   f:Show()
   f.edit:SetFocus()
@@ -1160,6 +1154,6 @@ end
 -- The JSON the AI receives (also handy to paste into any AI chat).
 function UI:ShowContext()
   local ok, snap = pcall(ns.Collect.Snapshot, ns.Collect)
-  local json = ok and ns.Json.Encode(snap) or ("Error: " .. tostring(snap))
-  self:ShowCopy(json, "Datos de tu personaje que recibe " .. persona().name)
+  local json = ok and ns.Json.Encode(snap) or (L.ERROR .. ": " .. tostring(snap))
+  self:ShowCopy(json, string.format(L.CONTEXT_TITLE, persona().name))
 end

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -266,13 +266,13 @@
 
 <!-- Setup wizard ---------------------------------------------------------------->
 <div class="wizard hidden" id="wizard">
-  <nav class="steps" aria-label="Pasos de la configuración"><ol id="stepper"></ol></nav>
+  <nav class="steps" aria-label="Setup steps"><ol id="stepper"></ol></nav>
   <div class="pane">
     <main class="page" id="page"><div class="page-inner" id="page-inner"></div></main>
     <div class="footer">
       <span class="hint" id="footer-hint"></span>
-      <button class="btn ghost" id="btn-back">Atrás</button>
-      <button class="btn primary" id="btn-next">Siguiente</button>
+      <button class="btn ghost" id="btn-back">Back</button>
+      <button class="btn primary" id="btn-next">Next</button>
     </div>
   </div>
 </div>
@@ -284,97 +284,687 @@
 
 <script>
 // ---------------------------------------------------------------------------
-// Data
+// Language: English by default, Spanish when the app (status.lang) or the
+// system (navigator.language) says so. A missing Spanish text falls back to English.
 // ---------------------------------------------------------------------------
-const PROVIDERS = {
-  'claude-code': {
-    name: 'Mi suscripción de Claude', rec: true,
-    desc: 'Usa tu plan Claude Pro o Max. No necesitas claves ni pagar nada extra.',
-    tags: [['good', 'Incluido en tu plan'], ['', 'Requiere Claude Pro o Max']],
-    models: [
-      ['sonnet', 'Sonnet', 'Rápido y listo. La mejor opción para la mayoría.', true],
-      ['opus', 'Opus', 'El más inteligente, pero tarda más y gasta más de tu límite.'],
-      ['haiku', 'Haiku', 'El más rápido; gasta muy poco de tu límite.'],
-      ['default', 'El de tu plan', 'Usa el modelo que tu plan tenga por defecto.'],
-    ],
-  },
-  codex: {
-    name: 'Mi suscripción de ChatGPT',
-    desc: 'Usa tu plan ChatGPT Plus o Pro a través de Codex, el programa oficial de OpenAI. No necesitas claves ni pagar nada extra.',
-    tags: [['good', 'Incluido en tu plan'], ['', 'Requiere ChatGPT Plus o Pro']],
-    models: [
-      ['default', 'El de tu plan', 'Usa el modelo que tu plan tenga por defecto. La mejor opción para la mayoría.', true],
-      ['gpt-6-luna', 'GPT-6 Luna', 'El más rápido; gasta muy poco de tu límite.'],
-      ['gpt-6-astra', 'GPT-6 Astra', 'El más inteligente, pero tarda más y gasta más de tu límite.'],
-    ],
-  },
-  claude: {
-    name: 'Claude con clave de API',
-    desc: 'Para quien no tiene suscripción: pagas solo lo que usas en la web de Anthropic.',
-    tags: [['cost', 'Pagas por uso (≈ 1 centavo por pregunta)'], ['', 'Requiere una clave']],
-    key: ['Entra a <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> e inicia sesión o crea una cuenta.',
-      'En <b>Billing</b>, carga algo de crédito (unos pocos dólares alcanzan para muchas preguntas).',
-      'En <b>API Keys</b>, pulsa <b>Create Key</b> y copia la clave (empieza con <code>sk-ant-</code>).'],
-    models: [
-      ['claude-opus-5-5', 'Claude Opus 5.5', 'El más inteligente (≈ 2 centavos por pregunta).', true],
-      ['claude-sonnet-5-5', 'Claude Sonnet 5.5', 'Equilibrado (≈ 1 centavo por pregunta).'],
-      ['claude-haiku-5-5', 'Claude Haiku 5.5', 'El más barato y rápido (menos de 0,1 centavo).'],
-    ],
-  },
-  chatgpt: {
-    name: 'ChatGPT con clave de API',
-    desc: 'Para quien no tiene suscripción: pagas solo lo que usas en la web de OpenAI. Si tienes ChatGPT Plus o Pro, elige «Mi suscripción de ChatGPT».',
-    tags: [['cost', 'Pagas por uso'], ['', 'Requiere una clave']],
-    key: ['Entra a <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> e inicia sesión.',
-      'Carga crédito en <b>Billing</b>.',
-      'Pulsa <b>Create new secret key</b> y copia la clave (empieza con <code>sk-</code>).'],
-  },
-  gemini: {
-    name: 'Gemini',
-    desc: 'La IA de Google. Suele tener un uso gratuito con límites.',
-    tags: [['good', 'Uso gratis con límites'], ['', 'Requiere una clave']],
-    key: ['Entra a <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> con tu cuenta de Google.',
-      'Pulsa <b>Create API key</b> y cópiala.'],
-  },
-  echo: {
-    name: 'Modo prueba',
-    desc: 'No usa IA: responde con los datos que recibe. Sirve para comprobar que el juego y la app se conectan.',
-    tags: [['good', 'Gratis'], ['', 'No responde con IA']],
-  },
-};
-const ADVANCED = {
-  ollama: {
-    name: 'IA en tu PC (Ollama)',
-    desc: 'Gratis y sin internet, pero necesita un PC potente y algo de configuración.',
-    tags: [['good', 'Gratis'], ['', 'Necesita un PC potente']],
-    modelText: true,
-    local: ['Instala <a href="https://ollama.com" target="_blank">Ollama</a>.', 'Descarga un modelo (por ejemplo <code>llama3.2</code>) desde la app de Ollama.'],
-  },
-};
-const ALL = { ...PROVIDERS, ...ADVANCED };
+const I18N = {
+  en: {
+    'nav.steps': 'Setup steps',
+    'btn.back': 'Back',
+    'btn.next': 'Next',
+    'btn.cancel': 'Cancel',
+    'btn.backToDash': 'Back to dashboard',
+    'btn.change': 'Change',
+    'btn.install': 'Install',
+    'btn.reinstall': 'Reinstall',
+    'busy.installing': 'Installing…',
+    'busy.waitingChoice': 'Waiting for your choice…',
+    'badge.rec': 'Recommended',
+    'badge.using': 'In use',
+    'badge.on': 'On',
+    'chip.ok': 'Running',
+    'chip.warn': 'Check your setup',
+    'chip.down': 'The app isn\'t responding',
+    'footer.stepOf': 'Step {n} of {total}',
+    'kicker.step': 'Step {n}',
+    'kicker.stepOptional': 'Step {n} · Optional',
 
-// Options that use a subscription through an official program on this PC.
-const CLI = {
-  'claude-code': {
-    api: 'claude', app: 'Claude Code', account: 'Claude',
-    about: 'Es el programa oficial y gratuito de Anthropic que conecta tu suscripción. Se instala con un clic.',
+    'step.optional': 'optional',
+    'step.welcome.title': 'Welcome',
+    'step.welcome.sub': 'What the app does',
+    'step.game.title': 'Your game',
+    'step.game.sub': 'Where WoW Forever is',
+    'step.addon.title': 'The addon',
+    'step.addon.sub': 'The window inside the game',
+    'step.ai.title': 'Your AI',
+    'step.ai.sub': 'Who answers your questions',
+    'step.voice.title': 'Invisible sending',
+    'step.voice.sub': 'Nothing shows on screen',
+    'step.done.title': 'Done',
+    'step.done.sub': 'How to use it',
+
+    // AI options
+    'tag.inPlan': 'Included in your plan',
+    'tag.needsKey': 'Requires a key',
+    'tag.free': 'Free',
+    'model.planDefault': 'Your plan\'s default',
+    'model.planDefault.desc': 'Uses whatever model your plan has as its default.',
+    'model.planDefault.descRec': 'Uses whatever model your plan has as its default. The best choice for most people.',
+    'model.smartest': 'The smartest, but slower and uses more of your limit.',
+    'model.fastest': 'The fastest; uses very little of your limit.',
+    'p.claudeCode.name': 'My Claude subscription',
+    'p.claudeCode.desc': 'Uses your Claude Pro or Max plan. No keys needed and nothing extra to pay.',
+    'p.claudeCode.tag': 'Requires Claude Pro or Max',
+    'p.claudeCode.sonnet': 'Fast and smart. The best choice for most people.',
+    'p.codex.name': 'My ChatGPT subscription',
+    'p.codex.desc': 'Uses your ChatGPT Plus or Pro plan through Codex, the official OpenAI program. No keys needed and nothing extra to pay.',
+    'p.codex.tag': 'Requires ChatGPT Plus or Pro',
+    'p.claude.name': 'Claude with an API key',
+    'p.claude.desc': 'For people without a subscription: you only pay for what you use, on Anthropic\'s website.',
+    'p.claude.tag': 'Pay as you go (≈ 1 cent per question)',
+    'p.claude.key1': 'Go to <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> and sign in or create an account.',
+    'p.claude.key2': 'In <b>Billing</b>, add some credit (a few dollars is enough for lots of questions).',
+    'p.claude.key3': 'In <b>API Keys</b>, click <b>Create Key</b> and copy the key (it starts with <code>sk-ant-</code>).',
+    'p.claude.opus': 'The smartest (≈ 2 cents per question).',
+    'p.claude.sonnet': 'Balanced (≈ 1 cent per question).',
+    'p.claude.haiku': 'The cheapest and fastest (less than 0.1 cent).',
+    'p.chatgpt.name': 'ChatGPT with an API key',
+    'p.chatgpt.desc': 'For people without a subscription: you only pay for what you use, on OpenAI\'s website. If you have ChatGPT Plus or Pro, choose “My ChatGPT subscription”.',
+    'p.chatgpt.tag': 'Pay as you go',
+    'p.chatgpt.key1': 'Go to <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> and sign in.',
+    'p.chatgpt.key2': 'Add credit in <b>Billing</b>.',
+    'p.chatgpt.key3': 'Click <b>Create new secret key</b> and copy the key (it starts with <code>sk-</code>).',
+    'p.gemini.desc': 'Google\'s AI. It usually has a free tier with limits.',
+    'p.gemini.tag': 'Free use with limits',
+    'p.gemini.key1': 'Go to <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> with your Google account.',
+    'p.gemini.key2': 'Click <b>Create API key</b> and copy it.',
+    'p.echo.name': 'Test mode',
+    'p.echo.desc': 'Doesn\'t use AI: it replies with the data it receives. Useful to check that the game and the app are connected.',
+    'p.echo.tag': 'Doesn\'t answer with AI',
+    'p.ollama.name': 'AI on your PC (Ollama)',
+    'p.ollama.desc': 'Free and works offline, but needs a powerful PC and some setup.',
+    'p.ollama.tag': 'Needs a powerful PC',
+    'p.ollama.local1': 'Install <a href="https://ollama.com" target="_blank">Ollama</a>.',
+    'p.ollama.local2': 'Download a model (for example <code>llama3.2</code>) from the Ollama app.',
+    'cli.claudeCode.about': 'It\'s Anthropic\'s free, official program that connects your subscription. It installs with one click.',
+    'cli.codex.about': 'It\'s OpenAI\'s free, official program that connects your ChatGPT plan. It installs with one click.',
+
+    // Welcome
+    'welcome.kicker': 'Welcome',
+    'welcome.title': 'Your AI companion for WoW Forever',
+    'welcome.lead': 'Ask it anything without leaving the game: which quest to do, how to improve your gear, where to go. The AI sees your character and answers you inside the game.',
+    'welcome.f1.title': 'Ask from the game',
+    'welcome.f1.text': 'Click the floating button on your screen and type what you want to know.',
+    'welcome.f2.title': 'Knows your character',
+    'welcome.f2.text': 'Your class, level, gear, quests and where you are, without you having to explain.',
+    'welcome.f3.title': 'Answers in the game',
+    'welcome.f3.text': 'They show up in an in-game window, with separate chats for each topic.',
+    'welcome.fact1': 'Takes about 3 minutes',
+    'welcome.fact2': 'You only do it once',
+    'welcome.fact3': 'You can change everything later',
+    'welcome.start': 'Get started',
+
+    // Game
+    'game.title': 'Where is your game?',
+    'game.lead': 'We need the WoW Forever folder to install the addon and receive your questions.',
+    'game.found': 'We found WoW Forever',
+    'game.foundText': 'If it\'s the right folder, click Next.',
+    'game.folder': 'Game folder',
+    'game.pickOther': 'Choose another folder…',
+    'game.notFound': 'We couldn\'t find WoW Forever automatically',
+    'game.notFoundText': 'It may be on another drive or in another folder. Look for it yourself: it\'s usually called <b>World of Warcraft</b> and has a <b>_forever_</b> folder inside.',
+    'game.pick': 'Choose folder…',
+    'game.detect': 'Search again',
+    'game.detecting': 'Searching…',
+    'game.example': 'Example:',
+    'game.hint': 'Choose the folder to continue',
+    'game.detectFail': 'We couldn\'t find it this time either. Use <b>Choose folder…</b>.',
+
+    // Addon
+    'addon.title': 'Install the addon',
+    'addon.lead': 'The addon is the part that lives inside the game: the floating button and the chat window where you ask and read the answers.',
+    'addon.restart': 'Addon installed. Restart the game',
+    'addon.restartText': 'WoW is open: close it completely and open it again so it loads the addon (/reload isn\'t enough).',
+    'addon.installed': 'Addon installed',
+    'addon.already': 'The addon is already installed',
+    'addon.version': 'Version {v}. It updates itself when a new version comes out.',
+    'addon.where': 'It will be installed in',
+    'addon.safe': 'It doesn\'t change anything else in the game. You can uninstall it whenever you want.',
+    'addon.install': 'Install the addon',
+    'addon.hint': 'Just one click',
+
+    // AI
+    'ai.title': 'Choose your AI',
+    'ai.lead': 'It\'s what answers your questions. If you have Claude Pro or Max, or ChatGPT Plus or Pro, use your subscription: you pay nothing extra.',
+    'ai.more': 'More options',
+    'ai.setup': 'Set up: {name}',
+    'ai.cliInstall': 'Install {app}',
+    'ai.cliInstalled': 'Already installed.',
+    'ai.cliLogin': 'Sign in with your {account} account',
+    'ai.cliLoggedIn': 'Signed in.',
+    'ai.cliLoginText': 'Your browser will open so you can sign in with your account (first time only).',
+    'ai.cliLoginBtn': 'Sign in',
+    'ai.cliWaiting': 'Follow the steps in the window that opened',
+    'ai.cliWaitingText': 'This screen updates by itself when you\'re done.',
+    'ai.getKey': 'Get your key',
+    'ai.pasteKey': 'Paste your key here',
+    'ai.keySaved': 'You already have one saved ({key}). Leave this empty to keep it.',
+    'ai.keyLocal': 'It\'s only saved on this PC.',
+    'ai.keyPlaceholder': 'Paste your key',
+    'ai.ollama': 'Set up Ollama',
+    'ai.model': 'Choose the model',
+    'ai.modelText': 'You can change it whenever you want.',
+    'ai.modelName': 'Type the model name',
+    'ai.modelNameText': 'The one you downloaded in Ollama.',
+    'ai.web': 'Search the internet when needed',
+    'ai.webText': 'Recommended. WoW Forever came out in November 2026 and the AI doesn\'t know it from memory: this way it can check Forever guides (zones, dungeons, new quests) before answering. Answers that need a search take a few seconds longer.',
+    'ai.webTitle': 'Search the internet',
+    'ai.save': 'Save and test',
+    'ai.testing': 'Testing…',
+    'ai.hintSteps': 'Complete the steps above',
+    'ai.hintTest': 'We\'ll ask a test question',
+    'ai.saveFail': 'Couldn\'t save',
+    'ai.testingText': 'We\'re asking the AI a sample question. It may take a few seconds.',
+    'ai.works': 'It works!',
+    'ai.answered': '{model} answered in {s} s:',
+    'ai.testFail': 'The test didn\'t work',
+    'ai.testFailText': 'Check the steps above and try again.',
+
+    // Voice (invisible sending)
+    'voice.activate': 'Turn on invisible sending',
+    'voice.activating': 'Turning on…',
+    'voice.deactivate': 'Turn off invisible sending',
+    'voice.deactivating': 'Turning off…',
+    'voice.update': 'Update invisible sending',
+    'voice.updating': 'Updating…',
+    'voice.title': 'How do your questions reach the app?',
+    'voice.lead': 'For security, WoW doesn\'t let addons talk to other programs on your PC: they can\'t use the internet or write files while you play. That\'s why your question needs a way to get out of the game and reach this app, which is the one that talks to the AI.',
+    'voice.flow1': 'Your question',
+    'voice.flow2': 'The way you choose',
+    'voice.flow3': 'This app',
+    'voice.flow4': 'The AI',
+    'voice.flow5': 'Answer in the game',
+    'voice.same': 'Answers come back to the game the same way with either option. You can change this later.',
+    'voice.recTitle': 'We recommend invisible sending',
+    'voice.recText': 'It\'s the only option that doesn\'t get in the way while you play: nothing appears on your screen, nothing can be heard, and it works even if WoW is minimized or behind another window. It only asks for a Windows permission once.',
+    'voice.on': 'Invisible',
+    'voice.onDesc': 'Doesn\'t get in the way: you can\'t see it, you can\'t hear it, and the game doesn\'t need to be visible.',
+    'voice.how': 'How it works',
+    'voice.what': 'What gets installed',
+    'voice.why': 'Why it asks for permission',
+    'voice.note': 'Keep in mind',
+    'voice.onHow': 'An extra voice is added to Windows, like the ones Narrator uses, but completely silent. When you ask, the addon “reads” your question with that voice and, instead of making a sound, the voice hands it to the app.',
+    'voice.onWhat': 'A silent voice called “ForeverAICompanion” in the Windows voice list. It doesn\'t change your other voices or your PC\'s sound, and nothing else uses it.',
+    'voice.onWhy': 'Windows only allows adding voices with administrator permission. It asks you just once; if you say no, nothing is installed.',
+    'voice.onNote': 'After turning it on, close WoW completely and open it again. You can turn it off any time from the dashboard.',
+    'voice.off': 'With an on-screen line',
+    'voice.offDesc': 'Installs nothing and asks for no permissions, but it\'s a little noticeable when you ask.',
+    'voice.offHow': 'When you ask, the addon briefly draws a thin line of small dark squares along the top edge of the screen. The app reads it, like a QR code, and the line disappears.',
+    'voice.offWhat': 'Nothing extra.',
+    'voice.offNote': 'You\'ll see a brief flicker at the top of the screen each time you ask, and WoW must be visible at that moment (not minimized or covered by another window). If another addon or a window covers that strip, the question may not get through.',
+    'voice.fair': 'Both options use normal Windows and game features: they don\'t modify WoW, don\'t read its memory and don\'t play for you.',
+    'voice.legacyTitle': 'Update invisible sending',
+    'voice.legacyText': 'Your invisible sending was set up under the app’s previous name. It keeps working, but click <b>Update invisible sending</b> to switch it to “ForeverAICompanion”. Windows will ask for permission once; then restart WoW.',
+    'voice.hint': 'Windows will ask for permission: click Yes',
+    'voice.onRestart': 'Invisible sending is on. Restart the game',
+    'voice.onRestartText': 'Close WoW completely and open it again so it starts using it.',
+    'voice.onOk': 'Invisible sending is on',
+    'voice.onOkText': 'The next time you open WoW, your questions will travel without anything showing.',
+    'voice.onFail': 'Couldn\'t turn on invisible sending',
+    'voice.onFailText': 'If you didn\'t accept the Windows permission, try again. Or choose “With an on-screen line” and continue: it works just as well.',
+    'voice.offOk': 'Invisible sending is off',
+    'voice.offOkText': 'Your questions will use the on-screen line.',
+
+    // Done
+    'done.title': 'You\'re all set!',
+    'done.lead': 'Here\'s how to use it in the game:',
+    'done.s1': 'Open WoW Forever',
+    'done.s1Text': 'If it was already open, close it completely and open it again.',
+    'done.s2': 'Click the floating button',
+    'done.s2Text': 'It\'s a circle with your assistant\'s portrait, at the top right of the screen next to the minimap. You can drag it wherever is most comfortable for you. Clicking it opens the chat window.',
+    'done.s3': 'Choose your assistant (first time only)',
+    'done.s3Text': 'Fizzi, the gnome inventor (Alliance), or Rizzik, the goblin dealmaker (Horde). You can change this whenever you want.',
+    'done.s4': 'Ask anything',
+    'done.s4Text': 'For example: “Which dungeon should I do now?”. The answer arrives in a few seconds.',
+    'done.autostartText': 'Recommended: that way the app is always ready when you play, without you having to open it.',
+    'done.closeTitle': 'You can close this window',
+    'done.closeText': 'When you close it, we\'ll ask whether you want the app to keep running in the background. If it does, you\'ll find it next to the Windows clock with this icon {icon}: click to open it, right-click to close it.',
+    'done.keyboard': 'Prefer the keyboard? You can also type <kbd>/ai</kbd> in the game chat.',
+    'done.toDash': 'Go to dashboard',
+
+    // Dashboard
+    'autostart': 'Open when Windows starts',
+    'ago.now': 'just now',
+    'ago.min': '{n} min ago',
+    'guide.auto': 'updates itself from the internet',
+    'guide.bundled': 'included in the app',
+    'guide.old': '{n} days old: the AI checks the internet for anything that may have changed',
+    'guide.text': 'What the AI knows about Forever. Reviewed on {date} · {how}{old}',
+    'dash.ok': 'Everything is working',
+    'dash.okText': 'In the game, click the floating button (top right, next to the minimap) and ask anything.',
+    'dash.testMode': '<b>You\'re in Test mode:</b> once you see it works, choose an AI.',
+    'dash.missing': 'Something still needs setting up',
+    'dash.missingText': 'Check what\'s marked below.',
+    'dash.settings': 'Settings',
+    'dash.game': 'Game',
+    'dash.notFound': 'Not found',
+    'dash.addon': 'Addon',
+    'dash.addonInstalled': 'Installed · version {v}',
+    'dash.notInstalled': 'Not installed',
+    'dash.ai': 'Artificial intelligence',
+    'dash.notChosen': 'Not chosen',
+    'dash.web': 'Search the internet',
+    'dash.webOn': 'The AI checks WoW Forever guides when it needs to',
+    'dash.webOff': 'Off: answers only with what it knows and your data',
+    'dash.guide': 'WoW Forever guide',
+    'dash.guideCheck': 'Check for updates',
+    'dash.guideChecking': 'Checking…',
+    'dash.voice': 'Invisible sending',
+    'dash.voiceLegacy': 'On, from the previous version: update it',
+    'dash.voiceOn': 'On: your questions travel without anything being seen or heard',
+    'dash.voiceOff': 'Off: when you ask, a line briefly appears at the top of the screen',
+    'dash.voiceUpdate': 'Update',
+    'dash.voiceActivate': 'Turn on',
+    'dash.close': 'When closing this window',
+    'dash.closeText': 'The app can keep running next to the Windows clock.',
+    'dash.closeAsk': 'Ask me',
+    'dash.closeTray': 'Keep running in the background',
+    'dash.closeQuit': 'Close the app',
+    'dash.autostartText': 'That way the app is always ready when you play.',
+    'dash.recent': 'Recent questions',
+    'dash.thinking': 'Thinking…',
+    'dash.empty': 'No questions yet. In the game, click the floating button and ask something: you\'ll see it here.',
+    'dash.more': 'More options',
+    'dash.knowledge': 'Server knowledge…',
+    'dash.wizard': 'Run setup again',
+    'dash.quit': 'Close the app',
+    'dash.uninstall': 'Uninstall',
+    'dash.footTray': 'When you close this window, the app can keep running next to the Windows clock: click its icon to come back here.',
+    'dash.foot': 'You can close this window: the app keeps running in the background.',
+    'toast.closeAsk': 'We\'ll ask you when you close the window.',
+    'toast.closeTray': 'When you close the window, the app will keep running next to the clock.',
+    'toast.closeQuit': 'When you close the window, the app will quit.',
+    'toast.webOn': 'The AI will search the internet when needed.',
+    'toast.webOff': 'The AI will answer only with what it knows and your data.',
+    'toast.autoOn': 'The app will open when Windows starts.',
+    'toast.autoOff': 'The app will no longer open when Windows starts.',
+    'toast.guideUpdated': 'Forever guide updated.',
+    'toast.guideLatest': 'You already have the latest guide.',
+    'quit.title': 'Close Forever AI Companion?',
+    'quit.text': 'You\'ll stop getting answers in the game until you open it again from the Start menu.',
+    'quit.endTitle': 'The app is closed',
+    'quit.endText': 'You can close this window now. To use it again, open it from the Start menu.',
+    'uninstall.title': 'Uninstall Forever AI Companion?',
+    'uninstall.text': 'This deletes the addon from the game, your settings (including keys) and the app. It can\'t be undone.',
+    'uninstall.endTitle': 'Uninstall complete',
+    'uninstall.endText': 'You can close this window now.',
   },
-  codex: {
-    api: 'codex', app: 'Codex', account: 'ChatGPT',
-    about: 'Es el programa oficial y gratuito de OpenAI que conecta tu plan de ChatGPT. Se instala con un clic.',
+  es: {
+    'nav.steps': 'Pasos de la configuración',
+    'btn.back': 'Atrás',
+    'btn.next': 'Siguiente',
+    'btn.cancel': 'Cancelar',
+    'btn.backToDash': 'Volver al panel',
+    'btn.change': 'Cambiar',
+    'btn.install': 'Instalar',
+    'btn.reinstall': 'Reinstalar',
+    'busy.installing': 'Instalando…',
+    'busy.waitingChoice': 'Esperando tu elección…',
+    'badge.rec': 'Recomendado',
+    'badge.using': 'En uso',
+    'badge.on': 'Activado',
+    'chip.ok': 'Funcionando',
+    'chip.warn': 'Revisa la configuración',
+    'chip.down': 'La app no responde',
+    'footer.stepOf': 'Paso {n} de {total}',
+    'kicker.step': 'Paso {n}',
+    'kicker.stepOptional': 'Paso {n} · Opcional',
+
+    'step.optional': 'opcional',
+    'step.welcome.title': 'Bienvenida',
+    'step.welcome.sub': 'Qué hace la app',
+    'step.game.title': 'Tu juego',
+    'step.game.sub': 'Dónde está WoW Forever',
+    'step.addon.title': 'El addon',
+    'step.addon.sub': 'La ventana dentro del juego',
+    'step.ai.title': 'Tu IA',
+    'step.ai.sub': 'Quién responde tus preguntas',
+    'step.voice.title': 'Envío invisible',
+    'step.voice.sub': 'Que no se vea nada',
+    'step.done.title': 'Listo',
+    'step.done.sub': 'Cómo usarlo',
+
+    'tag.inPlan': 'Incluido en tu plan',
+    'tag.needsKey': 'Requiere una clave',
+    'tag.free': 'Gratis',
+    'model.planDefault': 'El de tu plan',
+    'model.planDefault.desc': 'Usa el modelo que tu plan tenga por defecto.',
+    'model.planDefault.descRec': 'Usa el modelo que tu plan tenga por defecto. La mejor opción para la mayoría.',
+    'model.smartest': 'El más inteligente, pero tarda más y gasta más de tu límite.',
+    'model.fastest': 'El más rápido; gasta muy poco de tu límite.',
+    'p.claudeCode.name': 'Mi suscripción de Claude',
+    'p.claudeCode.desc': 'Usa tu plan Claude Pro o Max. No necesitas claves ni pagar nada extra.',
+    'p.claudeCode.tag': 'Requiere Claude Pro o Max',
+    'p.claudeCode.sonnet': 'Rápido y listo. La mejor opción para la mayoría.',
+    'p.codex.name': 'Mi suscripción de ChatGPT',
+    'p.codex.desc': 'Usa tu plan ChatGPT Plus o Pro a través de Codex, el programa oficial de OpenAI. No necesitas claves ni pagar nada extra.',
+    'p.codex.tag': 'Requiere ChatGPT Plus o Pro',
+    'p.claude.name': 'Claude con clave de API',
+    'p.claude.desc': 'Para quien no tiene suscripción: pagas solo lo que usas en la web de Anthropic.',
+    'p.claude.tag': 'Pagas por uso (≈ 1 centavo por pregunta)',
+    'p.claude.key1': 'Entra a <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> e inicia sesión o crea una cuenta.',
+    'p.claude.key2': 'En <b>Billing</b>, carga algo de crédito (unos pocos dólares alcanzan para muchas preguntas).',
+    'p.claude.key3': 'En <b>API Keys</b>, pulsa <b>Create Key</b> y copia la clave (empieza con <code>sk-ant-</code>).',
+    'p.claude.opus': 'El más inteligente (≈ 2 centavos por pregunta).',
+    'p.claude.sonnet': 'Equilibrado (≈ 1 centavo por pregunta).',
+    'p.claude.haiku': 'El más barato y rápido (menos de 0,1 centavo).',
+    'p.chatgpt.name': 'ChatGPT con clave de API',
+    'p.chatgpt.desc': 'Para quien no tiene suscripción: pagas solo lo que usas en la web de OpenAI. Si tienes ChatGPT Plus o Pro, elige «Mi suscripción de ChatGPT».',
+    'p.chatgpt.tag': 'Pagas por uso',
+    'p.chatgpt.key1': 'Entra a <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> e inicia sesión.',
+    'p.chatgpt.key2': 'Carga crédito en <b>Billing</b>.',
+    'p.chatgpt.key3': 'Pulsa <b>Create new secret key</b> y copia la clave (empieza con <code>sk-</code>).',
+    'p.gemini.desc': 'La IA de Google. Suele tener un uso gratuito con límites.',
+    'p.gemini.tag': 'Uso gratis con límites',
+    'p.gemini.key1': 'Entra a <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> con tu cuenta de Google.',
+    'p.gemini.key2': 'Pulsa <b>Create API key</b> y cópiala.',
+    'p.echo.name': 'Modo prueba',
+    'p.echo.desc': 'No usa IA: responde con los datos que recibe. Sirve para comprobar que el juego y la app se conectan.',
+    'p.echo.tag': 'No responde con IA',
+    'p.ollama.name': 'IA en tu PC (Ollama)',
+    'p.ollama.desc': 'Gratis y sin internet, pero necesita un PC potente y algo de configuración.',
+    'p.ollama.tag': 'Necesita un PC potente',
+    'p.ollama.local1': 'Instala <a href="https://ollama.com" target="_blank">Ollama</a>.',
+    'p.ollama.local2': 'Descarga un modelo (por ejemplo <code>llama3.2</code>) desde la app de Ollama.',
+    'cli.claudeCode.about': 'Es el programa oficial y gratuito de Anthropic que conecta tu suscripción. Se instala con un clic.',
+    'cli.codex.about': 'Es el programa oficial y gratuito de OpenAI que conecta tu plan de ChatGPT. Se instala con un clic.',
+
+    'welcome.kicker': 'Te damos la bienvenida',
+    'welcome.title': 'Tu compañero con IA para WoW Forever',
+    'welcome.lead': 'Pregúntale lo que quieras sin salir del juego: qué misión hacer, cómo mejorar tu equipo, a dónde ir. La IA ve tu personaje y te responde dentro del juego.',
+    'welcome.f1.title': 'Preguntas desde el juego',
+    'welcome.f1.text': 'Pulsa el botón flotante que aparece en tu pantalla y escribe lo que quieras saber.',
+    'welcome.f2.title': 'Conoce a tu personaje',
+    'welcome.f2.text': 'Tu clase, nivel, equipo, misiones y dónde estás, sin que tengas que explicarlo.',
+    'welcome.f3.title': 'Respuestas en el juego',
+    'welcome.f3.text': 'Llegan en una ventana del juego, con chats separados por tema.',
+    'welcome.fact1': 'Toma unos 3 minutos',
+    'welcome.fact2': 'Se hace una sola vez',
+    'welcome.fact3': 'Puedes cambiar todo después',
+    'welcome.start': 'Empezar',
+
+    'game.title': '¿Dónde está tu juego?',
+    'game.lead': 'Necesitamos la carpeta de WoW Forever para instalar el addon y recibir tus preguntas.',
+    'game.found': 'Encontramos WoW Forever',
+    'game.foundText': 'Si es la carpeta correcta, pulsa Siguiente.',
+    'game.folder': 'Carpeta del juego',
+    'game.pickOther': 'Elegir otra carpeta…',
+    'game.notFound': 'No encontramos WoW Forever automáticamente',
+    'game.notFoundText': 'Puede estar en otro disco o carpeta. Búscala tú: suele llamarse <b>World of Warcraft</b> y dentro tiene una carpeta <b>_forever_</b>.',
+    'game.pick': 'Elegir carpeta…',
+    'game.detect': 'Buscar de nuevo',
+    'game.detecting': 'Buscando…',
+    'game.example': 'Ejemplo:',
+    'game.hint': 'Elige la carpeta para continuar',
+    'game.detectFail': 'Tampoco lo encontramos esta vez. Usa <b>Elegir carpeta…</b>.',
+
+    'addon.title': 'Instalar el addon',
+    'addon.lead': 'El addon es la parte que vive dentro del juego: el botón flotante y la ventana de chats donde preguntas y lees las respuestas.',
+    'addon.restart': 'Addon instalado. Reinicia el juego',
+    'addon.restartText': 'WoW está abierto: ciérralo por completo y vuelve a abrirlo para que cargue el addon (con /reload no basta).',
+    'addon.installed': 'Addon instalado',
+    'addon.already': 'El addon ya está instalado',
+    'addon.version': 'Versión {v}. Se actualiza solo cuando sale una versión nueva.',
+    'addon.where': 'Se instalará en',
+    'addon.safe': 'No modifica nada más del juego. Puedes desinstalarlo cuando quieras.',
+    'addon.install': 'Instalar el addon',
+    'addon.hint': 'Un clic y listo',
+
+    'ai.title': 'Elige tu IA',
+    'ai.lead': 'Es quien responde tus preguntas. Si tienes Claude Pro o Max, o ChatGPT Plus o Pro, usa tu suscripción: no pagas nada extra.',
+    'ai.more': 'Más opciones',
+    'ai.setup': 'Configura: {name}',
+    'ai.cliInstall': 'Instalar {app}',
+    'ai.cliInstalled': 'Ya está instalado.',
+    'ai.cliLogin': 'Iniciar sesión con tu cuenta de {account}',
+    'ai.cliLoggedIn': 'Sesión iniciada.',
+    'ai.cliLoginText': 'Se abrirá tu navegador para que entres con tu cuenta (solo la primera vez).',
+    'ai.cliLoginBtn': 'Iniciar sesión',
+    'ai.cliWaiting': 'Sigue los pasos de la ventana que se abrió',
+    'ai.cliWaitingText': 'Esta pantalla se actualiza sola cuando termines.',
+    'ai.getKey': 'Consigue tu clave',
+    'ai.pasteKey': 'Pega tu clave aquí',
+    'ai.keySaved': 'Ya tienes una guardada ({key}). Déjalo vacío para mantenerla.',
+    'ai.keyLocal': 'Se guarda solo en este PC.',
+    'ai.keyPlaceholder': 'Pega tu clave',
+    'ai.ollama': 'Prepara Ollama',
+    'ai.model': 'Elige el modelo',
+    'ai.modelText': 'Puedes cambiarlo cuando quieras.',
+    'ai.modelName': 'Escribe el nombre del modelo',
+    'ai.modelNameText': 'El que descargaste en Ollama.',
+    'ai.web': 'Buscar en internet cuando haga falta',
+    'ai.webText': 'Recomendado. WoW Forever salió en noviembre de 2026 y la IA no lo conoce de memoria: así puede consultar guías de Forever (zonas, mazmorras, misiones nuevas) antes de responder. Las respuestas que necesitan buscar tardan unos segundos más.',
+    'ai.webTitle': 'Buscar en internet',
+    'ai.save': 'Guardar y probar',
+    'ai.testing': 'Probando…',
+    'ai.hintSteps': 'Completa los pasos de arriba',
+    'ai.hintTest': 'Haremos una pregunta de prueba',
+    'ai.saveFail': 'No se pudo guardar',
+    'ai.testingText': 'Hacemos una pregunta de ejemplo a la IA. Puede tardar unos segundos.',
+    'ai.works': '¡Funciona!',
+    'ai.answered': '{model} respondió en {s} s:',
+    'ai.testFail': 'La prueba no funcionó',
+    'ai.testFailText': 'Revisa los pasos de arriba y vuelve a intentarlo.',
+
+    'voice.activate': 'Activar envío invisible',
+    'voice.activating': 'Activando…',
+    'voice.deactivate': 'Desactivar envío invisible',
+    'voice.deactivating': 'Desactivando…',
+    'voice.update': 'Actualizar envío invisible',
+    'voice.updating': 'Actualizando…',
+    'voice.title': '¿Cómo llegan tus preguntas a la app?',
+    'voice.lead': 'Por seguridad, WoW no deja que los addons se comuniquen con otros programas de tu PC: no pueden usar internet ni escribir archivos mientras juegas. Por eso tu pregunta necesita un camino para salir del juego y llegar a esta app, que es la que habla con la IA.',
+    'voice.flow1': 'Tu pregunta',
+    'voice.flow2': 'El camino que eliges',
+    'voice.flow3': 'Esta app',
+    'voice.flow4': 'La IA',
+    'voice.flow5': 'Respuesta en el juego',
+    'voice.same': 'Las respuestas vuelven al juego igual con los dos caminos. Puedes cambiarlo después.',
+    'voice.recTitle': 'Te recomendamos el envío invisible',
+    'voice.recText': 'Es el único que no interfiere con nada mientras juegas: no aparece nada en tu pantalla, no se escucha nada y funciona aunque tengas WoW minimizado o detrás de otra ventana. Solo pide un permiso de Windows una vez.',
+    'voice.on': 'Invisible',
+    'voice.onDesc': 'No interfiere con nada: no se ve, no se oye y no depende de que el juego esté visible.',
+    'voice.how': 'Cómo funciona',
+    'voice.what': 'Qué se instala',
+    'voice.why': 'Por qué pide permiso',
+    'voice.note': 'Ten en cuenta',
+    'voice.onHow': 'Se agrega a Windows una voz más, como las que usa el Narrador, pero completamente muda. Al preguntar, el addon «lee» tu pregunta con esa voz y, en lugar de sonar, la voz se la entrega a la app.',
+    'voice.onWhat': 'Una voz silenciosa llamada «ForeverAICompanion» en la lista de voces de Windows. No cambia tus otras voces ni el sonido de tu PC, y nadie más la usa.',
+    'voice.onWhy': 'Windows solo permite agregar voces con permiso de administrador. Te lo pide una sola vez; si dices que no, no se instala nada.',
+    'voice.onNote': 'Después de activarlo, cierra WoW por completo y vuelve a abrirlo. Puedes desactivarlo cuando quieras desde el panel.',
+    'voice.off': 'Con una línea en pantalla',
+    'voice.offDesc': 'No instala nada ni pide permisos, pero se nota un poco al preguntar.',
+    'voice.offHow': 'Al preguntar, el addon dibuja durante un instante una línea delgada de cuadritos oscuros en el borde superior de la pantalla. La app la lee, como si fuera un código QR, y la línea desaparece.',
+    'voice.offWhat': 'Nada extra.',
+    'voice.offNote': 'Verás un parpadeo breve arriba de la pantalla cada vez que preguntas, y WoW debe estar visible (no minimizado ni tapado por otra ventana) en ese momento. Si otro addon o una ventana tapa esa franja, la pregunta puede no llegar.',
+    'voice.fair': 'Los dos caminos usan funciones normales de Windows y del juego: no modifican WoW, no leen su memoria y no juegan por ti.',
+    'voice.legacyTitle': 'Actualiza el envío invisible',
+    'voice.legacyText': 'Tu envío invisible se configuró con el nombre anterior de la app. Sigue funcionando, pero pulsa <b>Actualizar envío invisible</b> para cambiarlo a «ForeverAICompanion». Windows pedirá permiso una vez; luego reinicia WoW.',
+    'voice.hint': 'Windows te pedirá permiso: pulsa Sí',
+    'voice.onRestart': 'Envío invisible activado. Reinicia el juego',
+    'voice.onRestartText': 'Cierra WoW por completo y vuelve a abrirlo para que lo use.',
+    'voice.onOk': 'Envío invisible activado',
+    'voice.onOkText': 'La próxima vez que abras WoW, tus preguntas viajarán sin que se vea nada.',
+    'voice.onFail': 'No se pudo activar el envío invisible',
+    'voice.onFailText': 'Si no aceptaste el permiso de Windows, vuelve a intentarlo. O elige «Con una línea en pantalla» y sigue: funciona igual.',
+    'voice.offOk': 'Envío invisible desactivado',
+    'voice.offOkText': 'Tus preguntas usarán la línea en pantalla.',
+
+    'done.title': '¡Todo listo!',
+    'done.lead': 'Así se usa en el juego:',
+    'done.s1': 'Abre WoW Forever',
+    'done.s1Text': 'Si ya estaba abierto, ciérralo por completo y vuelve a abrirlo.',
+    'done.s2': 'Pulsa el botón flotante',
+    'done.s2Text': 'Es un círculo con el retrato de tu asistente, arriba a la derecha de la pantalla, junto al minimapa. Puedes arrastrarlo a donde te quede más cómodo. Al pulsarlo se abre la ventana de chats.',
+    'done.s3': 'Elige a tu asistente (solo la primera vez)',
+    'done.s3Text': 'Fizzi, la inventora gnoma (Alianza), o Rizzik, el negociante goblin (Horda). Puedes cambiarlo cuando quieras.',
+    'done.s4': 'Pregunta lo que quieras',
+    'done.s4Text': 'Por ejemplo: «¿Qué mazmorra me conviene hacer ahora?». La respuesta llega en unos segundos.',
+    'done.autostartText': 'Recomendado: así la app está lista siempre que juegas, sin que tengas que abrirla.',
+    'done.closeTitle': 'Puedes cerrar esta ventana',
+    'done.closeText': 'Al cerrarla te preguntaremos si quieres que la app siga funcionando en segundo plano. Si sigue, la encuentras junto al reloj de Windows con este ícono {icon}: clic para abrirla, clic derecho para cerrarla.',
+    'done.keyboard': '¿Prefieres el teclado? También puedes escribir <kbd>/ia</kbd> en el chat del juego.',
+    'done.toDash': 'Ir al panel',
+
+    'autostart': 'Abrir al iniciar Windows',
+    'ago.now': 'hace un momento',
+    'ago.min': 'hace {n} min',
+    'guide.auto': 'se actualiza sola desde internet',
+    'guide.bundled': 'incluida en la app',
+    'guide.old': 'tiene {n} días: la IA comprueba en internet lo que pudo cambiar',
+    'guide.text': 'Lo que la IA sabe de Forever. Revisada el {date} · {how}{old}',
+    'dash.ok': 'Todo funciona',
+    'dash.okText': 'En el juego pulsa el botón flotante (arriba a la derecha, junto al minimapa) y pregunta lo que quieras.',
+    'dash.testMode': '<b>Estás en Modo prueba:</b> cuando veas que funciona, elige una IA.',
+    'dash.missing': 'Falta algo por configurar',
+    'dash.missingText': 'Revisa lo que está marcado abajo.',
+    'dash.settings': 'Configuración',
+    'dash.game': 'Juego',
+    'dash.notFound': 'No encontrado',
+    'dash.addon': 'Addon',
+    'dash.addonInstalled': 'Instalado · versión {v}',
+    'dash.notInstalled': 'Sin instalar',
+    'dash.ai': 'Inteligencia artificial',
+    'dash.notChosen': 'Sin elegir',
+    'dash.web': 'Buscar en internet',
+    'dash.webOn': 'La IA consulta guías de WoW Forever cuando lo necesita',
+    'dash.webOff': 'Desactivado: responde solo con lo que sabe y tus datos',
+    'dash.guide': 'Guía de WoW Forever',
+    'dash.guideCheck': 'Buscar actualización',
+    'dash.guideChecking': 'Buscando…',
+    'dash.voice': 'Envío invisible',
+    'dash.voiceLegacy': 'Activado, de la versión anterior: actualízalo',
+    'dash.voiceOn': 'Activado: tus preguntas viajan sin que se vea ni se oiga nada',
+    'dash.voiceOff': 'Desactivado: al preguntar aparece un instante una línea arriba de la pantalla',
+    'dash.voiceUpdate': 'Actualizar',
+    'dash.voiceActivate': 'Activar',
+    'dash.close': 'Al cerrar esta ventana',
+    'dash.closeText': 'La app puede seguir funcionando junto al reloj de Windows.',
+    'dash.closeAsk': 'Preguntarme',
+    'dash.closeTray': 'Seguir en segundo plano',
+    'dash.closeQuit': 'Cerrar la app',
+    'dash.autostartText': 'Así la app siempre está lista cuando juegas.',
+    'dash.recent': 'Últimas preguntas',
+    'dash.thinking': 'Pensando…',
+    'dash.empty': 'Todavía no hay preguntas. En el juego pulsa el botón flotante y pregunta algo: la verás aquí.',
+    'dash.more': 'Más opciones',
+    'dash.knowledge': 'Conocimiento del servidor…',
+    'dash.wizard': 'Repetir la configuración',
+    'dash.quit': 'Cerrar la app',
+    'dash.uninstall': 'Desinstalar',
+    'dash.footTray': 'Al cerrar esta ventana, la app puede seguir funcionando junto al reloj de Windows: clic en su ícono para volver aquí.',
+    'dash.foot': 'Puedes cerrar esta ventana: la app sigue funcionando en segundo plano.',
+    'toast.closeAsk': 'Te preguntaremos al cerrar la ventana.',
+    'toast.closeTray': 'Al cerrar la ventana, la app seguirá funcionando junto al reloj.',
+    'toast.closeQuit': 'Al cerrar la ventana, la app se cerrará.',
+    'toast.webOn': 'La IA buscará en internet cuando haga falta.',
+    'toast.webOff': 'La IA responderá solo con lo que sabe y tus datos.',
+    'toast.autoOn': 'La app se abrirá al iniciar Windows.',
+    'toast.autoOff': 'La app ya no se abrirá al iniciar Windows.',
+    'toast.guideUpdated': 'Guía de Forever actualizada.',
+    'toast.guideLatest': 'Ya tienes la guía más reciente.',
+    'quit.title': '¿Cerrar Forever AI Companion?',
+    'quit.text': 'Dejarás de recibir respuestas en el juego hasta que la vuelvas a abrir desde el menú Inicio.',
+    'quit.endTitle': 'La app está cerrada',
+    'quit.endText': 'Ya puedes cerrar esta ventana. Para volver a usarla, ábrela desde el menú Inicio.',
+    'uninstall.title': '¿Desinstalar Forever AI Companion?',
+    'uninstall.text': 'Se borrará el addon del juego, tu configuración (incluidas las claves) y la app. No se puede deshacer.',
+    'uninstall.endTitle': 'Desinstalación completa',
+    'uninstall.endText': 'Ya puedes cerrar esta ventana.',
   },
 };
+const LANGS = Object.keys(I18N);
+let lang = String(navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+
+// t('ai.setup', { name }) -> "Set up: …". Values are inserted as given (escape them first when needed).
+function t(key, vars) {
+  let s = I18N[lang]?.[key];
+  if (s === undefined) s = I18N.en[key];
+  if (s === undefined) return key;
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s;
+}
+
+// ---------------------------------------------------------------------------
+// Data (rebuilt when the language changes)
+// ---------------------------------------------------------------------------
+let PROVIDERS, ADVANCED, ALL, CLI, STEPS;
+function buildData() {
+  PROVIDERS = {
+    'claude-code': {
+      name: t('p.claudeCode.name'), rec: true,
+      desc: t('p.claudeCode.desc'),
+      tags: [['good', t('tag.inPlan')], ['', t('p.claudeCode.tag')]],
+      models: [
+        ['sonnet', 'Sonnet', t('p.claudeCode.sonnet'), true],
+        ['opus', 'Opus', t('model.smartest')],
+        ['haiku', 'Haiku', t('model.fastest')],
+        ['default', t('model.planDefault'), t('model.planDefault.desc')],
+      ],
+    },
+    codex: {
+      name: t('p.codex.name'),
+      desc: t('p.codex.desc'),
+      tags: [['good', t('tag.inPlan')], ['', t('p.codex.tag')]],
+      models: [
+        ['default', t('model.planDefault'), t('model.planDefault.descRec'), true],
+        ['gpt-6-luna', 'GPT-6 Luna', t('model.fastest')],
+        ['gpt-6-astra', 'GPT-6 Astra', t('model.smartest')],
+      ],
+    },
+    claude: {
+      name: t('p.claude.name'),
+      desc: t('p.claude.desc'),
+      tags: [['cost', t('p.claude.tag')], ['', t('tag.needsKey')]],
+      key: [t('p.claude.key1'), t('p.claude.key2'), t('p.claude.key3')],
+      models: [
+        ['claude-opus-5-5', 'Claude Opus 5.5', t('p.claude.opus'), true],
+        ['claude-sonnet-5-5', 'Claude Sonnet 5.5', t('p.claude.sonnet')],
+        ['claude-haiku-5-5', 'Claude Haiku 5.5', t('p.claude.haiku')],
+      ],
+    },
+    chatgpt: {
+      name: t('p.chatgpt.name'),
+      desc: t('p.chatgpt.desc'),
+      tags: [['cost', t('p.chatgpt.tag')], ['', t('tag.needsKey')]],
+      key: [t('p.chatgpt.key1'), t('p.chatgpt.key2'), t('p.chatgpt.key3')],
+    },
+    gemini: {
+      name: 'Gemini',
+      desc: t('p.gemini.desc'),
+      tags: [['good', t('p.gemini.tag')], ['', t('tag.needsKey')]],
+      key: [t('p.gemini.key1'), t('p.gemini.key2')],
+    },
+    echo: {
+      name: t('p.echo.name'),
+      desc: t('p.echo.desc'),
+      tags: [['good', t('tag.free')], ['', t('p.echo.tag')]],
+    },
+  };
+  ADVANCED = {
+    ollama: {
+      name: t('p.ollama.name'),
+      desc: t('p.ollama.desc'),
+      tags: [['good', t('tag.free')], ['', t('p.ollama.tag')]],
+      modelText: true,
+      local: [t('p.ollama.local1'), t('p.ollama.local2')],
+    },
+  };
+  ALL = { ...PROVIDERS, ...ADVANCED };
+
+  // Options that use a subscription through an official program on this PC.
+  CLI = {
+    'claude-code': { api: 'claude', app: 'Claude Code', account: 'Claude', about: t('cli.claudeCode.about') },
+    codex: { api: 'codex', app: 'Codex', account: 'ChatGPT', about: t('cli.codex.about') },
+  };
+
+  STEPS = ['welcome', 'game', 'addon', 'ai', 'voice', 'done'].map((id) => ({
+    id, title: t(`step.${id}.title`), sub: t(`step.${id}.sub`), ...(id === 'voice' ? { optional: true } : {}),
+  }));
+}
+
+// Switches the language: rebuilds the data and the fixed texts of the page.
+function setLang(next) {
+  if (!LANGS.includes(next)) return;
+  lang = next;
+  document.documentElement.lang = lang;
+  buildData();
+  document.querySelector('nav.steps').setAttribute('aria-label', t('nav.steps'));
+  $('btn-back').textContent = t('btn.back');
+  $('btn-next').textContent = t('btn.next');
+}
+
 // Options that can search the internet.
 const SEARCHES = ['claude-code', 'claude', 'codex'];
-
-const STEPS = [
-  { id: 'welcome', title: 'Bienvenida', sub: 'Qué hace la app' },
-  { id: 'game', title: 'Tu juego', sub: 'Dónde está WoW Forever' },
-  { id: 'addon', title: 'El addon', sub: 'La ventana dentro del juego' },
-  { id: 'ai', title: 'Tu IA', sub: 'Quién responde tus preguntas' },
-  { id: 'voice', title: 'Envío invisible', sub: 'Que no se vea nada', optional: true },
-  { id: 'done', title: 'Listo', sub: 'Cómo usarlo' },
-];
 
 const ICON = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="#06210f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -397,12 +987,13 @@ const ICON = {
 // ---------------------------------------------------------------------------
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+setLang(lang);
 let status = null;
 let voice = null;          // { supported, active }
 const cli = {};            // per CLI option: { installed, loggedIn, method, waiting }
 let mode = null;           // 'wizard' | 'dash'
 let step = 'welcome';
-let returnToDash = false;  // a step opened from the dashboard ("Cambiar")
+let returnToDash = false;  // a step opened from the dashboard ("Change")
 let addonJustInstalled = null;
 let aiChoice = null;       // provider selected in the AI step
 let aiModel = null;        // model picked by the player (survives redraws)
@@ -417,7 +1008,7 @@ const PAGE_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
 async function api(path, body) {
   const opts = body === undefined && path === 'status'
     ? {}
-    : { method: 'POST', headers: { 'content-type': 'application/json', 'x-azerothia': '1' }, body: JSON.stringify(body || {}) };
+    : { method: 'POST', headers: { 'content-type': 'application/json', 'x-forever-ai-companion': '1' }, body: JSON.stringify(body || {}) };
   const res = await fetch(path === 'status' ? `/api/status?page=${PAGE_ID}` : `/api/${path}`, opts);
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
@@ -437,7 +1028,7 @@ function confirmBox(title, text, okLabel, danger) {
     const back = document.createElement('div');
     back.className = 'modal-back';
     back.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h3>${title}</h3><p>${text}</p>
-      <div class="acts"><button class="btn ghost" data-a="no">Cancelar</button><button class="btn ${danger ? 'danger' : 'primary'}" data-a="yes">${okLabel}</button></div></div>`;
+      <div class="acts"><button class="btn ghost" data-a="no">${t('btn.cancel')}</button><button class="btn ${danger ? 'danger' : 'primary'}" data-a="yes">${okLabel}</button></div></div>`;
     const onKey = (e) => { if (e.key === 'Escape') done(false); };
     const done = (v) => { document.removeEventListener('keydown', onKey); back.remove(); resolve(v); };
     document.addEventListener('keydown', onKey);
@@ -483,34 +1074,34 @@ const spinner = (key, label, busyLabel) => (busyAction === key ? `<span class="s
 const VIEWS = {
   welcome() {
     return {
-      html: `<div class="kicker">Te damos la bienvenida</div>
-        <h1>Tu compañero con IA para WoW Forever</h1>
-        <p class="lead">Pregúntale lo que quieras sin salir del juego: qué misión hacer, cómo mejorar tu equipo, a dónde ir. La IA ve tu personaje y te responde dentro del juego.</p>
+      html: `<div class="kicker">${t('welcome.kicker')}</div>
+        <h1>${t('welcome.title')}</h1>
+        <p class="lead">${t('welcome.lead')}</p>
         <div class="features">
-          <div class="feature"><span class="ic">${ICON.chat}</span><div><b>Preguntas desde el juego</b><span>Pulsa el botón flotante que aparece en tu pantalla y escribe lo que quieras saber.</span></div></div>
-          <div class="feature"><span class="ic">${ICON.spark}</span><div><b>Conoce a tu personaje</b><span>Tu clase, nivel, equipo, misiones y dónde estás, sin que tengas que explicarlo.</span></div></div>
-          <div class="feature"><span class="ic">${ICON.eye}</span><div><b>Respuestas en el juego</b><span>Llegan en una ventana del juego, con chats separados por tema.</span></div></div>
+          <div class="feature"><span class="ic">${ICON.chat}</span><div><b>${t('welcome.f1.title')}</b><span>${t('welcome.f1.text')}</span></div></div>
+          <div class="feature"><span class="ic">${ICON.spark}</span><div><b>${t('welcome.f2.title')}</b><span>${t('welcome.f2.text')}</span></div></div>
+          <div class="feature"><span class="ic">${ICON.eye}</span><div><b>${t('welcome.f3.title')}</b><span>${t('welcome.f3.text')}</span></div></div>
         </div>
-        <div class="facts"><span class="fact">Toma unos 3 minutos</span><span class="fact">Se hace una sola vez</span><span class="fact">Puedes cambiar todo después</span></div>`,
-      next: { label: 'Empezar', action: () => go('game') },
+        <div class="facts"><span class="fact">${t('welcome.fact1')}</span><span class="fact">${t('welcome.fact2')}</span><span class="fact">${t('welcome.fact3')}</span></div>`,
+      next: { label: t('welcome.start'), action: () => go('game') },
     };
   },
 
   game() {
     const ok = isDone.game();
     return {
-      html: `<div class="kicker">Paso 2</div><h1>¿Dónde está tu juego?</h1>
-        <p class="lead">Necesitamos la carpeta de WoW Forever para instalar el addon y recibir tus preguntas.</p>
+      html: `<div class="kicker">${t('kicker.step', { n: 2 })}</div><h1>${t('game.title')}</h1>
+        <p class="lead">${t('game.lead')}</p>
         ${ok
-          ? `${callout('ok', 'Encontramos WoW Forever', 'Si es la carpeta correcta, pulsa Siguiente.')}
-             <div class="card"><h3>Carpeta del juego</h3><div class="path">${esc(status.wow.dir)}</div>
-             <div style="margin-top:12px"><button class="btn small" data-act="pick">${spinner('pick', 'Elegir otra carpeta…', 'Esperando tu elección…')}</button></div></div>`
-          : `${callout('warn', 'No encontramos WoW Forever automáticamente', 'Puede estar en otro disco o carpeta. Búscala tú: suele llamarse <b>World of Warcraft</b> y dentro tiene una carpeta <b>_forever_</b>.')}
-             <div class="links"><button class="btn primary" data-act="pick">${spinner('pick', 'Elegir carpeta…', 'Esperando tu elección…')}</button>
-             <button class="btn" data-act="detect">${spinner('detect', 'Buscar de nuevo', 'Buscando…')}</button></div>
-             <p class="small faint" style="margin-top:14px">Ejemplo: <code>C:\\Program Files (x86)\\World of Warcraft</code></p>`}`,
-      next: returnToDash && ok ? { label: 'Volver al panel', action: openDash } : { label: 'Siguiente', disabled: !ok, action: () => go('addon') },
-      hint: ok ? '' : 'Elige la carpeta para continuar',
+          ? `${callout('ok', t('game.found'), t('game.foundText'))}
+             <div class="card"><h3>${t('game.folder')}</h3><div class="path">${esc(status.wow.dir)}</div>
+             <div style="margin-top:12px"><button class="btn small" data-act="pick">${spinner('pick', t('game.pickOther'), t('busy.waitingChoice'))}</button></div></div>`
+          : `${callout('warn', t('game.notFound'), t('game.notFoundText'))}
+             <div class="links"><button class="btn primary" data-act="pick">${spinner('pick', t('game.pick'), t('busy.waitingChoice'))}</button>
+             <button class="btn" data-act="detect">${spinner('detect', t('game.detect'), t('game.detecting'))}</button></div>
+             <p class="small faint" style="margin-top:14px">${t('game.example')} <code>C:\\Program Files (x86)\\World of Warcraft</code></p>`}`,
+      next: returnToDash && ok ? { label: t('btn.backToDash'), action: openDash } : { label: t('btn.next'), disabled: !ok, action: () => go('addon') },
+      hint: ok ? '' : t('game.hint'),
     };
   },
 
@@ -518,19 +1109,19 @@ const VIEWS = {
     const ok = isDone.addon();
     const just = addonJustInstalled;
     return {
-      html: `<div class="kicker">Paso 3</div><h1>Instalar el addon</h1>
-        <p class="lead">El addon es la parte que vive dentro del juego: el botón flotante y la ventana de chats donde preguntas y lees las respuestas.</p>
+      html: `<div class="kicker">${t('kicker.step', { n: 3 })}</div><h1>${t('addon.title')}</h1>
+        <p class="lead">${t('addon.lead')}</p>
         ${ok
           ? (just?.wowRunning
-              ? callout('warn', 'Addon instalado. Reinicia el juego', 'WoW está abierto: ciérralo por completo y vuelve a abrirlo para que cargue el addon (con /reload no basta).')
-              : callout('ok', just ? 'Addon instalado' : 'El addon ya está instalado', `Versión ${esc(status.wow.addonVersion)}. Se actualiza solo cuando sale una versión nueva.`))
-            + `<button class="btn small" data-act="install">${spinner('install', 'Reinstalar', 'Instalando…')}</button>`
-          : `<div class="card"><h3>Se instalará en</h3><div class="path">${esc(status.wow.dir)}\\Interface\\AddOns</div>
-             <p class="small muted" style="margin:10px 0 0">No modifica nada más del juego. Puedes desinstalarlo cuando quieras.</p></div>`}`,
+              ? callout('warn', t('addon.restart'), t('addon.restartText'))
+              : callout('ok', just ? t('addon.installed') : t('addon.already'), t('addon.version', { v: esc(status.wow.addonVersion) })))
+            + `<button class="btn small" data-act="install">${spinner('install', t('btn.reinstall'), t('busy.installing'))}</button>`
+          : `<div class="card"><h3>${t('addon.where')}</h3><div class="path">${esc(status.wow.dir)}\\Interface\\AddOns</div>
+             <p class="small muted" style="margin:10px 0 0">${t('addon.safe')}</p></div>`}`,
       next: ok
-        ? (returnToDash ? { label: 'Volver al panel', action: openDash } : { label: 'Siguiente', action: () => go('ai') })
-        : { label: spinner('install', 'Instalar el addon', 'Instalando…'), disabled: busyAction === 'install', action: installAddon },
-      hint: ok ? '' : 'Un clic y listo',
+        ? (returnToDash ? { label: t('btn.backToDash'), action: openDash } : { label: t('btn.next'), action: () => go('ai') })
+        : { label: spinner('install', t('addon.install'), t('busy.installing')), disabled: busyAction === 'install', action: installAddon },
+      hint: ok ? '' : t('addon.hint'),
     };
   },
 
@@ -541,8 +1132,8 @@ const VIEWS = {
     const p = ALL[id];
     const choice = (pid, q) => `<label class="choice ${pid === id ? 'sel' : ''}">
         <input type="radio" name="provider" value="${pid}" ${pid === id ? 'checked' : ''}>
-        <div><div class="head"><span class="title">${q.name}</span>${q.rec ? '<span class="badge rec">Recomendado</span>' : ''}${pid === active ? '<span class="badge using">En uso</span>' : ''}</div>
-        <div class="desc">${q.desc}</div><div class="tags">${q.tags.map(([k, t]) => `<span class="tag ${k}">${t}</span>`).join('')}</div></div></label>`;
+        <div><div class="head"><span class="title">${q.name}</span>${q.rec ? `<span class="badge rec">${t('badge.rec')}</span>` : ''}${pid === active ? `<span class="badge using">${t('badge.using')}</span>` : ''}</div>
+        <div class="desc">${q.desc}</div><div class="tags">${q.tags.map(([k, label]) => `<span class="tag ${k}">${label}</span>`).join('')}</div></div></label>`;
     const saved = status.ai.keys[id];
     const current = aiModel || status.ai.models[id] || status.ai.defaults[id] || p.models?.find((m) => m[3])?.[0] || p.models?.[0]?.[0];
 
@@ -551,43 +1142,43 @@ const VIEWS = {
     if (CLI[id]) {
       const c = cli[id] || {};
       const m = CLI[id];
-      items.push([c.installed, `Instalar ${m.app}`, c.installed ? 'Ya está instalado.' : m.about,
-        c.installed ? '' : `<button class="btn primary small" data-act="cli-install">Instalar ${m.app}</button>`]);
-      items.push([c.loggedIn, `Iniciar sesión con tu cuenta de ${m.account}`, c.loggedIn ? 'Sesión iniciada.' : 'Se abrirá tu navegador para que entres con tu cuenta (solo la primera vez).',
-        c.installed && !c.loggedIn ? `<button class="btn primary small" data-act="cli-login">Iniciar sesión</button>` : '']);
-      if (c.waiting && !(c.installed && c.loggedIn)) items.push([false, 'Sigue los pasos de la ventana que se abrió', 'Esta pantalla se actualiza sola cuando termines.', '']);
+      items.push([c.installed, t('ai.cliInstall', { app: m.app }), c.installed ? t('ai.cliInstalled') : m.about,
+        c.installed ? '' : `<button class="btn primary small" data-act="cli-install">${t('ai.cliInstall', { app: m.app })}</button>`]);
+      items.push([c.loggedIn, t('ai.cliLogin', { account: m.account }), c.loggedIn ? t('ai.cliLoggedIn') : t('ai.cliLoginText'),
+        c.installed && !c.loggedIn ? `<button class="btn primary small" data-act="cli-login">${t('ai.cliLoginBtn')}</button>` : '']);
+      if (c.waiting && !(c.installed && c.loggedIn)) items.push([false, t('ai.cliWaiting'), t('ai.cliWaitingText'), '']);
     }
     if (p.key) {
-      items.push([Boolean(saved), 'Consigue tu clave', `<ol>${p.key.map((s) => `<li>${s}</li>`).join('')}</ol>`, '']);
-      items.push([Boolean(saved), 'Pega tu clave aquí', saved ? `Ya tienes una guardada (${esc(saved)}). Déjalo vacío para mantenerla.` : 'Se guarda solo en este PC.',
-        `<input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="Pega tu clave">`]);
+      items.push([Boolean(saved), t('ai.getKey'), `<ol>${p.key.map((s) => `<li>${s}</li>`).join('')}</ol>`, '']);
+      items.push([Boolean(saved), t('ai.pasteKey'), saved ? t('ai.keySaved', { key: esc(saved) }) : t('ai.keyLocal'),
+        `<input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="${esc(t('ai.keyPlaceholder'))}">`]);
     }
-    if (p.local) items.push([false, 'Prepara Ollama', `<ol>${p.local.map((s) => `<li>${s}</li>`).join('')}</ol>`, '']);
+    if (p.local) items.push([false, t('ai.ollama'), `<ol>${p.local.map((s) => `<li>${s}</li>`).join('')}</ol>`, '']);
     if (p.models) {
-      items.push([true, 'Elige el modelo', 'Puedes cambiarlo cuando quieras.',
-        `<div class="models">${p.models.map(([v, t, d, rec]) => `<label class="choice ${v === current ? 'sel' : ''}"><input type="radio" name="model" value="${v}" ${v === current ? 'checked' : ''}>
-          <div><div class="head"><span class="title">${t}</span>${rec ? '<span class="badge rec">Recomendado</span>' : ''}</div><div class="desc">${d}</div></div></label>`).join('')}</div>`]);
+      items.push([true, t('ai.model'), t('ai.modelText'),
+        `<div class="models">${p.models.map(([v, title, d, rec]) => `<label class="choice ${v === current ? 'sel' : ''}"><input type="radio" name="model" value="${v}" ${v === current ? 'checked' : ''}>
+          <div><div class="head"><span class="title">${title}</span>${rec ? `<span class="badge rec">${t('badge.rec')}</span>` : ''}</div><div class="desc">${d}</div></div></label>`).join('')}</div>`]);
     } else if (p.modelText) {
-      items.push([true, 'Escribe el nombre del modelo', 'El que descargaste en Ollama.', `<input type="text" id="model-text" spellcheck="false" value="${esc(aiModel || status.ai.models[id] || status.ai.defaults[id] || 'llama3.2')}">`]);
+      items.push([true, t('ai.modelName'), t('ai.modelNameText'), `<input type="text" id="model-text" spellcheck="false" value="${esc(aiModel || status.ai.models[id] || status.ai.defaults[id] || 'llama3.2')}">`]);
     }
 
     const ready = !CLI[id] || (cli[id]?.installed && cli[id]?.loggedIn);
     const testOk = aiTest?.state === 'ok' && active === id;
     return {
-      html: `<div class="kicker">Paso 4</div><h1>Elige tu IA</h1>
-        <p class="lead">Es quien responde tus preguntas. Si tienes Claude Pro o Max, o ChatGPT Plus o Pro, usa tu suscripción: no pagas nada extra.</p>
+      html: `<div class="kicker">${t('kicker.step', { n: 4 })}</div><h1>${t('ai.title')}</h1>
+        <p class="lead">${t('ai.lead')}</p>
         <div class="choices">${Object.entries(PROVIDERS).map(([pid, q]) => choice(pid, q)).join('')}</div>
-        <details class="more" ${ADVANCED[id] ? 'open' : ''}><summary>Más opciones</summary><div class="choices" style="margin-top:10px">${Object.entries(ADVANCED).map(([pid, q]) => choice(pid, q)).join('')}</div></details>
-        ${items.length ? `<div class="card" style="margin-top:18px"><h3>Configura: ${p.name}</h3>
-          <ol class="todo">${items.map(([ok, t, d, act], i) => `<li><span class="n ${ok ? 'ok' : ''}">${ok ? '✓' : i + 1}</span>
-            <div><b>${t}</b>${d.startsWith('<ol>') ? d : d ? `<p>${d}</p>` : ''}${act ? `<div class="act">${act}</div>` : ''}</div></li>`).join('')}</ol></div>` : ''}
-        ${SEARCHES.includes(id) ?`<div class="card"><div class="line"><div class="t"><b>Buscar en internet cuando haga falta</b><p>Recomendado. WoW Forever salió en noviembre de 2026 y la IA no lo conoce de memoria: así puede consultar guías de Forever (zonas, mazmorras, misiones nuevas) antes de responder. Las respuestas que necesitan buscar tardan unos segundos más.</p></div>
-          <label class="switch" title="Buscar en internet"><input type="checkbox" id="web-search" ${status.ai.webSearch ? 'checked' : ''}><i></i></label></div></div>` : ''}
+        <details class="more" ${ADVANCED[id] ? 'open' : ''}><summary>${t('ai.more')}</summary><div class="choices" style="margin-top:10px">${Object.entries(ADVANCED).map(([pid, q]) => choice(pid, q)).join('')}</div></details>
+        ${items.length ? `<div class="card" style="margin-top:18px"><h3>${t('ai.setup', { name: p.name })}</h3>
+          <ol class="todo">${items.map(([ok, title, d, act], i) => `<li><span class="n ${ok ? 'ok' : ''}">${ok ? '✓' : i + 1}</span>
+            <div><b>${title}</b>${d.startsWith('<ol>') ? d : d ? `<p>${d}</p>` : ''}${act ? `<div class="act">${act}</div>` : ''}</div></li>`).join('')}</ol></div>` : ''}
+        ${SEARCHES.includes(id) ?`<div class="card"><div class="line"><div class="t"><b>${t('ai.web')}</b><p>${t('ai.webText')}</p></div>
+          <label class="switch" title="${esc(t('ai.webTitle'))}"><input type="checkbox" id="web-search" ${status.ai.webSearch ? 'checked' : ''}><i></i></label></div></div>` : ''}
         <div class="result" id="ai-result">${aiTest ? aiTest.html : ''}</div>`,
       next: testOk
-        ? { label: returnToDash ? 'Volver al panel' : 'Siguiente', action: () => (returnToDash ? openDash() : go(voiceStepNeeded() ? 'voice' : 'done')) }
-        : { label: spinner('save', 'Guardar y probar', 'Probando…'), disabled: !ready || Boolean(busyAction), action: saveAndTest },
-      hint: !ready ? 'Completa los pasos de arriba' : testOk ? '' : 'Haremos una pregunta de prueba',
+        ? { label: returnToDash ? t('btn.backToDash') : t('btn.next'), action: () => (returnToDash ? openDash() : go(voiceStepNeeded() ? 'voice' : 'done')) }
+        : { label: spinner('save', t('ai.save'), t('ai.testing')), disabled: !ready || Boolean(busyAction), action: saveAndTest },
+      hint: !ready ? t('ai.hintSteps') : testOk ? '' : t('ai.hintTest'),
       after() {
         document.querySelectorAll('input[name=provider]').forEach((r) => {
           r.onchange = () => { aiChoice = r.value; aiModel = null; aiTest = null; render(); if (CLI[r.value]) checkCli(r.value); };
@@ -609,42 +1200,42 @@ const VIEWS = {
   voice() {
     const on = voice?.active;
     const choice = voiceChoice || 'on';
-    const opt = (v, t, d, rows, rec) => `<label class="choice ${choice === v ? 'sel' : ''}"><input type="radio" name="voice" value="${v}" ${choice === v ? 'checked' : ''}>
-      <div><div class="head"><span class="title">${t}</span>${rec ? '<span class="badge rec">Recomendado</span>' : ''}${v === 'on' && on ? '<span class="badge using">Activado</span>' : ''}</div><div class="desc">${d}</div>
+    const opt = (v, title, d, rows, rec) => `<label class="choice ${choice === v ? 'sel' : ''}"><input type="radio" name="voice" value="${v}" ${choice === v ? 'checked' : ''}>
+      <div><div class="head"><span class="title">${title}</span>${rec ? `<span class="badge rec">${t('badge.rec')}</span>` : ''}${v === 'on' && on ? `<span class="badge using">${t('badge.on')}</span>` : ''}</div><div class="desc">${d}</div>
       <dl class="explain">${rows.map(([k, text]) => `<dt>${k}</dt><dd>${text}</dd>`).join('')}</dl></div></label>`;
-    const leave = returnToDash ? { label: 'Volver al panel', action: openDash } : { label: 'Siguiente', action: () => go('done') };
+    const leave = returnToDash ? { label: t('btn.backToDash'), action: openDash } : { label: t('btn.next'), action: () => go('done') };
     let next = leave;
-    if (choice === 'on' && !on) next = { label: spinner('voice', 'Activar envío invisible', 'Activando…'), disabled: Boolean(busyAction), action: activateVoice };
-    if (choice === 'off' && on) next = { label: spinner('voice', 'Desactivar envío invisible', 'Desactivando…'), disabled: Boolean(busyAction), action: deactivateVoice };
-    // Installed under the app's first name: one click (and one permission) renames it.
+    if (choice === 'on' && !on) next = { label: spinner('voice', t('voice.activate'), t('voice.activating')), disabled: Boolean(busyAction), action: activateVoice };
+    if (choice === 'off' && on) next = { label: spinner('voice', t('voice.deactivate'), t('voice.deactivating')), disabled: Boolean(busyAction), action: deactivateVoice };
+    // Set up under the app's previous name: one click (and one permission) updates it.
     const legacy = choice === 'on' && voice?.legacy && !voiceMsg;
-    if (legacy) next = { label: spinner('voice', 'Actualizar envío invisible', 'Actualizando…'), disabled: Boolean(busyAction), action: activateVoice };
+    if (legacy) next = { label: spinner('voice', t('voice.update'), t('voice.updating')), disabled: Boolean(busyAction), action: activateVoice };
     return {
-      html: `<div class="kicker">Paso 5 · Opcional</div><h1>¿Cómo llegan tus preguntas a la app?</h1>
-        <p class="lead">Por seguridad, WoW no deja que los addons se comuniquen con otros programas de tu PC: no pueden usar internet ni escribir archivos mientras juegas. Por eso tu pregunta necesita un camino para salir del juego y llegar a esta app, que es la que habla con la IA.</p>
+      html: `<div class="kicker">${t('kicker.stepOptional', { n: 5 })}</div><h1>${t('voice.title')}</h1>
+        <p class="lead">${t('voice.lead')}</p>
         <div class="flow" aria-hidden="true">
-          <span>Tu pregunta</span><i>→</i><span class="hi">El camino que eliges</span><i>→</i><span>Esta app</span><i>→</i><span>La IA</span><i>→</i><span>Respuesta en el juego</span>
+          <span>${t('voice.flow1')}</span><i>→</i><span class="hi">${t('voice.flow2')}</span><i>→</i><span>${t('voice.flow3')}</span><i>→</i><span>${t('voice.flow4')}</span><i>→</i><span>${t('voice.flow5')}</span>
         </div>
-        <p class="small muted" style="margin:-6px 0 16px">Las respuestas vuelven al juego igual con los dos caminos. Puedes cambiarlo después.</p>
-        ${callout('info', 'Te recomendamos el envío invisible', 'Es el único que no interfiere con nada mientras juegas: no aparece nada en tu pantalla, no se escucha nada y funciona aunque tengas WoW minimizado o detrás de otra ventana. Solo pide un permiso de Windows una vez.')}
+        <p class="small muted" style="margin:-6px 0 16px">${t('voice.same')}</p>
+        ${callout('info', t('voice.recTitle'), t('voice.recText'))}
         <div class="choices">
-          ${opt('on', 'Invisible', 'No interfiere con nada: no se ve, no se oye y no depende de que el juego esté visible.', [
-            ['Cómo funciona', 'Se agrega a Windows una voz más, como las que usa el Narrador, pero completamente muda. Al preguntar, el addon «lee» tu pregunta con esa voz y, en lugar de sonar, la voz se la entrega a la app.'],
-            ['Qué se instala', 'Una voz silenciosa llamada «ForeverAICompanion» en la lista de voces de Windows. No cambia tus otras voces ni el sonido de tu PC, y nadie más la usa.'],
-            ['Por qué pide permiso', 'Windows solo permite agregar voces con permiso de administrador. Te lo pide una sola vez; si dices que no, no se instala nada.'],
-            ['Ten en cuenta', 'Después de activarlo, cierra WoW por completo y vuelve a abrirlo. Puedes desactivarlo cuando quieras desde el panel.'],
+          ${opt('on', t('voice.on'), t('voice.onDesc'), [
+            [t('voice.how'), t('voice.onHow')],
+            [t('voice.what'), t('voice.onWhat')],
+            [t('voice.why'), t('voice.onWhy')],
+            [t('voice.note'), t('voice.onNote')],
           ], true)}
-          ${opt('off', 'Con una línea en pantalla', 'No instala nada ni pide permisos, pero se nota un poco al preguntar.', [
-            ['Cómo funciona', 'Al preguntar, el addon dibuja durante un instante una línea delgada de cuadritos oscuros en el borde superior de la pantalla. La app la lee, como si fuera un código QR, y la línea desaparece.'],
-            ['Qué se instala', 'Nada extra.'],
-            ['Ten en cuenta', 'Verás un parpadeo breve arriba de la pantalla cada vez que preguntas, y WoW debe estar visible (no minimizado ni tapado por otra ventana) en ese momento. Si otro addon o una ventana tapa esa franja, la pregunta puede no llegar.'],
+          ${opt('off', t('voice.off'), t('voice.offDesc'), [
+            [t('voice.how'), t('voice.offHow')],
+            [t('voice.what'), t('voice.offWhat')],
+            [t('voice.note'), t('voice.offNote')],
           ])}
         </div>
-        <p class="small faint" style="margin-top:14px">Los dos caminos usan funciones normales de Windows y del juego: no modifican WoW, no leen su memoria y no juegan por ti.</p>
-        ${legacy ? `<div style="margin-top:14px">${callout('warn', 'Actualiza el envío invisible', 'Tienes la voz con su nombre anterior («AzerothIA»). Sigue funcionando, pero pulsa <b>Actualizar envío invisible</b> para cambiarla a «ForeverAICompanion». Windows pedirá permiso una vez; luego reinicia WoW.')}</div>` : ''}
+        <p class="small faint" style="margin-top:14px">${t('voice.fair')}</p>
+        ${legacy ? `<div style="margin-top:14px">${callout('warn', t('voice.legacyTitle'), t('voice.legacyText'))}</div>` : ''}
         ${voiceMsg ? `<div style="margin-top:14px">${voiceMsg}</div>` : ''}`,
       next,
-      hint: (choice === 'on' && !on) || legacy ? 'Windows te pedirá permiso: pulsa Sí' : '',
+      hint: (choice === 'on' && !on) || legacy ? t('voice.hint') : '',
       after() {
         document.querySelectorAll('input[name=voice]').forEach((r) => { r.onchange = () => { voiceChoice = r.value; voiceMsg = null; render(); }; });
       },
@@ -655,19 +1246,19 @@ const VIEWS = {
     const auto = status.autostart;
     return {
       html: `<div class="big-check">${ICON.check}</div>
-        <h1>¡Todo listo!</h1>
-        <p class="lead">Así se usa en el juego:</p>
+        <h1>${t('done.title')}</h1>
+        <p class="lead">${t('done.lead')}</p>
         <ol class="howto">
-          <li><div><b>Abre WoW Forever</b><span>Si ya estaba abierto, ciérralo por completo y vuelve a abrirlo.</span></div></li>
-          <li><div><b>Pulsa el botón flotante</b><span>Es un círculo con el retrato de tu asistente, arriba a la derecha de la pantalla, junto al minimapa. Puedes arrastrarlo a donde te quede más cómodo. Al pulsarlo se abre la ventana de chats.</span></div></li>
-          <li><div><b>Elige a tu asistente (solo la primera vez)</b><span>Fizzi, la inventora gnoma (Alianza), o Rizzik, el negociante goblin (Horda). Puedes cambiarlo cuando quieras.</span></div></li>
-          <li><div><b>Pregunta lo que quieras</b><span>Por ejemplo: «¿Qué mazmorra me conviene hacer ahora?». La respuesta llega en unos segundos.</span></div></li>
+          <li><div><b>${t('done.s1')}</b><span>${t('done.s1Text')}</span></div></li>
+          <li><div><b>${t('done.s2')}</b><span>${t('done.s2Text')}</span></div></li>
+          <li><div><b>${t('done.s3')}</b><span>${t('done.s3Text')}</span></div></li>
+          <li><div><b>${t('done.s4')}</b><span>${t('done.s4Text')}</span></div></li>
         </ol>
-        ${auto === null ? '' : `<div class="card" style="margin-top:18px"><div class="line"><div class="t"><b>Abrir al iniciar Windows</b><p>Recomendado: así la app está lista siempre que juegas, sin que tengas que abrirla.</p></div>
-          <label class="switch" title="Abrir al iniciar Windows"><input type="checkbox" id="autostart" ${auto ? 'checked' : ''}><i></i></label></div></div>`}
-        ${status.tray ? `<div class="callout info" style="margin-top:16px"><span class="ic">${ICON.info}</span><div><b>Puedes cerrar esta ventana</b><p>Al cerrarla te preguntaremos si quieres que la app siga funcionando en segundo plano. Si sigue, la encuentras junto al reloj de Windows con este ícono <img src="/icon.png" alt="" style="width:18px;height:18px;vertical-align:-4px">: clic para abrirla, clic derecho para cerrarla.</p></div></div>` : ''}
-        <p class="small faint">¿Prefieres el teclado? También puedes escribir <kbd>/ia</kbd> en el chat del juego.</p>`,
-      next: { label: 'Ir al panel', action: openDash },
+        ${auto === null ? '' : `<div class="card" style="margin-top:18px"><div class="line"><div class="t"><b>${t('autostart')}</b><p>${t('done.autostartText')}</p></div>
+          <label class="switch" title="${esc(t('autostart'))}"><input type="checkbox" id="autostart" ${auto ? 'checked' : ''}><i></i></label></div></div>`}
+        ${status.tray ? `<div class="callout info" style="margin-top:16px"><span class="ic">${ICON.info}</span><div><b>${t('done.closeTitle')}</b><p>${t('done.closeText', { icon: '<img src="/icon.png" alt="" style="width:18px;height:18px;vertical-align:-4px">' })}</p></div></div>` : ''}
+        <p class="small faint">${t('done.keyboard')}</p>`,
+      next: { label: t('done.toDash'), action: openDash },
       after() { bindAutostart(); },
     };
   },
@@ -686,7 +1277,7 @@ function renderWizard(full = true) {
     const doneStep = isDone[s.id]() && s.id !== 'welcome' && i !== idx;
     const reachable = !returnToDash && (firstOpen === -1 || i <= firstOpen);
     return `<li class="${i === idx ? 'current' : doneStep ? 'done' : ''}"><button data-step="${s.id}" ${reachable && i !== idx ? '' : 'disabled'}>
-      <span class="num">${doneStep ? '✓' : i + 1}</span><div><b>${s.title}${s.optional ? '<span class="opt">opcional</span>' : ''}</b><small>${s.sub}</small></div></button></li>`;
+      <span class="num">${doneStep ? '✓' : i + 1}</span><div><b>${s.title}${s.optional ? `<span class="opt">${t('step.optional')}</span>` : ''}</b><small>${s.sub}</small></div></button></li>`;
   }).join('');
   document.querySelectorAll('#stepper button').forEach((b) => { b.onclick = () => go(b.dataset.step); });
 
@@ -702,10 +1293,10 @@ function renderWizard(full = true) {
   }
   const n = currentView.next;
   $('btn-back').classList.toggle('hidden', idx === 0 && !returnToDash);
-  $('btn-back').textContent = returnToDash ? 'Cancelar' : 'Atrás';
+  $('btn-back').textContent = returnToDash ? t('btn.cancel') : t('btn.back');
   $('btn-next').innerHTML = n.label;
   $('btn-next').disabled = Boolean(n.disabled);
-  $('footer-hint').textContent = currentView.hint || `Paso ${idx + 1} de ${steps.length}`;
+  $('footer-hint').textContent = currentView.hint || t('footer.stepOf', { n: idx + 1, total: steps.length });
 }
 
 $('btn-next').onclick = () => currentView?.next.action?.();
@@ -744,7 +1335,7 @@ function render() {
   $('dash').classList.toggle('hidden', mode !== 'dash');
   const ok = setupComplete() && status.running;
   $('chip').className = `chip ${ok ? 'ok' : 'warn'}${mode === 'dash' ? '' : ' hidden'}`;
-  $('chip-text').textContent = ok ? 'Funcionando' : 'Revisa la configuración';
+  $('chip-text').textContent = ok ? t('chip.ok') : t('chip.warn');
   $('version').textContent = `v${status.version}`;
   if (mode === 'wizard') { renderWizard(); lastWizardKey = wizardKey(); }
   else renderDash();
@@ -753,9 +1344,9 @@ function render() {
 // Dashboard ------------------------------------------------------------------
 function ago(iso) {
   const s = Math.max(0, Math.round((Date.now() - new Date(iso)) / 1000));
-  if (s < 60) return 'hace un momento';
-  if (s < 3600) return `hace ${Math.round(s / 60)} min`;
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (s < 60) return t('ago.now');
+  if (s < 3600) return t('ago.min', { n: Math.round(s / 60) });
+  return new Date(iso).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
 }
 function modelLabel(id) {
   const p = ALL[id];
@@ -763,13 +1354,13 @@ function modelLabel(id) {
   return p?.models?.find(([v]) => v === m)?.[1] || m || '';
 }
 
-// "Revisada el 13 de noviembre de 2026 · se actualiza sola"
+// "Reviewed on November 13, 2026 · updates itself from the internet"
 function guideText(g) {
   const [y, m, d] = g.date.split('-').map(Number);
-  const date = new Date(y, m - 1, d).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' });
-  const how = g.autoUpdate ? 'se actualiza sola desde internet' : 'incluida en la app';
-  const old = g.stale ? ` · <span style="color:var(--warn)">tiene ${g.age} días: la IA comprueba en internet lo que pudo cambiar</span>` : '';
-  return `Lo que la IA sabe de Forever. Revisada el ${esc(date)} · ${how}${old}`;
+  const date = new Date(y, m - 1, d).toLocaleDateString(lang, { day: 'numeric', month: 'long', year: 'numeric' });
+  const how = g.autoUpdate ? t('guide.auto') : t('guide.bundled');
+  const old = g.stale ? ` · <span style="color:var(--warn)">${t('guide.old', { n: g.age })}</span>` : '';
+  return t('guide.text', { date: esc(date), how, old });
 }
 
 function renderDash() {
@@ -779,40 +1370,40 @@ function renderDash() {
   const row = (icon, title, sub, btn) => `<div class="rowi"><span class="ic">${icon}</span><div class="t"><b>${title}</b><span>${sub}</span></div>${btn}</div>`;
   const html = `
     ${ok
-      ? callout('ok', 'Todo funciona', `En el juego pulsa el botón flotante (arriba a la derecha, junto al minimapa) y pregunta lo que quieras.${s.ai.preset === 'echo' ? ' <b>Estás en Modo prueba:</b> cuando veas que funciona, elige una IA.' : ''}`)
-      : callout('warn', 'Falta algo por configurar', esc(s.problem || 'Revisa lo que está marcado abajo.'))}
-    <div class="section-title">Configuración</div>
+      ? callout('ok', t('dash.ok'), `${t('dash.okText')}${s.ai.preset === 'echo' ? ` ${t('dash.testMode')}` : ''}`)
+      : callout('warn', t('dash.missing'), esc(s.problem || t('dash.missingText')))}
+    <div class="section-title">${t('dash.settings')}</div>
     <div class="rows">
-      ${row(ICON.game, 'Juego', s.wow.valid ? esc(s.wow.dir) : '<span style="color:var(--warn)">No encontrado</span>', '<button class="btn small" data-open="game">Cambiar</button>')}
-      ${row(ICON.puzzle, 'Addon', s.wow.addonInstalled ? `Instalado · versión ${esc(s.wow.addonVersion)}` : '<span style="color:var(--warn)">Sin instalar</span>', `<button class="btn small" data-open="addon">${s.wow.addonInstalled ? 'Reinstalar' : 'Instalar'}</button>`)}
-      ${row(ICON.star, 'Inteligencia artificial', p ? `${esc(p.name)}${modelLabel(s.ai.preset) ? ' · ' + esc(modelLabel(s.ai.preset)) : ''}` : '<span style="color:var(--warn)">Sin elegir</span>', '<button class="btn small" data-open="ai">Cambiar</button>')}
-      ${SEARCHES.includes(s.ai.preset) ?`<div class="rowi"><span class="ic">${ICON.spark}</span><div class="t"><b>Buscar en internet</b><span>${s.ai.webSearch ? 'La IA consulta guías de WoW Forever cuando lo necesita' : 'Desactivado: responde solo con lo que sabe y tus datos'}</span></div>
-        <label class="switch" title="Buscar en internet"><input type="checkbox" id="web-search" ${s.ai.webSearch ? 'checked' : ''}><i></i></label></div>` : ''}
-      ${s.guide ? row(ICON.book, 'Guía de WoW Forever', guideText(s.guide),
-        s.guide.autoUpdate ? `<button class="btn small" data-act="guide">${spinner('guide', 'Buscar actualización', 'Buscando…')}</button>` : '') : ''}
-      ${voiceStepNeeded() && voice ? row(ICON.hide, 'Envío invisible', voice.legacy ? '<span style="color:var(--warn)">Activado con el nombre anterior: actualízalo</span>' : voice.active ? 'Activado: tus preguntas viajan sin que se vea ni se oiga nada' : 'Desactivado: al preguntar aparece un instante una línea arriba de la pantalla', `<button class="btn small" data-open="voice">${voice.legacy ? 'Actualizar' : voice.active ? 'Cambiar' : 'Activar'}</button>`) : ''}
-      ${s.tray ? `<div class="rowi"><span class="ic"><img src="/icon.png" alt="" style="width:22px;height:22px"></span><div class="t"><b>Al cerrar esta ventana</b><span>La app puede seguir funcionando junto al reloj de Windows.</span></div>
-        <select id="close-action" class="select" title="Al cerrar esta ventana">
-          <option value="ask" ${s.closeAction === 'ask' ? 'selected' : ''}>Preguntarme</option>
-          <option value="tray" ${s.closeAction === 'tray' ? 'selected' : ''}>Seguir en segundo plano</option>
-          <option value="quit" ${s.closeAction === 'quit' ? 'selected' : ''}>Cerrar la app</option>
+      ${row(ICON.game, t('dash.game'), s.wow.valid ? esc(s.wow.dir) : `<span style="color:var(--warn)">${t('dash.notFound')}</span>`, `<button class="btn small" data-open="game">${t('btn.change')}</button>`)}
+      ${row(ICON.puzzle, t('dash.addon'), s.wow.addonInstalled ? t('dash.addonInstalled', { v: esc(s.wow.addonVersion) }) : `<span style="color:var(--warn)">${t('dash.notInstalled')}</span>`, `<button class="btn small" data-open="addon">${s.wow.addonInstalled ? t('btn.reinstall') : t('btn.install')}</button>`)}
+      ${row(ICON.star, t('dash.ai'), p ? `${esc(p.name)}${modelLabel(s.ai.preset) ? ' · ' + esc(modelLabel(s.ai.preset)) : ''}` : `<span style="color:var(--warn)">${t('dash.notChosen')}</span>`, `<button class="btn small" data-open="ai">${t('btn.change')}</button>`)}
+      ${SEARCHES.includes(s.ai.preset) ?`<div class="rowi"><span class="ic">${ICON.spark}</span><div class="t"><b>${t('dash.web')}</b><span>${s.ai.webSearch ? t('dash.webOn') : t('dash.webOff')}</span></div>
+        <label class="switch" title="${esc(t('dash.web'))}"><input type="checkbox" id="web-search" ${s.ai.webSearch ? 'checked' : ''}><i></i></label></div>` : ''}
+      ${s.guide ? row(ICON.book, t('dash.guide'), guideText(s.guide),
+        s.guide.autoUpdate ? `<button class="btn small" data-act="guide">${spinner('guide', t('dash.guideCheck'), t('dash.guideChecking'))}</button>` : '') : ''}
+      ${voiceStepNeeded() && voice ? row(ICON.hide, t('dash.voice'), voice.legacy ? `<span style="color:var(--warn)">${t('dash.voiceLegacy')}</span>` : voice.active ? t('dash.voiceOn') : t('dash.voiceOff'), `<button class="btn small" data-open="voice">${voice.legacy ? t('dash.voiceUpdate') : voice.active ? t('btn.change') : t('dash.voiceActivate')}</button>`) : ''}
+      ${s.tray ? `<div class="rowi"><span class="ic"><img src="/icon.png" alt="" style="width:22px;height:22px"></span><div class="t"><b>${t('dash.close')}</b><span>${t('dash.closeText')}</span></div>
+        <select id="close-action" class="select" title="${esc(t('dash.close'))}">
+          <option value="ask" ${s.closeAction === 'ask' ? 'selected' : ''}>${t('dash.closeAsk')}</option>
+          <option value="tray" ${s.closeAction === 'tray' ? 'selected' : ''}>${t('dash.closeTray')}</option>
+          <option value="quit" ${s.closeAction === 'quit' ? 'selected' : ''}>${t('dash.closeQuit')}</option>
         </select></div>` : ''}
-      ${s.autostart === null ? '' : `<div class="rowi"><span class="ic">${ICON.power}</span><div class="t"><b>Abrir al iniciar Windows</b><span>Así la app siempre está lista cuando juegas.</span></div>
-        <label class="switch" title="Abrir al iniciar Windows"><input type="checkbox" id="autostart" ${s.autostart ? 'checked' : ''}><i></i></label></div>`}
+      ${s.autostart === null ? '' : `<div class="rowi"><span class="ic">${ICON.power}</span><div class="t"><b>${t('autostart')}</b><span>${t('dash.autostartText')}</span></div>
+        <label class="switch" title="${esc(t('autostart'))}"><input type="checkbox" id="autostart" ${s.autostart ? 'checked' : ''}><i></i></label></div>`}
     </div>
-    <div class="section-title">Últimas preguntas</div>
+    <div class="section-title">${t('dash.recent')}</div>
     <div class="rows"><ul class="feed">${s.events.length ? s.events.map((e) => `<li>
         <div class="meta">${ago(e.time)} · ${esc(e.who)}</div><div class="q">${esc(e.question)}</div>
-        ${e.pending ? '<div class="a wait"><span class="spin"></span>Pensando…</div>' : `<div class="a ${e.ok === false ? 'bad' : ''}">${esc(e.answer)}</div>`}</li>`).join('')
-      : '<li class="empty">Todavía no hay preguntas. En el juego pulsa el botón flotante y pregunta algo: la verás aquí.</li>'}</ul></div>
-    <div class="section-title">Más opciones</div>
+        ${e.pending ? `<div class="a wait"><span class="spin"></span>${t('dash.thinking')}</div>` : `<div class="a ${e.ok === false ? 'bad' : ''}">${esc(e.answer)}</div>`}</li>`).join('')
+      : `<li class="empty">${t('dash.empty')}</li>`}</ul></div>
+    <div class="section-title">${t('dash.more')}</div>
     <div class="links">
-      <button class="btn small" data-act="knowledge">Conocimiento del servidor…</button>
-      <button class="btn small" data-act="wizard">Repetir la configuración</button>
-      <button class="btn small" data-act="quit">Cerrar la app</button>
-      <button class="btn small danger" data-act="uninstall">Desinstalar</button>
+      <button class="btn small" data-act="knowledge">${t('dash.knowledge')}</button>
+      <button class="btn small" data-act="wizard">${t('dash.wizard')}</button>
+      <button class="btn small" data-act="quit">${t('dash.quit')}</button>
+      <button class="btn small danger" data-act="uninstall">${t('dash.uninstall')}</button>
     </div>
-    <p class="small faint" style="margin-top:18px">${s.tray ? 'Al cerrar esta ventana, la app puede seguir funcionando junto al reloj de Windows: clic en su ícono para volver aquí.' : 'Puedes cerrar esta ventana: la app sigue funcionando en segundo plano.'}</p>`;
+    <p class="small faint" style="margin-top:18px">${s.tray ? t('dash.footTray') : t('dash.foot')}</p>`;
   if ($('dash-inner')._html === html) return;
   $('dash-inner')._html = html;
   $('dash-inner').innerHTML = html;
@@ -824,7 +1415,7 @@ function renderDash() {
   if (ca) ca.onchange = async () => {
     try {
       await api('close-action', { action: ca.value });
-      toast('ok', { ask: 'Te preguntaremos al cerrar la ventana.', tray: 'Al cerrar la ventana, la app seguirá funcionando junto al reloj.', quit: 'Al cerrar la ventana, la app se cerrará.' }[ca.value]);
+      toast('ok', { ask: t('toast.closeAsk'), tray: t('toast.closeTray'), quit: t('toast.closeQuit') }[ca.value]);
     } catch (e) { toast('bad', esc(e.message)); }
     await refresh(true);
   };
@@ -836,7 +1427,7 @@ function bindWebSearch() {
   el.onchange = async () => {
     try {
       await api('web-search', { enabled: el.checked });
-      toast('ok', el.checked ? 'La IA buscará en internet cuando haga falta.' : 'La IA responderá solo con lo que sabe y tus datos.');
+      toast('ok', el.checked ? t('toast.webOn') : t('toast.webOff'));
     } catch (e) { toast('bad', esc(e.message)); }
     await refresh(true);
   };
@@ -848,7 +1439,7 @@ function bindAutostart() {
   el.onchange = async () => {
     try {
       await api('autostart', { enabled: el.checked });
-      toast('ok', el.checked ? 'La app se abrirá al iniciar Windows.' : 'La app ya no se abrirá al iniciar Windows.');
+      toast('ok', el.checked ? t('toast.autoOn') : t('toast.autoOff'));
     } catch (e) { toast('bad', esc(e.message)); }
     await refresh(true);
   };
@@ -869,18 +1460,18 @@ async function saveAndTest() {
     try {
       await api('set-ai', { preset: aiChoice, apiKey: $('key')?.value || '', model });
     } catch (e) {
-      aiTest = { state: 'bad', html: callout('bad', 'No se pudo guardar', esc(e.message)) };
+      aiTest = { state: 'bad', html: callout('bad', t('ai.saveFail'), esc(e.message)) };
       return;
     }
-    aiTest = { state: 'running', html: callout('info', 'Probando…', 'Hacemos una pregunta de ejemplo a la IA. Puede tardar unos segundos.') };
+    aiTest = { state: 'running', html: callout('info', t('ai.testing'), t('ai.testingText')) };
     status = await api('status');
     render();
     $('ai-result')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     try {
       const r = await api('test-ai');
-      aiTest = { state: 'ok', html: `<div class="callout ok"><span class="ic">${ICON.check}</span><div><b>¡Funciona!</b><p>${esc(r.model)} respondió en ${r.seconds} s:</p><div class="answer">${esc(r.text)}</div></div></div>` };
+      aiTest = { state: 'ok', html: `<div class="callout ok"><span class="ic">${ICON.check}</span><div><b>${t('ai.works')}</b><p>${t('ai.answered', { model: esc(r.model), s: r.seconds })}</p><div class="answer">${esc(r.text)}</div></div></div>` };
     } catch (e) {
-      aiTest = { state: 'bad', html: callout('bad', 'La prueba no funcionó', `${esc(e.message)}<br>Revisa los pasos de arriba y vuelve a intentarlo.`) };
+      aiTest = { state: 'bad', html: callout('bad', t('ai.testFail'), `${esc(e.message)}<br>${t('ai.testFailText')}`) };
     }
   });
   $('ai-result')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -891,10 +1482,10 @@ async function activateVoice() {
     try {
       const r = await api('voice-install');
       voiceMsg = r.wowRunning
-        ? callout('warn', 'Envío invisible activado. Reinicia el juego', 'Cierra WoW por completo y vuelve a abrirlo para que lo use.')
-        : callout('ok', 'Envío invisible activado', 'La próxima vez que abras WoW, tus preguntas viajarán sin que se vea nada.');
+        ? callout('warn', t('voice.onRestart'), t('voice.onRestartText'))
+        : callout('ok', t('voice.onOk'), t('voice.onOkText'));
     } catch (e) {
-      voiceMsg = callout('bad', 'No se pudo activar el envío invisible', `${esc(e.message)}. Si no aceptaste el permiso de Windows, vuelve a intentarlo. O elige «Con una línea en pantalla» y sigue: funciona igual.`);
+      voiceMsg = callout('bad', t('voice.onFail'), `${esc(e.message)}. ${t('voice.onFailText')}`);
     }
     await checkVoice();
   });
@@ -903,7 +1494,7 @@ async function activateVoice() {
 async function deactivateVoice() {
   await run('voice', async () => {
     await api('voice-uninstall');
-    voiceMsg = callout('ok', 'Envío invisible desactivado', 'Tus preguntas usarán la línea en pantalla.');
+    voiceMsg = callout('ok', t('voice.offOk'), t('voice.offOkText'));
     await checkVoice();
   });
 }
@@ -911,7 +1502,7 @@ async function deactivateVoice() {
 const ACTIONS = {
   detect: () => run('detect', async () => {
     const r = await api('detect-wow');
-    if (!r.found.length) toast('bad', 'Tampoco lo encontramos esta vez. Usa <b>Elegir carpeta…</b>.');
+    if (!r.found.length) toast('bad', t('game.detectFail'));
   }),
   pick: () => run('pick', async () => { await api('pick-wow'); }),
   install: installAddon,
@@ -926,18 +1517,18 @@ const ACTIONS = {
   knowledge: () => api('knowledge').catch((e) => toast('bad', esc(e.message))),
   guide: () => run('guide', async () => {
     const r = await api('guide-check');
-    toast('ok', r.updated ? 'Guía de Forever actualizada.' : 'Ya tienes la guía más reciente.');
+    toast('ok', r.updated ? t('toast.guideUpdated') : t('toast.guideLatest'));
   }),
   wizard: () => openWizard('welcome'),
   quit: async () => {
-    if (!(await confirmBox('¿Cerrar Forever AI Companion?', 'Dejarás de recibir respuestas en el juego hasta que la vuelvas a abrir desde el menú Inicio.', 'Cerrar la app'))) return;
+    if (!(await confirmBox(t('quit.title'), t('quit.text'), t('dash.quit')))) return;
     await api('quit').catch(() => {});
-    endScreen('La app está cerrada', 'Ya puedes cerrar esta ventana. Para volver a usarla, ábrela desde el menú Inicio.');
+    endScreen(t('quit.endTitle'), t('quit.endText'));
   },
   uninstall: async () => {
-    if (!(await confirmBox('¿Desinstalar Forever AI Companion?', 'Se borrará el addon del juego, tu configuración (incluidas las claves) y la app. No se puede deshacer.', 'Desinstalar', true))) return;
+    if (!(await confirmBox(t('uninstall.title'), t('uninstall.text'), t('dash.uninstall'), true))) return;
     await api('uninstall').catch(() => {});
-    endScreen('Desinstalación completa', 'Ya puedes cerrar esta ventana.');
+    endScreen(t('uninstall.endTitle'), t('uninstall.endText'));
   },
 };
 
@@ -971,16 +1562,18 @@ async function checkVoice() {
 // Polls the app every 2 s. The wizard is only redrawn when something it shows
 // changed (new questions alone don't redraw it, so typing is never disturbed).
 let lastWizardKey = '';
-const wizardKey = () => JSON.stringify([{ ...status, events: null }, voice, cli, busyAction, step, aiChoice, aiTest?.state, voiceChoice]);
+const wizardKey = () => JSON.stringify([{ ...status, events: null }, voice, cli, busyAction, step, aiChoice, aiTest?.state, voiceChoice, lang]);
 async function refresh(force = false) {
   if (stopped) return;
   try {
     status = await api('status');
   } catch {
     $('chip').className = 'chip bad';
-    $('chip-text').textContent = 'La app no responde';
+    $('chip-text').textContent = t('chip.down');
     return;
   }
+  // The app says which language to use (when it knows); a change redraws everything.
+  if (LANGS.includes(status.lang) && status.lang !== lang) setLang(status.lang);
   if (!mode) {
     mode = setupComplete() ? 'dash' : 'wizard';
     if (mode === 'wizard') {
@@ -998,7 +1591,7 @@ async function refresh(force = false) {
 // sends this too, but the app waits and sees the page come back.
 window.addEventListener('pagehide', () => {
   if (stopped) return;
-  try { fetch('/api/window-closed', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json', 'x-azerothia': '1' }, body: JSON.stringify({ page: PAGE_ID }) }); } catch { /* closing */ }
+  try { fetch('/api/window-closed', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json', 'x-forever-ai-companion': '1' }, body: JSON.stringify({ page: PAGE_ID }) }); } catch { /* closing */ }
 });
 
 (async () => {

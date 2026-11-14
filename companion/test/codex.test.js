@@ -9,6 +9,7 @@ import {
   CODEX_DISABLE, codexArgs, friendlyCodexError, parseCodexEvents, parseLoginStatus, shellQuote,
 } from '../src/codex.js';
 import { ask, canSearch } from '../src/providers.js';
+import { runInLang } from '../src/i18n.js';
 
 test('Codex runs as a plain chat model with our instructions', () => {
   const args = codexArgs({ model: 'gpt-6-luna', effort: 'low' }, {
@@ -54,8 +55,9 @@ test('Codex events: answer, failures and sign-in', () => {
     '{"type":"turn.failed","error":{"message":"unexpected status 401 Unauthorized: Missing bearer"}}',
   ].join('\n'));
   assert.match(bad.error, /401/);
-  assert.match(friendlyCodexError(bad.error), /Iniciar sesión/);
-  assert.match(friendlyCodexError("You've hit your usage limit"), /límite de uso de tu plan/);
+  assert.match(runInLang('en', () => friendlyCodexError(bad.error)), /Sign in/);
+  assert.match(runInLang('en', () => friendlyCodexError("You've hit your usage limit")), /usage limit/);
+  assert.match(runInLang('es', () => friendlyCodexError(bad.error)), /Iniciar sesión/);
 
   assert.deepEqual(parseLoginStatus('Not logged in'), { loggedIn: false, method: null });
   assert.deepEqual(parseLoginStatus('Logged in using ChatGPT'), { loggedIn: true, method: 'chatgpt' });
@@ -111,10 +113,12 @@ test('asking through Codex end to end (fake codex in a folder with spaces)', { s
   assert.match(r.model, /suscripción/);
   const call = JSON.parse(fs.readFileSync(logFile, 'utf8'));
   assert.match(call.system, /^Eres Fizzi\./, 'our prompt reached Codex as its instructions');
-  assert.match(call.system, /No ejecutes comandos/);
+  assert.match(call.system, /Do not run commands/);
   assert.match(call.stdin, /¿Qué hago ahora\?/);
   assert.ok(call.args.includes("web_search='live'"));
 
   process.env.FAKE_CODEX_FAIL = "You've hit your usage limit. Try again later.";
-  await assert.rejects(ask(cfg, 'Eres Fizzi.', messages, {}), /límite de uso de tu plan/);
+  await assert.rejects(runInLang('en', () => ask(cfg, 'Eres Fizzi.', messages, {})), /usage limit/);
+  // Inside a Spanish player's request, the same error is in Spanish.
+  await assert.rejects(runInLang('es', () => ask(cfg, 'Eres Fizzi.', messages, {})), /límite de uso de tu plan/);
 });

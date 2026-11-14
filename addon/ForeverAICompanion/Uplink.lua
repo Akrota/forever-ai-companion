@@ -14,15 +14,15 @@
 -- Each cell holds one 6-bit symbol: 2 bits per R/G/B channel, 4 dark levels
 -- (LEVELS below). "White" in the rulers is the brightest level.
 -- Data bytes (all lengths big endian):
---   v1: "AZIA" | 1 | length(3) | payload | adler32(payload)(4)
---   v2: "AZIA" | 2 | compressedLength(3) | payloadLength(3) | LZW(payload) | adler32(payload)(4)
+--   v1: "FAIC" | 1 | length(3) | payload | adler32(payload)(4)
+--   v2: "FAIC" | 2 | compressedLength(3) | payloadLength(3) | LZW(payload) | adler32(payload)(4)
 -- LZW: codes start at 9 bits and grow to 16; the dictionary stops at 65536 entries.
 local _, ns = ...
 
 local Uplink = {}
 ns.Uplink = Uplink
 
-Uplink.MAGIC = "AZIA"
+Uplink.MAGIC = "FAIC"
 Uplink.CELL_PX = 3      -- cell size in physical screen pixels
 Uplink.MAX_COLS = 4095  -- limit of the 12-bit width field
 Uplink.MAX_SCREEN_FRACTION = 0.25
@@ -274,7 +274,7 @@ function Uplink:Prepare(frame, step)
   local parent, maxCols, unit, physH = geometry(self)
   local W, H, cells = Uplink.BuildGrid(frame, maxCols, step)
   if H * self.CELL_PX > physH * self.MAX_SCREEN_FRACTION then
-    return false, "La pregunta y los datos no caben en la pantalla."
+    return false, ns.L.DOESNT_FIT
   end
   self.preparing = true
   local grid = self.grid
@@ -315,7 +315,7 @@ end
 
 -- Prepare + Reveal in one go (no frame spreading).
 function Uplink:Send(frame, callback)
-  if self.busy or self.preparing then return false, "Ya hay un envío en curso." end
+  if self.busy or self.preparing then return false, ns.L.SEND_IN_PROGRESS end
   local ok, err = self:Prepare(frame)
   if not ok then return false, err end
   self:Reveal(callback)

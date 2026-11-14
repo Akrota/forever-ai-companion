@@ -5,10 +5,11 @@
 // hours and keeps the newest one on disk. Every guide starts with a small
 // header:
 //   ---
-//   fecha: 2026-11-13          (when it was last reviewed)
-//   versionJuego: 1.60.1       (game version it describes)
+//   date: 2026-11-13           (when it was last reviewed)
+//   gameVersion: 1.60.1        (game version it describes)
 //   build: 70938               (game build it describes)
 //   ---
+// (The first guides used Spanish keys "fecha" and "versionJuego": still accepted.)
 import fs from 'node:fs';
 import path from 'node:path';
 import { foreverGuide } from './assets.js';
@@ -19,7 +20,7 @@ const MIN_BODY = 1000;
 // Older than this, the AI must double-check facts that may have changed.
 export const STALE_DAYS = 21;
 
-// { meta: { fecha, versionJuego, build }, body } or null if it isn't a guide.
+// { meta: { date, gameVersion, build }, body } or null if it isn't a guide.
 export function parseGuide(text) {
   const m = /^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(String(text || ''));
   if (!m) return null;
@@ -28,7 +29,9 @@ export function parseGuide(text) {
     const kv = /^\s*([A-Za-z]+)\s*:\s*(.*?)\s*$/.exec(line);
     if (kv) meta[kv[1]] = kv[2];
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(meta.fecha || '')) return null;
+  meta.date = meta.date || meta.fecha;
+  meta.gameVersion = meta.gameVersion || meta.versionJuego;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(meta.date || '')) return null;
   meta.build = meta.build ? Number(meta.build) || null : null;
   return { meta, body: m[2].trim() };
 }
@@ -42,7 +45,7 @@ export function validGuide(text) {
   return g;
 }
 
-const newer = (a, b) => (!b || a.meta.fecha > b.meta.fecha ? a : b);
+const newer = (a, b) => (!b || a.meta.date > b.meta.date ? a : b);
 
 // The newest of: the downloaded guide, the one inside this app.
 export function currentGuide(dir) {
@@ -58,11 +61,11 @@ export function currentGuide(dir) {
 
 const daysBetween = (a, b) => Math.floor((Date.parse(b) - Date.parse(a)) / 86400000);
 
-// "13 de noviembre de 2026"
-export function spanishDate(iso) {
-  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+// "November 13, 2026"
+export function longDate(iso) {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const [y, mo, d] = iso.split('-').map(Number);
-  return `${d} de ${months[mo - 1]} de ${y}`;
+  return `${months[mo - 1]} ${d}, ${y}`;
 }
 
 const localIso = (now) => {
@@ -73,7 +76,7 @@ const localIso = (now) => {
 // How fresh the guide is compared with today and with the player's game.
 export function guideFreshness(guide, { now = new Date(), client = null } = {}) {
   const today = localIso(now);
-  const age = guide ? daysBetween(guide.meta.fecha, today) : null;
+  const age = guide ? daysBetween(guide.meta.date, today) : null;
   const gameBuild = Number(client?.build) || null;
   const gameNewer = Boolean(guide?.meta.build && gameBuild && gameBuild > guide.meta.build);
   return { today, age, gameBuild, gameVersion: client?.version || null, gameNewer, stale: age !== null && age > STALE_DAYS };
@@ -82,17 +85,17 @@ export function guideFreshness(guide, { now = new Date(), client = null } = {}) 
 // Prompt section: today's date, the guide's date and whether the game changed since.
 export function freshnessSection(guide, opts = {}) {
   const f = guideFreshness(guide, opts);
-  const lines = [`## Fecha y versión\nHoy es ${spanishDate(f.today)}. Usa esta fecha para todo lo que dependa del calendario (bandas, eventos, parches): lo que la guía anuncia para una fecha ya pasada, ya ocurrió.`];
+  const lines = [`## Date and version\nToday is ${longDate(f.today)}. Use this date for everything that depends on the calendar (raids, events, patches): what the guide announces for a date that has passed has already happened.`];
   if (guide) {
-    const ver = guide.meta.versionJuego ? ` para la versión ${guide.meta.versionJuego}${guide.meta.build ? ` (build ${guide.meta.build})` : ''} del juego` : '';
-    lines.push(`La guía base de Forever se revisó el ${spanishDate(guide.meta.fecha)}${ver}.`);
+    const ver = guide.meta.gameVersion ? ` for game version ${guide.meta.gameVersion}${guide.meta.build ? ` (build ${guide.meta.build})` : ''}` : '';
+    lines.push(`The WoW Forever base guide was last reviewed on ${longDate(guide.meta.date)}${ver}.`);
   }
-  if (f.gameVersion) lines.push(`El jugador tiene la versión ${f.gameVersion}${f.gameBuild ? ` (build ${f.gameBuild})` : ''}.`);
+  if (f.gameVersion) lines.push(`The player has version ${f.gameVersion}${f.gameBuild ? ` (build ${f.gameBuild})` : ''}.`);
   if (f.gameNewer || f.stale) {
-    const why = f.gameNewer ? 'Blizzard actualizó el juego después de la guía' : `la guía tiene ${f.age} días`;
-    lines.push(`Atención: ${why}, así que puede haber cambios que no aparecen en ella. Para datos que cambian con los parches (niveles, botín, recompensas, ajustes de clases, fechas, eventos), lo más reciente manda: si puedes buscar en internet, comprueba antes de afirmar; si no, avisa que pudo haber cambiado.`);
+    const why = f.gameNewer ? 'Blizzard updated the game after the guide' : `the guide is ${f.age} days old`;
+    lines.push(`Warning: ${why}, so there may be changes it doesn't include. For facts that change with patches (levels, loot, rewards, class tuning, dates, events), the most recent information wins: if you can search the internet, check before stating them; if not, say they may have changed.`);
   } else {
-    lines.push('Si internet muestra algo más reciente que contradice la guía, lo más reciente manda.');
+    lines.push('If the internet shows something more recent that contradicts the guide, the most recent information wins.');
   }
   return lines.join('\n');
 }
@@ -113,16 +116,16 @@ export function startGuideUpdates({ url, dir, log = () => {}, intervalMs = 6 * 3
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     const guide = validGuide(text);
-    if (!guide) throw new Error('el archivo descargado no es una guía válida');
+    if (!guide) throw new Error('the downloaded file is not a valid guide');
     const have = currentGuide(dir);
-    if (have && guide.meta.fecha <= have.meta.fecha) return false;
+    if (have && guide.meta.date <= have.meta.date) return false;
     fs.mkdirSync(dir, { recursive: true });
     const tmp = path.join(dir, `${GUIDE_FILE}.tmp`);
     fs.writeFileSync(tmp, text);
     fs.renameSync(tmp, path.join(dir, GUIDE_FILE));
     const etag = res.headers.get('etag');
     if (etag) fs.writeFileSync(etagFile, etag);
-    log(`Guía de Forever actualizada (${guide.meta.fecha}).`);
+    log(`WoW Forever guide updated (${guide.meta.date}).`);
     onUpdate(guide);
     return true;
   }
@@ -133,7 +136,7 @@ export function startGuideUpdates({ url, dir, log = () => {}, intervalMs = 6 * 3
     if (reason === 'patch' && Date.now() - lastAt < 30 * 60000) return Promise.resolve(false);
     lastAt = Date.now();
     busy = download()
-      .catch((e) => { log(`No se pudo actualizar la guía de Forever: ${e.message}`); return false; })
+      .catch((e) => { log(`Could not update the WoW Forever guide: ${e.message}`); return false; })
       .finally(() => { busy = null; });
     return busy;
   }

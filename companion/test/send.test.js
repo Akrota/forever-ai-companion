@@ -64,6 +64,7 @@ const FAKE_UI = `
   time = os.time
   SHOTS = 0
   Screenshot = function() SHOTS = SHOTS + 1 end
+  GetLocale = function() return LOCALE or "enUS" end
   InCombatLockdown = function() return false end
   UnitAffectingCombat = function() return false end
   strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
@@ -94,7 +95,7 @@ const PRELUDE_DRIVE = `
   function START()
     for _, f in ipairs(FRAMES) do
       if f.scripts.OnEvent then
-        f.scripts.OnEvent(f, "ADDON_LOADED", "AzerothIA")
+        f.scripts.OnEvent(f, "ADDON_LOADED", "ForeverAICompanion")
         f.scripts.OnEvent(f, "PLAYER_LOGIN")
       end
     end
@@ -137,7 +138,7 @@ const PRELUDE_DRIVE = `
   end
 `;
 
-const FILES = ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Core.lua'];
+const FILES = ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Core.lua'];
 
 // Renders a DUMP() like the screen would show it (UIParent: 768 units = 1440 px)
 // and decodes it with the companion's decoder.
@@ -236,15 +237,15 @@ test('/ia probar-canales runs every probe, undoes it and reports through the str
       RUN_FRAMES(1)
     end
     RESULT = DUMP() .. "#" .. table.concat(CALLS, ",") .. "#" .. tostring(LoggingChat())
-  `, {}, ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
+  `, {}, ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
   FAKE_UI + PRELUDE_DRIVE + probeApis);
   const [dump, calls, loggingAfter] = out.split('#');
-  for (const c of ['SetCVar:aziaProbe=AZIA-PROBE-', 'DisableAddOn', 'SaveAddOns', 'CreateMacro', 'SendAddonMessage', 'SpeakText', 'EnableAddOn', 'SetCVar:aziaProbe=']) {
+  for (const c of ['SetCVar:faicProbe=FAIC-PROBE-', 'DisableAddOn', 'SaveAddOns', 'CreateMacro', 'SendAddonMessage', 'SpeakText', 'EnableAddOn', 'SetCVar:faicProbe=']) {
     assert.ok(calls.includes(c), `missing ${c} in ${calls}`);
   }
   assert.equal(loggingAfter, 'false', 'chat logging restored');
   const { req } = decodeDump(dump);
-  assert.equal(req.question, 'Prueba de canales invisibles');
+  assert.equal(req.question, 'Invisible channel test');
   assert.equal(req.probe.results.cvar, 'ok');
   assert.equal(req.probe.results.addons, 'ok');
   assert.equal(req.probe.ttsVoices[0].name, 'Microsoft Helena Desktop');
@@ -265,7 +266,7 @@ test('oversized requests are trimmed to the frame size limit', () => {
 
 test('chats: each chat keeps its own history, answers land in the right chat', () => {
   const out = runLua(`
-    AzerothIA_DB = { history = { { id = "old1", question = "pregunta vieja", status = "done", answer = "respuesta vieja", t = 100 } } }
+    ForeverAICompanion_DB = { history = { { id = "old1", question = "pregunta vieja", status = "done", answer = "respuesta vieja", t = 100 } } }
     START()
     local migrated = ns.Chats:Current()
     local a = ns.Chats:New()
@@ -295,10 +296,10 @@ test('chats: each chat keeps its own history, answers land in the right chat', (
     RESULT = migrated.title .. "|" .. #migrated.messages .. "#" .. dumpA1 .. "#" .. dumpB1 .. "#" .. dumpA2
       .. "#" .. a.title .. "|" .. tostring(a.messages[1].answer) .. "|" .. tostring(b.messages[1].answer) .. "|" .. bUnread
       .. "#" .. table.concat(titles, ",")
-  `, {}, ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
+  `, {}, ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
   FAKE_UI + PRELUDE_DRIVE);
   const [migrated, dA1, dB1, dA2, summary, titles] = out.split('#');
-  assert.equal(migrated, 'Conversación anterior|1');
+  assert.equal(migrated, 'Previous conversation|1');
   const a1 = decodeDump(dA1).req;
   const b1 = decodeDump(dB1).req;
   const a2 = decodeDump(dA2).req;
@@ -318,7 +319,7 @@ test('floating button: opens the chats, new chat, unread badge, drag, hide', () 
   const out = runLua(`
     IsShiftKeyDown = function() return SHIFT end
     START()
-    local b = AzerothIAFloatingButton
+    local b = ForeverAICompanionFloatingButton
     assert(b, "button not created")
     b.dragging = false -- the fake UI answers unknown fields with a function
     local shownAtStart = tostring(b.shown)
@@ -348,7 +349,7 @@ test('floating button: opens the chats, new chat, unread badge, drag, hide', () 
     local hidden = tostring(b.shown) .. "," .. tostring(ns.db.button.shown)
 
     RESULT = table.concat({ shownAtStart, openedByClick, closedBySecondClick, newChat, badge, thinking, saved, hidden }, "#")
-  `, {}, ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
+  `, {}, ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
   FAKE_UI + PRELUDE_DRIVE);
   const [shownAtStart, opened, closed, newChat, badge, thinking, saved, hidden] = out.split('#');
   assert.equal(shownAtStart, 'true');
@@ -377,7 +378,7 @@ test('window: welcome suggestions, bubbles, copy, retry, font size and sidebar',
     local current = ns.Chats:Current()
     local asked = current.messages[1].question
 
-    -- Answer arrives: user bubble + AI bubble with "Copiar".
+    -- Answer arrives: user bubble + AI bubble with "Copy".
     ns.Core:ApplyInbox({ answers = { { id = current.messages[1].id, ok = true, answer = "Ve a Gnomeregan" } } })
     ui:Refresh()
     local shownBubbles = 0
@@ -386,7 +387,7 @@ test('window: welcome suggestions, bubbles, copy, retry, font size and sidebar',
     aiBubble.action.scripts.OnClick(aiBubble.action)
     local copyOpen = tostring(ui.copyFrame and ui.copyFrame.shown)
 
-    -- An error offers "Reintentar", which asks again in the same chat.
+    -- An error offers "Retry", which asks again in the same chat.
     current.messages[1].status = "error"
     current.messages[1].answer = "Error: sin conexión"
     ui:Refresh()
@@ -399,12 +400,12 @@ test('window: welcome suggestions, bubbles, copy, retry, font size and sidebar',
     local sidebar = tostring(ui.side.shown) .. "," .. tostring(ns.db.ui.sidebar)
 
     RESULT = table.concat({ welcomeShown, chips, asked, shownBubbles, copyOpen, retried, size, sidebar }, "#")
-  `, {}, ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
+  `, {}, ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
   FAKE_UI + PRELUDE_DRIVE);
   const [welcome, chips, asked, bubbles, copyOpen, retried, size, sidebar] = out.split('#');
   assert.equal(welcome, 'true', 'empty chat shows the welcome screen');
   assert.equal(chips, '6');
-  assert.equal(asked, '¿Qué mazmorra me conviene hacer ahora?');
+  assert.equal(asked, 'Which dungeon should I run now?');
   assert.equal(bubbles, '2', 'one bubble for the question, one for the answer');
   assert.equal(copyOpen, 'true');
   assert.equal(retried, '1,pending', 'retry replaces the failed question with a new attempt');
@@ -449,7 +450,7 @@ test('assistant: first open asks Fizzi or Rizzik, suggests by faction, themes ev
 
     RESULT = table.concat({ chooserShown, welcomeHidden, cards, back, suggested, chosen, afterPick,
       accent, hello, pending, reopened, accent2, ns.Personas:Current().id }, "#")
-  `, {}, ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
+  `, {}, ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
   FAKE_UI.replace('GetStringHeight" then return function() return 10 end end',
     'GetStringHeight" then return function() return 10 end end\n      if k == "SetText" then return function(self, v) self.textValue = v end end') + PRELUDE_DRIVE);
   const [chooser, welcomeHidden, cards, back, suggested, chosen, afterPick, accent, hello, pending, reopened, accent2, final] = out.split('#');
@@ -461,8 +462,8 @@ test('assistant: first open asks Fizzi or Rizzik, suggests by faction, themes ev
   assert.equal(chosen, 'rizzik,true');
   assert.equal(afterPick, 'false,true', 'after choosing, the welcome screen appears');
   assert.equal(accent, '0.80', 'Horde red accent for Rizzik');
-  assert.match(hello, /negocio/);
-  assert.match(pending, /ganancias|letra chica|contactos|transmisor|trato/, 'thinking phrases are Rizzik\'s');
+  assert.match(hello, /deal/);
+  assert.match(pending, /fine print|profits|contacts|transmitter|deal/, 'thinking phrases are Rizzik\'s');
   assert.equal(reopened, 'true,true', 'the chooser can be reopened, now with a way back');
   assert.equal(accent2, '0.25', 'switching to Fizzi recolors the window');
   assert.equal(final, 'fizzi');
@@ -477,6 +478,12 @@ test('the request tells the app which assistant answers', () => {
   `, {}, FILES, FAKE_UI + PRELUDE_DRIVE);
   const { req } = decodeDump(dump);
   assert.equal(req.assistant, 'fizzi', 'asking before choosing keeps the faction\'s assistant');
+  assert.equal(req.lang, 'en', 'the game\'s language travels with the request');
+  const dumpEs = runLua(`
+    START()
+    RESULT = ASK("¿Qué hago?")
+  `, {}, FILES, 'LOCALE = "esES"\n' + FAKE_UI + PRELUDE_DRIVE);
+  assert.equal(decodeDump(dumpEs).req.lang, 'es');
 });
 
 test('every texture of the window is anchored (no invisible backgrounds)', () => {
@@ -494,7 +501,7 @@ test('every texture of the window is anchored (no invisible backgrounds)', () =>
       if t.parent ~= ns.Uplink.grid and not rawget(t, "anchored") then missing[#missing + 1] = i end
     end
     RESULT = #missing .. "/" .. #TEXTURES
-  `, {}, ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
+  `, {}, ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
   FAKE_UI + PRELUDE_DRIVE);
   const [missing, total] = out.split('/').map(Number);
   assert.ok(total > 20, `expected many textures, got ${total}`);
@@ -532,7 +539,7 @@ test('notification card: preview, click opens the chat, fades away', () => {
     local after = tostring(card2.shown)
 
     RESULT = table.concat({ shown, hop, badge, opened, before, after }, "#")
-  `, {}, ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
+  `, {}, ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
   FAKE_UI + PRELUDE_DRIVE);
   const [shown, hop, badge, opened, before, after] = out.split('#');
   assert.equal(shown, 'true', 'a card appears when the answer lands in a chat you are not viewing');
@@ -559,10 +566,126 @@ test('portraits: race icon atlas when the game has it, icon files or the gadget 
     GetFileIDFromPath = function() return nil end
     local c = P.PortraitName(fresh("rizzik"))
     RESULT = a .. "#" .. b .. "#" .. c
-  `, {}, ['Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
+  `, {}, ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'],
   FAKE_UI + PRELUDE_DRIVE);
   const [a, b, c] = out.split('#');
   assert.equal(a, 'atlas raceicon128-goblin-male|atlas raceicon128-gnome-female');
   assert.match(b, /Achievement_Character_Goblin_Male/);
   assert.match(c, /INV_Misc_Coin_01/);
+});
+
+// --- Languages ---------------------------------------------------------------
+// GetLocale() picks the texts: esES / esMX -> Spanish, anything else -> English.
+const ALL_FILES = ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'];
+const RECORD_TEXT = FAKE_UI.replace('GetStringHeight" then return function() return 10 end end',
+  'GetStringHeight" then return function() return 10 end end\n      if k == "SetText" then return function(self, v) self.textValue = v end end');
+const inLocale = (locale) => `LOCALE = ${JSON.stringify(locale)}\n` + RECORD_TEXT + PRELUDE_DRIVE;
+
+for (const { locale, code, title, hello, hint, chip, chooserTitle, pick, role, faction } of [
+  { locale: 'enUS', code: 'en', title: 'New chat', hello: 'Hi, Sharp! What shall we invent today?',
+    hint: 'Each chat remembers its own conversation: use one per topic.', chip: 'Which dungeon should I run now?',
+    chooserTitle: 'Your assistant', pick: 'Choose Fizzi|Choose Rizzik', role: 'Gnomeregan inventor · Alliance', faction: '(your faction)' },
+  { locale: 'esMX', code: 'es', title: 'Nuevo chat', hello: '¡Hola, Sharp! ¿Qué inventamos hoy?',
+    hint: 'Cada chat recuerda su propia conversación: usa uno por tema.', chip: '¿Qué mazmorra me conviene hacer ahora?',
+    chooserTitle: 'Tu asistente', pick: 'Elegir a Fizzi|Elegir a Rizzik', role: 'Inventora de Gnomeregan · Alianza', faction: '(tu facción)' },
+]) {
+  test(`window and assistant chooser in ${locale}`, () => {
+    const out = runLua(`
+      UnitFactionGroup = function() return "Alliance" end
+      START()
+      ns.UI:Show()
+      local ui = ns.UI
+      ui:Refresh()
+      -- First open: the chooser.
+      local chooser = ui.title.textValue
+      local picks = ui.chooser.cards[1].pick.textValue .. "|" .. ui.chooser.cards[2].pick.textValue
+      local role = ui.chooser.cards[1].role.textValue
+      local full = ns.Personas.list.fizzi.fullName .. "|" .. ns.Personas.list.rizzik.fullName
+      ui.chooser.cards[1].pick.scripts.OnClick(ui.chooser.cards[1].pick)
+      -- Then the welcome screen of an empty chat.
+      local w = ui.welcome
+      RESULT = table.concat({ ns.L.code, chooser, picks, role, full, ui.title.textValue, w.hello.textValue,
+        w.hint.textValue, ns.L.SUGGESTIONS[1], ui.placeholder.textValue, ns.L.WINDOW_TITLE }, "#")
+    `, {}, ALL_FILES, inLocale(locale));
+    const [gotCode, chooser, picks, gotRole, full, gotTitle, gotHello, gotHint, gotChip, placeholder, windowTitle] = out.split('#');
+    assert.equal(gotCode, code);
+    assert.equal(chooser, chooserTitle);
+    assert.equal(picks, pick);
+    assert.match(gotRole, new RegExp(`^${role}`));
+    assert.ok(gotRole.includes(faction), `suggested assistant marked: ${gotRole}`);
+    assert.equal(full, code === 'en' ? 'Fizzi Sparkwrench|Rizzik Fastfuse' : 'Fizzi Chispatuerca|Rizzik Bujíaveloz');
+    assert.equal(gotTitle, title);
+    assert.equal(gotHello, hello);
+    assert.equal(gotHint, hint);
+    assert.equal(gotChip, chip);
+    assert.match(placeholder, code === 'en' ? /^Ask Fizzi/ : /^Pregúntale algo a Fizzi/);
+    assert.equal(windowTitle, 'Forever AI Companion');
+  });
+}
+
+test('slash commands accept English and Spanish words in any game language', () => {
+  for (const locale of ['enUS', 'esES']) {
+    const out = runLua(`
+      START()
+      PRINTED = {}
+      print = function(...) PRINTED[#PRINTED + 1] = table.concat({ ... }, " ") end
+      local slash = SlashCmdList.FOREVERAICOMPANION
+      slash("assistant rizzik")
+      local en = ns.Personas:Current().id .. "|" .. PRINTED[#PRINTED]
+      slash("asistente fizzi")
+      local es = ns.Personas:Current().id .. "|" .. PRINTED[#PRINTED]
+      slash("help")
+      local help = PRINTED[#PRINTED]
+      slash("ayuda")
+      local ayuda = PRINTED[#PRINTED]
+      slash("button reset")
+      local reset = PRINTED[#PRINTED]
+      local function talk() ns.Chats:AddMessage(ns.Chats:Current(), { id = tostring(math.random()), question = "q", status = "done" }) end
+      talk()
+      local before = #ns.db.chats
+      slash("new")
+      local afterNew = #ns.db.chats - before
+      talk()
+      slash("nuevo")
+      local afterNuevo = #ns.db.chats - before
+      -- Anything else is a question, even if it starts with a command word.
+      slash("data about my quests")
+      local asked = ns.Chats:Current().messages[1].question
+      RESULT = table.concat({ en, es, help, ayuda, reset, afterNew, afterNuevo, asked,
+        SLASH_FOREVERAICOMPANION1, SLASH_FOREVERAICOMPANION2, SLASH_FOREVERAICOMPANION3 }, "#")
+    `, {}, ALL_FILES, inLocale(locale));
+    const [en, es, help, ayuda, reset, afterNew, afterNuevo, asked, s1, s2, s3] = out.split('#');
+    const spanish = locale === 'esES';
+    assert.equal(en, spanish ? 'rizzik||cff66ccffForever AI:|r Rizzik es ahora tu asistente.'
+      : 'rizzik||cff66ccffForever AI:|r Rizzik is now your assistant.');
+    assert.equal(es, spanish ? 'fizzi||cff66ccffForever AI:|r Fizzi es ahora tu asistente.'
+      : 'fizzi||cff66ccffForever AI:|r Fizzi is now your assistant.');
+    assert.equal(help, ayuda, 'help and ayuda are the same command');
+    assert.match(help, spanish ? /\/ia nuevo crea un chat/ : /\/ia new creates a chat/);
+    assert.match(reset, spanish ? /botón devuelto/ : /button moved back/);
+    assert.equal(afterNew, '1');
+    assert.equal(afterNuevo, '2');
+    assert.equal(asked, 'data about my quests');
+    assert.deepEqual([s1, s2, s3], ['/ia', '/azia', '/ai']);
+  }
+});
+
+test('Spanish falls back to English for a missing key, and every key is translated', () => {
+  const out = runLua(`
+    local es, en = ns.Locales.es, ns.Locales.en
+    local untranslated = {}
+    for k in pairs(en) do if rawget(es, k) == nil then untranslated[#untranslated + 1] = k end end
+    for k in pairs(es) do if rawget(en, k) == nil then untranslated[#untranslated + 1] = "en:" .. k end end
+    local before = ns.L.SEND
+    ns.L.SEND = nil                       -- a key the Spanish table does not have
+    RESULT = table.concat({ ns.L.code, before, ns.L.SEND, ns.L.NO_SUCH_KEY, #ns.L.FIZZI_THINKING,
+      table.concat(untranslated, ",") }, "#")
+  `, {}, ['Locale.lua'], 'LOCALE = "esES"; GetLocale = function() return LOCALE end');
+  const [code, before, fallback, unknown, thinking, untranslated] = out.split('#');
+  assert.equal(code, 'es');
+  assert.equal(before, 'Enviar');
+  assert.equal(fallback, 'Send', 'missing Spanish text shows the English one');
+  assert.equal(unknown, 'NO_SUCH_KEY', 'never nil');
+  assert.equal(thinking, '5');
+  assert.equal(untranslated, '', 'both languages have the same keys');
 });

@@ -1,12 +1,12 @@
 // Test the AI configuration without the game:
-//   npm run ask -- "¿Qué mazmorra me recomiendas?"
-// Uses sample/contexto-ejemplo.json as the character.
+//   npm run ask -- "Which dungeon do you recommend?"
+// Uses sample/sample-context.json as the character.
 import { loadConfig } from '../src/config.js';
 import { sampleContext } from '../src/assets.js';
 import { buildMessages, buildSystem, cleanAnswer, loadKnowledge } from '../src/prompt.js';
 import { ask } from '../src/providers.js';
 
-const question = process.argv.slice(2).join(' ') || '¿Cuál es la mejor mazmorra que puedo hacer ahora?';
+const question = process.argv.slice(2).join(' ') || 'What is the best dungeon I can run right now?';
 const cfg = loadConfig();
 const req = { id: 'test', question, context: sampleContext(), history: [] };
 

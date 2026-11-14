@@ -1,4 +1,4 @@
-// Reads the AzerothIA strip straight from the screen while the game runs.
+// Reads the addon's strip straight from the screen while the game runs.
 //
 // A small helper (PowerShell + C#, both built into Windows) watches a tiny
 // 40x9 px area at the top-left of the WoW window ~50 times per second. When
@@ -19,7 +19,7 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-public static class AziaReader {
+public static class FaicReader {
   [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
   [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
   [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h, out RECT r);
@@ -147,7 +147,7 @@ $ProgressPreference = 'SilentlyContinue'
 Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @'
 ${CSHARP}
 '@
-[AziaReader]::Run(${captureHeight}, $${wholeScreen ? 'true' : 'false'})
+[FaicReader]::Run(${captureHeight}, $${wholeScreen ? 'true' : 'false'})
 `;
 }
 
@@ -166,7 +166,7 @@ export function startScreenReader({ onFrame, log = () => {}, captureHeight = CAP
     });
     const lines = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
     lines.on('line', (line) => {
-      if (line === 'READY') { log('Lector de pantalla activo.'); return; }
+      if (line === 'READY') { log('Screen reader active.'); return; }
       if (!line.startsWith('FRAME ')) return;
       const [, seq, attempt, w, h, b64] = line.split(' ');
       try {
@@ -175,20 +175,20 @@ export function startScreenReader({ onFrame, log = () => {}, captureHeight = CAP
           width: Number(w), height: Number(h), channels: 3, data: Buffer.from(b64, 'base64'),
         });
       } catch (e) {
-        log(`Error procesando la franja: ${e.message}`);
+        log(`Error processing the strip: ${e.message}`);
       }
     });
     child.stderr.on('data', (d) => {
       const text = String(d).replace(/#< CLIXML[\s\S]*/, '').trim(); // PowerShell progress noise
-      if (text) log(`Lector de pantalla: ${text}`);
+      if (text) log(`Screen reader: ${text}`);
     });
     child.on('exit', (code) => {
       child = null;
       if (stopped) return;
-      log(`El lector de pantalla se cerró (código ${code}); se reinicia en 3 s.`);
+      log(`The screen reader exited (code ${code}); restarting in 3 s.`);
       restartTimer = setTimeout(launch, 3000);
     });
-    child.on('error', (e) => log(`No se pudo iniciar el lector de pantalla: ${e.message}`));
+    child.on('error', (e) => log(`Could not start the screen reader: ${e.message}`));
   };
   launch();
 

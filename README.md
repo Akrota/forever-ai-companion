@@ -5,331 +5,353 @@
 <h1 align="center">Forever AI Companion</h1>
 
 <p align="center">
-  Tu asistente con IA dentro de <b>World of Warcraft: Forever</b>.<br>
-  Pregunta lo que quieras sin salir del juego: la IA ya conoce a tu personaje.
+  Your AI assistant inside <b>World of Warcraft: Forever</b>.<br>
+  Ask anything without leaving the game: the AI already knows your character.
 </p>
 
 <p align="center">
-  <a href="https://github.com/lucasmenares/forever-ai-companion/releases/latest/download/ForeverAICompanion.exe"><b>⬇ Descargar para Windows</b></a>
+  <a href="https://github.com/lucasmenares/forever-ai-companion/releases/latest/download/ForeverAICompanion.exe"><b>⬇ Download for Windows</b></a>
 </p>
 
----
-
-## Contenido
-
-- [Qué es](#qué-es)
-- [Instalación (3 minutos)](#instalación-3-minutos)
-- [Cómo se usa en el juego](#cómo-se-usa-en-el-juego)
-- [Qué IA elegir](#qué-ia-elegir)
-- [Cómo funciona por dentro](#cómo-funciona-por-dentro)
-- [La guía de WoW Forever y sus actualizaciones](#la-guía-de-wow-forever-y-sus-actualizaciones)
-- [Privacidad y seguridad](#privacidad-y-seguridad)
-- [Preguntas frecuentes y problemas](#preguntas-frecuentes-y-problemas)
-- [Desinstalar](#desinstalar)
-- [Para desarrolladores](#para-desarrolladores)
+<p align="center"><sub>English and Spanish · Inglés y español</sub></p>
 
 ---
 
-## Qué es
+## Contents
 
-Forever AI Companion son dos piezas que trabajan juntas:
+- [What it is](#what-it-is)
+- [Installation (3 minutes)](#installation-3-minutes)
+- [Using it in the game](#using-it-in-the-game)
+- [Which AI to choose](#which-ai-to-choose)
+- [Languages](#languages)
+- [How it works](#how-it-works)
+- [The WoW Forever guide and its updates](#the-wow-forever-guide-and-its-updates)
+- [Privacy and safety](#privacy-and-safety)
+- [FAQ and troubleshooting](#faq-and-troubleshooting)
+- [Uninstalling](#uninstalling)
+- [For developers](#for-developers)
 
-| Pieza | Dónde vive | Qué hace |
+---
+
+## What it is
+
+Forever AI Companion has two parts that work together:
+
+| Part | Where it lives | What it does |
 |---|---|---|
-| **El addon** | Dentro de WoW Forever | El botón flotante, la ventana de chats y el asistente. Lee los datos de tu personaje y muestra las respuestas. |
-| **La app** (`ForeverAICompanion.exe`) | En tu PC con Windows | Recibe tu pregunta, se la hace a la IA que elegiste y devuelve la respuesta al juego. |
+| **The addon** | Inside WoW Forever | The floating button, the chat window and your assistant. It reads your character's data and shows the answers. |
+| **The app** (`ForeverAICompanion.exe`) | On your Windows PC | Receives your question, asks the AI you chose and sends the answer back to the game. |
 
-Con cada pregunta la IA recibe, sin que tengas que explicarlo:
+With every question the AI receives, without you having to explain anything:
 
-- tu **personaje**: raza, clase, nivel, experiencia, talentos y estadísticas;
-- tu **equipo** pieza por pieza, lo que llevas en las **bolsas** y en el banco;
-- **dónde estás**: zona y coordenadas;
-- tus **misiones** con su progreso, recompensas y las coordenadas reales de dónde hacerlas;
-- **profesiones**, reputaciones, mazmorras con bloqueo, grupo y objetivo.
+- your **character**: race, class, level, experience, talents and stats;
+- your **gear** slot by slot, what's in your **bags** and your bank;
+- **where you are**: zone and coordinates;
+- your **quests** with progress, rewards and the real coordinates of where to do them;
+- **professions**, reputations, dungeon lockouts, group and target.
 
-Así puedes preguntar cosas como *"¿Qué hago ahora?"*, *"¿Me sirve este anillo?"* o *"¿Qué mazmorra me conviene?"* y recibir una respuesta pensada para **tu** personaje.
+So you can ask things like *"What should I do now?"*, *"Is this ring better?"* or *"Which dungeon should I run?"* and get an answer for **your** character.
 
-Te responde un asistente con personalidad: **Fizzi**, una inventora gnoma, para la Alianza, o **Rizzik**, un negociante goblin, para la Horda.
+You get an assistant with personality: **Fizzi**, a gnome inventor, for the Alliance, or **Rizzik**, a goblin dealer, for the Horde.
 
 ---
 
-## Instalación (3 minutos)
+## Installation (3 minutes)
 
-**Requisitos:** Windows 10 u 11, WoW Forever instalado y una IA (abajo se explica cuál elegir: si tienes Claude Pro/Max o ChatGPT Plus/Pro, no pagas nada extra).
+**Requirements:** Windows 10 or 11, WoW Forever installed, and an AI (see [Which AI to choose](#which-ai-to-choose): with Claude Pro/Max or ChatGPT Plus/Pro you pay nothing extra).
 
-### 1. Descarga y abre la app
+### 1. Download and open the app
 
-1. Descarga [**ForeverAICompanion.exe**](https://github.com/lucasmenares/forever-ai-companion/releases/latest/download/ForeverAICompanion.exe).
-2. Haz doble clic en el archivo.
+1. Download [**ForeverAICompanion.exe**](https://github.com/lucasmenares/forever-ai-companion/releases/latest/download/ForeverAICompanion.exe).
+2. Double-click the file.
 
-> **¿Aparece "Windows protegió su PC"?** Es normal en programas nuevos que todavía no tienen firma digital. Pulsa **Más información** y luego **Ejecutar de todas formas**.
+> **Does "Windows protected your PC" appear?** That's normal for new programs that don't have a digital signature yet. Click **More info** and then **Run anyway**.
 
-La app se instala sola en tu usuario (sin pedir permisos), crea el acceso directo **Forever AI Companion** en el escritorio y en el menú Inicio, y abre su ventana. Después puedes borrar el archivo descargado.
+The app installs itself for your user (no permissions needed), creates a **Forever AI Companion** shortcut on the desktop and in the Start menu, and opens its window. You can delete the downloaded file afterwards.
 
-### 2. Sigue el asistente de la app
+### 2. Follow the app's setup
 
-La ventana te guía paso a paso:
+The window guides you step by step:
 
-| Paso | Qué hacer |
+| Step | What to do |
 |---|---|
-| **Tu juego** | Normalmente encuentra WoW Forever solo. Si no, pulsa **Elegir carpeta…** y elige la carpeta *World of Warcraft*. |
-| **El addon** | Pulsa **Instalar el addon**. |
-| **Tu IA** | Elige quién responde (ver [Qué IA elegir](#qué-ia-elegir)), sigue los pasos que aparecen y pulsa **Guardar y probar**: verás una respuesta de ejemplo. |
-| **Envío invisible** (opcional, recomendado) | Elige cómo viaja tu pregunta del juego a la app ([más abajo](#cómo-viaja-tu-pregunta-invisible-o-línea-en-pantalla) se explica). |
-| **Listo** | Deja activado **Abrir al iniciar Windows** para no tener que acordarte de abrir la app. |
+| **Your game** | It usually finds WoW Forever by itself. If not, click **Choose folder…** and pick the *World of Warcraft* folder. |
+| **The addon** | Click **Install the addon**. |
+| **Your AI** | Choose who answers (see [Which AI to choose](#which-ai-to-choose)), follow the steps shown and click **Save and test**: you'll see a sample answer. |
+| **Invisible sending** (optional, recommended) | Choose how your question travels from the game to the app ([explained below](#how-your-question-travels-invisible-or-on-screen-line)). |
+| **Done** | Leave **Open when Windows starts** on so you never have to remember to open the app. |
 
-### 3. Reinicia WoW
+### 3. Restart WoW
 
-Si el juego estaba abierto, **ciérralo por completo y vuelve a abrirlo** (con `/reload` no basta la primera vez).
+If the game was open, **close it completely and open it again** (`/reload` is not enough the first time).
 
-### Actualizar
+### Updating
 
-Descarga el `.exe` nuevo y ábrelo: reemplaza la versión anterior y actualiza el addon solo, sin perder tus chats ni tu configuración. La guía de WoW Forever que usa la IA se actualiza sola desde internet, sin descargar nada.
+Download the new `.exe` and open it: it replaces the old version and updates the addon by itself, keeping your chats and settings. The WoW Forever guide the AI uses updates by itself from the internet, with nothing to download.
+
+Coming from version 1.5.0 or earlier, the app and the addon move to new folder names on their own: your chats, settings and API keys come along. Restart WoW once afterwards. If you use invisible sending, the app window will offer **Update invisible sending** (Windows asks for permission once); until then it keeps working as before.
 
 ---
 
-## Cómo se usa en el juego
+## Using it in the game
 
-1. **Pulsa el botón flotante**: el círculo con el retrato de tu asistente, arriba a la derecha junto al minimapa. Puedes arrastrarlo.
-2. **La primera vez elige a tu asistente**: Fizzi (Alianza) o Rizzik (Horda). Te sugiere el de tu facción.
-3. **Escribe tu pregunta** y pulsa Enviar. En unos segundos llega la respuesta; si tenías la ventana cerrada, te llega un aviso.
+1. **Click the floating button**: the circle with your assistant's portrait, top right next to the minimap. You can drag it anywhere.
+2. **The first time, choose your assistant**: Fizzi (Alliance) or Rizzik (Horde). It suggests the one for your faction.
+3. **Type your question** and click Send. The answer arrives in a few seconds; if the window was closed, you get a notification.
 
-- **Chats por tema**: cada chat recuerda su conversación (equipo, misiones, mazmorras…). Clic derecho en el botón flotante abre un chat nuevo.
-- **Ver qué se envía**: en la ventana pulsa **Ver los datos que envío**.
-- **En combate** no se puede preguntar (a propósito): espera a salir.
+- **Chats by topic**: each chat remembers its conversation (gear, quests, dungeons…). Right-click the floating button to start a new chat.
+- **See what is sent**: in the window click **See the data I send**.
+- **In combat** you can't ask (on purpose): wait until combat ends.
 
-### Comandos de chat (opcionales)
+### Chat commands (optional)
 
-| Comando | Qué hace |
+Every command also works with its Spanish word (shown in parentheses).
+
+| Command | What it does |
 |---|---|
-| `/ia` | Abre o cierra la ventana |
-| `/ia <pregunta>` | Pregunta directo en el chat abierto |
-| `/ia nuevo` | Crea un chat nuevo |
-| `/ia asistente` | Elige entre Fizzi y Rizzik (`/ia asistente fizzi` o `/ia asistente rizzik`) |
-| `/ia boton` | Muestra u oculta el botón flotante (`/ia boton reset` lo devuelve a su lugar) |
-| `/ia sonido` | Activa o silencia el aviso de respuesta |
-| `/ia datos` | Muestra los datos que se envían |
-| `/ia estado` · `/ia buzon` | Diagnóstico: estado de la conexión y revisar respuestas pendientes |
-| `/ia ayuda` | Lista de comandos |
+| `/ia` or `/ai` | Opens or closes the window |
+| `/ia <question>` | Asks directly in the open chat |
+| `/ia new` (`nuevo`) | Starts a new chat |
+| `/ia assistant` (`asistente`) | Choose between Fizzi and Rizzik (`/ia assistant fizzi` or `/ia assistant rizzik`) |
+| `/ia button` (`boton`) | Shows or hides the floating button (`/ia button reset` puts it back in place) |
+| `/ia sound` (`sonido`) | Turns the answer notification sound on or off |
+| `/ia data` (`datos`) | Shows the data that is sent |
+| `/ia status` (`estado`) · `/ia inbox` (`buzon`) | Diagnostics: connection status and check for pending answers |
+| `/ia help` (`ayuda`) | List of commands |
 
 ---
 
-## Qué IA elegir
+## Which AI to choose
 
-| Opción | Para quién | Costo | Busca en internet |
+| Option | For whom | Cost | Searches the internet |
 |---|---|---|---|
-| **Mi suscripción de Claude** (recomendado) | Tienes Claude Pro o Max | Incluido en tu plan | Sí |
-| **Mi suscripción de ChatGPT** | Tienes ChatGPT Plus o Pro | Incluido en tu plan | Sí |
-| **Claude con clave de API** | Sin suscripción | Pagas por uso (≈ 1 centavo de dólar por pregunta) | Sí |
-| **ChatGPT con clave de API** | Sin suscripción | Pagas por uso | No |
-| **Gemini** | Quieres probar gratis | Uso gratuito con límites | No |
-| **IA en tu PC (Ollama)** | Tienes un PC potente | Gratis, sin internet | No |
-| **Modo prueba** | Comprobar que el juego y la app se conectan | Gratis (no es una IA) | — |
+| **My Claude subscription** (recommended) | You have Claude Pro or Max | Included in your plan | Yes |
+| **My ChatGPT subscription** | You have ChatGPT Plus or Pro | Included in your plan | Yes |
+| **Claude with an API key** | No subscription | Pay per use (≈ 1 US cent per question) | Yes |
+| **ChatGPT with an API key** | No subscription | Pay per use | No |
+| **Gemini** | You want to try it for free | Free usage with limits | No |
+| **AI on your PC (Ollama)** | You have a powerful PC | Free, no internet | No |
+| **Test mode** | Check that the game and the app are connected | Free (not an AI) | — |
 
-Con las suscripciones, la app instala el programa oficial (**Claude Code** de Anthropic o **Codex** de OpenAI) y abre tu navegador para iniciar sesión. Tus preguntas cuentan para el límite de uso de tu plan.
+With the subscriptions, the app installs the official program (**Claude Code** by Anthropic or **Codex** by OpenAI) and opens your browser to sign in. Your questions count toward your plan's usage limit.
 
-Puedes cambiar de IA o de modelo cuando quieras desde el panel de la app (**Cambiar**, al lado de *Inteligencia artificial*).
+You can change the AI or the model at any time from the app's dashboard (**Change**, next to *Artificial intelligence*).
 
 ---
 
-## Cómo funciona por dentro
+## Languages
 
-Por seguridad, los addons de WoW **no pueden usar internet ni escribir archivos**. Por eso la pregunta necesita un camino para salir del juego y la respuesta otro para volver:
+Everything is available in **English and Spanish**, chosen automatically:
+
+| Part | Language |
+|---|---|
+| The addon (window, button, assistant, commands) | Your WoW client's language: Spanish for `esES`/`esMX`, English for everything else |
+| The app window and the tray icon | Your Windows language: Spanish if Windows is in Spanish, English otherwise |
+| The AI's answers | The language of your question, using the names your game client shows (zones, quests, items) |
+
+To force the app's language, set `"language": "en"` or `"es"` in `%APPDATA%\ForeverAICompanion\config.json` (`"auto"` by default).
+
+---
+
+## How it works
+
+For safety, WoW addons **cannot use the internet or write files**. So the question needs a way out of the game and the answer a way back in:
 
 ```mermaid
 sequenceDiagram
-    participant J as Jugador
-    participant A as Addon (en WoW)
+    participant P as Player
+    participant A as Addon (in WoW)
     participant W as Windows
-    participant P as App (tu PC)
-    participant IA as IA elegida
-    J->>A: Escribe la pregunta
-    A->>A: Junta los datos del personaje
-    A->>W: "Lee en voz alta" la pregunta con la voz muda ForeverAICompanion
-    W->>P: La voz entrega el texto a la app (no suena nada)
-    P->>IA: Pregunta + datos + guía de Forever
-    IA-->>P: Respuesta
-    P->>A: Escribe la respuesta en un buzón del addon y "toca el timbre"
-    A->>J: Muestra la respuesta en el chat
+    participant C as App (your PC)
+    participant AI as Chosen AI
+    P->>A: Types the question
+    A->>A: Gathers the character data
+    A->>W: "Reads aloud" the question with the silent ForeverAICompanion voice
+    W->>C: The voice hands the text to the app (nothing is heard)
+    C->>AI: Question + data + WoW Forever guide
+    AI-->>C: Answer
+    C->>A: Writes the answer into an addon inbox and "rings the bell"
+    A->>P: Shows the answer in the chat
 ```
 
-### Ida: del juego a la app
+### Going out: from the game to the app
 
-1. El addon junta tu pregunta y los datos del personaje en un JSON. Para que sea liviano, las secciones que no cambiaron desde la última pregunta (equipo, talentos…) se envían solo como una huella, y la app las completa desde su copia.
-2. Lo empaqueta con una marca `AZIA`, su largo y una suma de control, y lo envía por uno de dos caminos:
+1. The addon puts your question and the character data into a JSON. To keep it light, sections that didn't change since the last question (gear, talents…) are sent only as a fingerprint, and the app fills them in from its copy.
+2. It packs it with a `FAIC` mark, its length and a checksum, and sends it by one of two paths:
 
-#### Cómo viaja tu pregunta: invisible o línea en pantalla
+#### How your question travels: invisible or on-screen line
 
-| | **Invisible** (recomendado) | **Línea en pantalla** |
+| | **Invisible** (recommended) | **On-screen line** |
 |---|---|---|
-| Cómo funciona | Windows tiene voces para leer texto en voz alta (como el Narrador). La app agrega una voz **muda** llamada *ForeverAICompanion*. El addon "lee" tu pregunta con esa voz y, en lugar de sonar, la voz se la entrega a la app. | El addon dibuja durante ~0,35 s una línea delgada de cuadritos oscuros en el borde superior. La app la lee de la ventana del juego, como un código QR. |
-| Qué se ve o se oye | Nada | Un parpadeo breve arriba de la pantalla |
-| Requisitos | Un permiso de administrador una sola vez (Windows solo deja agregar voces así) | WoW visible al preguntar (no minimizado ni tapado) |
-| Qué se instala | Una voz silenciosa en la lista de voces de Windows | Nada |
+| How it works | Windows has voices to read text aloud (like Narrator). The app adds a **silent** voice called *ForeverAICompanion*. The addon "reads" your question with that voice and, instead of making a sound, the voice hands it to the app. | The addon draws a thin line of dark squares along the top edge for ~0.35 s. The app reads it from the game window, like a QR code. |
+| What you see or hear | Nothing | A brief flicker at the top of the screen |
+| Requirements | Administrator permission once (Windows only allows adding voices that way) | WoW visible when asking (not minimized or covered) |
+| What gets installed | A silent voice in Windows' voice list | Nothing |
 
-Técnicamente, la voz es un pequeño motor SAPI que la app compila en tu PC con el compilador de C# incluido en Windows. Cuando el juego le pide hablar, guarda el texto en `%APPDATA%\AzerothIA\tts-inbox\` en vez de generar audio. Los mensajes van en trozos de hasta 16.000 caracteres (`AZIA:<id>:<parte>/<total>:<datos>`) y la app los vuelve a unir.
+Technically, the voice is a small SAPI engine that the app compiles on your PC with the C# compiler included in Windows. When the game asks it to speak, it saves the text in `%APPDATA%\ForeverAICompanion\tts-inbox\` instead of producing audio. Messages travel in chunks of up to 16,000 characters (`FAIC:<id>:<part>/<total>:<data>`) and the app joins them back.
 
-### Vuelta: de la app al juego
+### Coming back: from the app to the game
 
-- Al instalar el addon se crean **50 addons "buzón"** (`AzerothIA_S01` … `S50`) que el juego carga solo cuando se le pide. La app escribe las respuestas en ellos.
-- Para avisar que hay respuesta, la app "toca un timbre": 500 archivos `sig/NNN.wav` empiezan vacíos y la app convierte el siguiente en un sonido mudo de 50 ms. Cada 2 segundos el addon intenta reproducirlo; si se puede, lo corta al instante y carga el siguiente buzón, que lee la respuesta recién escrita.
-- Cada buzón se puede cargar una vez por sesión (por eso hay 50; con `/reload` se reinician). Si el sonido del juego está desactivado, el addon revisa los buzones con un temporizador.
+- Installing the addon creates **50 "inbox" addons** (`ForeverAICompanion_S01` … `S50`) that the game loads only on request. The app writes the answers into them.
+- To signal an answer, the app "rings a bell": 500 `sig/NNN.wav` files start empty, and the app turns the next one into a 50 ms silent sound. Every 2 seconds the addon tries to play it; if it can, it stops it instantly and loads the next inbox, which reads the freshly written answer.
+- Each inbox can be loaded once per session (that's why there are 50; `/reload` resets them). If the game's sound is off, the addon checks the inboxes on a timer.
 
-Esto explica por qué hay que **reiniciar WoW** después de instalar: el juego solo ve los archivos que existían al arrancar.
+That's why you need to **restart WoW** after installing: the game only sees files that existed when it started.
 
-### Qué recibe la IA
+### What the AI receives
 
-- **Las instrucciones del asistente**: personalidad de Fizzi o Rizzik, cómo leer los datos y cómo responder (breve, con coordenadas, sin enlaces porque el juego no puede abrirlos).
-- **La fecha de hoy y la versión del juego**, para razonar sobre el calendario y los parches.
-- **La guía de WoW Forever** (ver abajo).
-- **Tus datos y la pregunta**, más las preguntas anteriores del mismo chat.
-- Si la IA puede, **busca en internet** cuando necesita un dato propio de Forever (unos segundos más). Se puede desactivar en el panel.
+- **The assistant's instructions**: Fizzi's or Rizzik's personality, how to read the data and how to answer (short, with coordinates, no links because the game can't open them).
+- **Today's date and the game version**, to reason about the calendar and patches.
+- **The WoW Forever guide** (see below).
+- **Your data and the question**, plus the earlier questions of the same chat.
+- If the AI can, it **searches the internet** when it needs a Forever-specific fact (a few seconds more). It can be turned off in the dashboard.
 
-Con las suscripciones, Claude Code y Codex se ejecutan como un chat simple: nuestras instrucciones reemplazan las suyas de programación, sin acceso a tus archivos ni a comandos, sin tu configuración y sin guardar sesiones.
+With the subscriptions, Claude Code and Codex run as a plain chat: our instructions replace their coding ones, with no access to your files or commands, without your settings and without saving sessions.
 
 ---
 
-## La guía de WoW Forever y sus actualizaciones
+## The WoW Forever guide and its updates
 
-WoW Forever salió el 4 de noviembre de 2026, después de que se entrenaran las IA, así que no lo conocen de memoria. Por eso la IA recibe una **guía base de Forever**: zonas, mazmorras con sus niveles, bandas, la raza Cielonata, cambios de sistemas y calendario.
+WoW Forever launched on November 4, 2026, after the AIs were trained, so they don't know it from memory. That's why the AI receives a **WoW Forever base guide**: zones, dungeons with their levels, raids, the Skyborne race, system changes and the calendar. It's written in English and includes the Spanish client names (`es: ...`) so Spanish players get the names they see.
 
-La guía es el archivo [`companion/knowledge-builtin/wow-forever.md`](companion/knowledge-builtin/wow-forever.md) de este repositorio. Empieza con un encabezado:
+The guide is the file [`companion/knowledge-builtin/wow-forever.md`](companion/knowledge-builtin/wow-forever.md) in this repository. It starts with a header:
 
 ```
 ---
-fecha: 2026-11-13       ← cuándo se revisó por última vez
-versionJuego: 1.60.1    ← versión del juego que describe
-build: 70938            ← número de compilación del juego
+date: 2026-11-13       ← when it was last reviewed
+gameVersion: 1.60.1    ← game version it describes
+build: 70938           ← the game's build number
 ---
 ```
 
-**Cómo se mantiene al día:**
+**How it stays current:**
 
-- La app trae una copia, y además **descarga la de este repositorio** al iniciar, cada 6 horas y apenas detecta que el juego se actualizó. Solo la usa si es válida y su `fecha` es más nueva; sin conexión usa la última que descargó.
-- La IA sabe la fecha de hoy y la antigüedad de la guía. Si la guía tiene más de 21 días, o el juego es más nuevo que la guía, comprueba en internet lo que cambia con los parches antes de afirmarlo.
+- The app ships with a copy, and also **downloads the one in this repository** at startup, every 6 hours and as soon as it notices the game was updated. It only uses it if it's valid and its `date` is newer; offline it uses the last one it downloaded.
+- The AI knows today's date and how old the guide is. If the guide is more than 21 days old, or the game is newer than the guide, it checks on the internet whatever changes with patches before stating it.
 
-**Para actualizar la guía de todos los jugadores** (sin publicar una versión nueva de la app):
+**To update the guide for every player** (without releasing a new version of the app):
 
-1. Abre [`companion/knowledge-builtin/wow-forever.md`](companion/knowledge-builtin/wow-forever.md) en GitHub y pulsa el lápiz (*Edit*).
-2. Haz los cambios y **cambia la `fecha`** a la de hoy (y `versionJuego` y `build` si hubo parche; el build se ve con `/ia datos` en el juego, sección *client*).
-3. Pulsa **Commit changes**. En unas horas todas las apps lo descargan (o al pulsar **Buscar actualización** en el panel).
+1. Open [`companion/knowledge-builtin/wow-forever.md`](companion/knowledge-builtin/wow-forever.md) on GitHub and click the pencil (*Edit*).
+2. Make your changes and **set `date` to today** (and `gameVersion` and `build` if there was a patch; the build is shown by `/ia data` in the game, in the *client* section).
+3. Click **Commit changes**. Within a few hours every app downloads it (or right away with **Check for updates** in the dashboard).
 
-Consejos para la guía: escribe fechas completas ("abrieron el 9 de diciembre de 2026", no "abren pronto"), marca con "según guías" lo que no está confirmado por Blizzard y mantenla por debajo de 200 KB.
+Tips: write full dates ("opened on December 9, 2026", not "opening soon"), mark with "per guides" whatever Blizzard hasn't confirmed, and keep it under 200 KB.
 
-Además, cada jugador puede agregar su propio conocimiento en el panel de la app (**Conocimiento del servidor…**): los archivos `.md` o `.txt` de esa carpeta se incluyen en cada pregunta y tienen prioridad sobre la guía.
-
----
-
-## Privacidad y seguridad
-
-- **Tus datos solo van a la IA que elegiste.** Este proyecto no tiene servidores: no recibe tus preguntas, tus datos ni tus claves.
-- La única conexión propia de la app es descargar la guía de Forever desde este repositorio (una lectura, sin enviar nada).
-- Las claves de API se guardan solo en tu PC, en `%APPDATA%\AzerothIA\config.json`.
-- La ventana de la app es una página local (`127.0.0.1`) que no acepta conexiones de otros equipos ni de otras páginas web.
-- **El juego no se modifica**: no se toca su memoria ni sus archivos, y el addon no juega por ti. Solo se usan funciones normales de los addons y de Windows.
-- No es un producto de Blizzard. Úsalo bajo tu responsabilidad.
+Each player can also add their own knowledge from the app's dashboard (**Server knowledge…**): `.md` or `.txt` files in that folder are included with every question and take priority over the guide.
 
 ---
 
-## Preguntas frecuentes y problemas
+## Privacy and safety
 
-**¿Cuánto cuesta?**
-La app es gratis. Con tu suscripción de Claude o ChatGPT no pagas nada extra (las preguntas cuentan para el límite de tu plan). Con una clave de API pagas según el uso.
-
-**No llega la respuesta.**
-- Abre la app y mira que arriba diga **Funcionando**.
-- Si acabas de instalar el addon o el envío invisible, cierra WoW por completo y vuelve a abrirlo.
-- Escribe `/ia buzon` en el juego para revisar si hay respuestas nuevas.
-- Si usas la línea en pantalla, WoW tiene que estar visible al preguntar y en modo ventana o "pantalla completa (ventana)".
-
-**No veo el botón flotante.**
-Puede que lo hayas ocultado (Shift + clic derecho). Escribe `/ia boton`, o `/ia boton reset` para devolverlo a su lugar.
-
-**La prueba de la IA falla.**
-Revisa los pasos del paso *Tu IA*: que el programa esté instalado y con la sesión iniciada, o que la clave esté completa. El mensaje de error explica qué falta.
-
-**¿La app tiene que estar abierta?**
-Sí, mientras juegas. Al cerrar su ventana puede seguir funcionando junto al reloj de Windows (clic en el ícono para volver a abrirla; clic derecho para cerrarla). Con **Abrir al iniciar Windows** no tienes que acordarte.
-
-**¿Funciona en Mac?**
-No por ahora: solo Windows 10 y 11.
+- **Your data only goes to the AI you chose.** This project has no servers: it never receives your questions, your data or your keys.
+- The app's only connection of its own is downloading the WoW Forever guide from this repository (a read, nothing is sent).
+- API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`.
+- The app window is a local page (`127.0.0.1`) that doesn't accept connections from other computers or other web pages.
+- **The game is not modified**: its memory and files are not touched, and the addon doesn't play for you. It only uses normal addon and Windows features.
+- This is not a Blizzard product. Use it at your own risk.
 
 ---
 
-## Desinstalar
+## FAQ and troubleshooting
 
-Abre la app y, en **Más opciones**, pulsa **Desinstalar**. Se borran el addon, los buzones, la voz invisible, tu configuración, los accesos directos y el programa.
+**How much does it cost?**
+The app is free. With your Claude or ChatGPT subscription you pay nothing extra (questions count toward your plan's limit). With an API key you pay per use.
+
+**The answer doesn't arrive.**
+- Open the app and check that it says **Running** at the top.
+- If you just installed the addon or invisible sending, close WoW completely and open it again.
+- Type `/ia inbox` in the game to check for new answers.
+- With the on-screen line, WoW must be visible when asking and in windowed or "fullscreen (windowed)" mode.
+
+**I can't see the floating button.**
+You may have hidden it (Shift + right-click). Type `/ia button`, or `/ia button reset` to put it back in place.
+
+**The AI test fails.**
+Check the steps in *Your AI*: the program must be installed and signed in, or the key must be complete. The error message tells you what's missing.
+
+**Does the app need to stay open?**
+Yes, while you play. When you close its window it can keep running next to the Windows clock (click the icon to open it again; right-click to close it). With **Open when Windows starts** you don't have to remember.
+
+**Does it work on Mac?**
+Not for now: Windows 10 and 11 only.
 
 ---
 
-## Para desarrolladores
+## Uninstalling
 
-> El nombre interno del proyecto es **AzerothIA** (su primer nombre). Se mantiene en la carpeta del addon, la carpeta de datos (`%APPDATA%\AzerothIA`) y la carpeta de instalación para que las actualizaciones conserven chats, configuración y el envío invisible.
+Open the app and, under **More options**, click **Uninstall**. It removes the addon, the inboxes, the invisible voice, your settings, the shortcuts and the program.
 
-### Estructura
+---
+
+## For developers
+
+### Structure
 
 ```
-addon/AzerothIA/            Addon (Lua 5.1, cliente moderno, interfaz 16001)
-  Collect.lua               Lee los datos del personaje (cada sección por separado)
-  Uplink.lua                Juego → app: arma el paquete y elige el camino
-  Voice.lua                 Camino invisible (texto a voz con la voz muda)
-  Live.lua                  App → juego: buzones y timbre
-  UI.lua Button.lua         Ventana de chats y botón flotante
-  Chats.lua Notify.lua      Conversaciones y avisos
-  Personas.lua              Fizzi y Rizzik
-  Core.lua                  Eventos y comandos /ia
+addon/ForeverAICompanion/   Addon (Lua 5.1, modern client, interface 16001)
+  Locale.lua                English and Spanish texts (by the client's language)
+  Collect.lua               Reads the character's data (each section separately)
+  Uplink.lua                Game → app: builds the package and picks the path
+  Voice.lua                 Invisible path (text to speech with the silent voice)
+  Live.lua                  App → game: inboxes and bell
+  UI.lua Button.lua         Chat window and floating button
+  Chats.lua Notify.lua      Conversations and notifications
+  Personas.lua              Fizzi and Rizzik
+  Core.lua                  Events and /ia commands
 companion/
-  src/app/                  App: main (autoinstalación, bandeja), controller,
-                            server (ventana local), system (Windows), ui.html
-  src/watcher.js            Recibe preguntas y publica respuestas
-  src/voice-inbox.js        Lee lo que entrega la voz muda
-  src/screen-reader.js      Lee la línea en pantalla
-  src/grid.js image.js      Decodifica la línea
-  src/inbox.js              Buzones y timbre
-  src/prompt.js             Instrucciones para la IA
-  src/guide.js              Guía de Forever: fecha, versión y descargas
-  src/providers.js          Claude, OpenAI/Gemini/Ollama, Claude Code, Codex, prueba
-  src/codex.js              Codex: instalación, sesión y ejecución
-  src/claude-code.js        Claude Code: instalación y sesión
-  src/tts-voice.js          Instala la voz muda
-  tts/AzerothIATts.cs       Motor de la voz muda (C#)
-  tray/Tray.cs              Ícono junto al reloj (C#)
-  knowledge-builtin/        Guía de WoW Forever
-  scripts/build.js          Empaqueta ForeverAICompanion.exe
-  test/                     Pruebas (ejecutan el Lua real del addon)
+  src/app/                  App: main (self-install, tray), controller,
+                            server (local window), system (Windows), ui.html
+  src/i18n.js               English and Spanish messages (app, tray, in-game errors)
+  src/watcher.js            Receives questions and publishes answers
+  src/voice-inbox.js        Reads what the silent voice delivers
+  src/screen-reader.js      Reads the on-screen line
+  src/grid.js image.js      Decodes the line
+  src/inbox.js              Inboxes and bell
+  src/prompt.js             Instructions for the AI
+  src/guide.js              WoW Forever guide: date, version and downloads
+  src/providers.js          Claude, OpenAI/Gemini/Ollama, Claude Code, Codex, test
+  src/codex.js              Codex: install, sign-in and running it
+  src/claude-code.js        Claude Code: install and sign-in
+  src/tts-voice.js          Installs the silent voice
+  src/migrate.js            Moves installs from the project's previous name
+  tts/ForeverAICompanionTts.cs  Silent voice engine (C#)
+  tray/Tray.cs              Icon next to the clock (C#)
+  knowledge-builtin/        WoW Forever guide
+  scripts/build.js          Packages ForeverAICompanion.exe
+  test/                     Tests (they run the addon's real Lua)
 ```
 
-### Compilar y probar
+### Build and test
 
-Requisitos: Windows y Node.js 25.5 o superior (para `--build-sea`; para desarrollar basta Node 22).
+Requirements: Windows and Node.js 25.5 or later (for `--build-sea`; Node 22 is enough for development).
 
 ```bash
 cd companion
 npm install
-npm test            # pruebas
-npm run app         # la app con su ventana, desde el código
-npm run build       # genera dist/ForeverAICompanion.exe
+npm test            # tests
+npm run app         # the app with its window, from source
+npm run build       # creates dist/ForeverAICompanion.exe
 ```
 
-El `.exe` es un único ejecutable (Node SEA) que incluye Node.js, la app, el addon, la guía y los íconos. Los ayudantes en C# (voz muda y bandeja) se compilan en el PC del jugador con el compilador de .NET Framework incluido en Windows.
+The `.exe` is a single executable (Node SEA) that includes Node.js, the app, the addon, the guide and the icons. The C# helpers (silent voice and tray) are compiled on the player's PC with the .NET Framework compiler included in Windows.
 
-Modo terminal, sin ventana:
+Terminal mode, without a window:
 
 ```bash
-npm run install-addon -- --wow "C:\ruta\World of Warcraft\_forever_"
+npm run install-addon -- --wow "C:\path\World of Warcraft\_forever_"
 npm start
-npm run ask -- "¿Qué mazmorra me recomiendas?"
+npm run ask -- "Which dungeon do you recommend?"
 ```
 
-Variables para pruebas: `AZIA_DATA_DIR` (carpeta de datos), `AZIA_WOW_DIR`, `AZIA_PROVIDER`, `AZIA_NO_SHORTCUTS`. Argumentos del `.exe`: `--no-install`, `--no-window`, `--background`.
+Test variables: `FAIC_DATA_DIR` (data folder), `FAIC_WOW_DIR`, `FAIC_PROVIDER`, `FAIC_NO_SHORTCUTS`, `FAIC_LANG` (`en` / `es`). `.exe` arguments: `--no-install`, `--no-window`, `--background`.
 
-### Publicar una versión nueva
+### Releasing a new version
 
-1. Sube el número en `companion/src/app/controller.js` (`VERSION`) y, si cambió el addon, en `addon/AzerothIA/AzerothIA.toc`.
-2. `npm test` y `npm run build`.
-3. En GitHub, **Releases → Draft a new release**, crea la etiqueta (por ejemplo `v1.5.0`) y adjunta `dist/ForeverAICompanion.exe` con ese nombre exacto: el enlace de descarga de este README siempre apunta al último.
+1. Bump the number in `companion/src/app/controller.js` (`VERSION`) and, if the addon changed, in `addon/ForeverAICompanion/ForeverAICompanion.toc`.
+2. `npm test` and `npm run build`.
+3. On GitHub, **Releases → Draft a new release**, create the tag (for example `v1.6.0`) and attach `dist/ForeverAICompanion.exe` with that exact name: this README's download link always points to the latest one.
 
-### Pendiente
+### To do
 
-- **Firma digital** del `.exe` para quitar el aviso de SmartScreen (certificado de firma de código o Azure Trusted Signing).
-- Revisar las políticas de Blizzard para Forever antes de una distribución amplia.
+- **Code signing** for the `.exe` to remove the SmartScreen warning (a code signing certificate or Azure Trusted Signing).
+- Review Blizzard's policies for Forever before a wide release.

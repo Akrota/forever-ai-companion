@@ -6,8 +6,10 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { env } from './config.js';
 
-const MARKER = /AZIA-PROBE-(\d+)/g;
-const SLOT_DISABLED = /AzerothIA_S50\s*:\s*disabled/i;
+// AZIA / AzerothIA: what an addon from before the rename writes (it may still
+// be loaded in a game that was running when the app updated).
+const MARKER = /(?:FAIC|AZIA)-PROBE-(\d+)/g;
+const SLOT_DISABLED = /(?:ForeverAICompanion|AzerothIA)_S50\s*:\s*disabled/i;
 
 function listDir(dir) {
   try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
@@ -69,7 +71,7 @@ export function startProbeMonitor({ wowDir, log = () => {}, intervalMs = 500 }) 
       if (tokens.length || slotDisabled) {
         const ev = { kind, file, time: now, tokens: [...new Set(tokens)], slotDisabled };
         events.push(ev);
-        log(`Prueba de canales: cambio con marca en ${path.basename(file)} (${kind})`);
+        log(`Channel test: marked change in ${path.basename(file)} (${kind})`);
       }
     }
     first = false;
@@ -106,10 +108,10 @@ $one = @(Get-ChildItem 'HKLM:\\SOFTWARE\\Microsoft\\Speech_OneCore\\Voices\\Toke
 }
 
 const NAMES = {
-  cvar: 'Variable de configuración propia (Config.wtf)',
-  addons: 'Lista de addons (AddOns.txt)',
+  cvar: 'Custom setting variable (Config.wtf)',
+  addons: 'Addon list (AddOns.txt)',
   macro: 'Macro (macros-cache.txt)',
-  chat: 'Registro del chat (WoWChatLog.txt)',
+  chat: 'Chat log (WoWChatLog.txt)',
 };
 
 // Builds the verdict for a probe request. Returns { text, report }.
@@ -122,7 +124,7 @@ export async function probeReport(probe, monitor) {
     const hit = monitor.events.find((e) => e.kind === kind && e.time >= at - 2000 &&
       (kind === 'addons' ? e.slotDisabled : e.tokens.includes(String(probe.token))));
     channels[kind] = {
-      api: probe.results?.[kind] ?? 'no probado',
+      api: probe.results?.[kind] ?? 'not tested',
       works: Boolean(hit),
       seconds: hit ? Math.max(0, (hit.time - at) / 1000) : null,
       file: hit?.file,
@@ -138,11 +140,11 @@ export async function probeReport(probe, monitor) {
   const inSapi = gameVoices.filter((n) => sapi.has(base(n)));
   const inOneCore = gameVoices.filter((n) => onecore.has(base(n)) && !sapi.has(base(n)));
   const tts = {
-    api: probe.results?.tts ?? 'no probado',
+    api: probe.results?.tts ?? 'not tested',
     gameVoices,
     windowsSapi: voices.sapi,
     windowsOneCore: voices.onecore,
-    family: inSapi.length ? 'sapi' : inOneCore.length ? 'onecore' : 'desconocida',
+    family: inSapi.length ? 'sapi' : inOneCore.length ? 'onecore' : 'unknown',
   };
 
   const report = { at: new Date().toISOString(), token: probe.token, channels, tts, flashClientIcon: probe.flashClientIcon };
@@ -151,21 +153,21 @@ export async function probeReport(probe, monitor) {
     fs.writeFileSync(path.join(env.dataDir, 'probe-report.json'), JSON.stringify(report, null, 2));
   } catch { /* report is also in the answer and the log */ }
 
-  const lines = ['Resultado de la prueba de canales invisibles:'];
+  const lines = ['Invisible channel test results:'];
   for (const [kind, c] of Object.entries(channels)) {
     const verdict = c.works
-      ? `SÍ, se escribió a los ${c.seconds.toFixed(1)} s`
-      : `NO se escribió durante la prueba${c.api !== 'ok' ? ` (el juego respondió: ${c.api})` : ''}`;
+      ? `YES, written after ${c.seconds.toFixed(1)} s`
+      : `NO, not written during the test${c.api !== 'ok' ? ` (the game answered: ${c.api})` : ''}`;
     lines.push(`- ${NAMES[kind]}: ${verdict}`);
   }
   const fam = {
-    sapi: 'voces clásicas de Windows (se puede agregar una voz propia de AzerothIA)',
-    onecore: 'voces modernas de Windows (no se pueden agregar voces propias)',
-    desconocida: 'no se pudo determinar',
+    sapi: 'classic Windows voices (a ForeverAICompanion voice can be added)',
+    onecore: 'modern Windows voices (custom voices cannot be added)',
+    unknown: 'could not be determined',
   }[tts.family];
-  lines.push(`- Texto a voz: ${gameVoices.length ? `${gameVoices.length} voces en el juego, ${fam}` : 'el juego no ofrece voces'}` +
-    `${tts.api !== 'ok' ? ` (hablar: ${tts.api})` : ''}`);
-  lines.push(`- Parpadeo del icono: ${probe.flashClientIcon ? 'disponible' : 'no disponible'}`);
-  lines.push('Si algo dice NO, puede que el juego lo guarde solo al salir: cierra sesión y la app lo seguirá registrando.');
+  lines.push(`- Text to speech: ${gameVoices.length ? `${gameVoices.length} voices in the game, ${fam}` : 'the game offers no voices'}` +
+    `${tts.api !== 'ok' ? ` (speak: ${tts.api})` : ''}`);
+  lines.push(`- Icon flashing: ${probe.flashClientIcon ? 'available' : 'not available'}`);
+  lines.push('If something says NO, the game may only save it when you log out: log out and the app will keep recording it.');
   return { text: lines.join('\n'), report };
 }

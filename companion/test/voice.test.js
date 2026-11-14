@@ -2,9 +2,16 @@
 // app's reassembly must round-trip a request exactly.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { runLua } from './helpers.js';
-import { createAssembler } from '../src/voice-inbox.js';
-import { machineRegFile, machineUnregFile, VOICE_NAME } from '../src/tts-voice.js';
+import { createAssembler, startVoiceInbox } from '../src/voice-inbox.js';
+import { ttsEngineSource } from '../src/assets.js';
+import {
+  ENGINE_CLASS, ENGINE_CLSID, ENGINE_DLL, LEGACY_ENGINE_CLASS, LEGACY_ENGINE_DLL, LEGACY_VOICE_NAME, VOICE_NAME,
+  isLegacyEngine, machineRegFile, machineUnregFile,
+} from '../src/tts-voice.js';
 
 test('Lua base64 matches the standard encoding', () => {
   for (const s of ['', 'a', 'ab', 'abc', 'hola ñandú {"x":1}', '\u0000ÿ\u0010binario']) {
@@ -18,7 +25,7 @@ test('a request spoken in chunks by the addon is reassembled by the app', () => 
     SPOKEN = {}
     C_VoiceChat = {
       GetTtsVoices = function() return { { voiceID = 0, name = "Microsoft Zira Desktop - English (United States)" },
-                                         { voiceID = 3, name = "AzerothIA - English (United States)" } } end,
+                                         { voiceID = 3, name = "ForeverAICompanion - English (United States)" } } end,
       SpeakText = function(id, text, rate, volume, overlap)
         assert(id == 3, "wrong voice"); assert(overlap == true, "must queue"); assert(volume == 0, "must be silent")
         SPOKEN[#SPOKEN + 1] = text
@@ -41,6 +48,8 @@ test('a request spoken in chunks by the addon is reassembled by the app', () => 
   const [json, ...spoken] = out.split('\0');
   assert.ok(spoken.length > 1, 'should be split in several messages');
   for (const s of spoken) assert.ok(s.length <= 1000 + 20);
+  for (const s of spoken) assert.match(s, /^FAIC:v1:\d+\/\d+:/);
+  assert.equal(Buffer.from(spoken[0].split(':')[3], 'base64').toString('latin1', 0, 4), 'FAIC', 'frame mark');
   const asm = createAssembler();
   // Arrival order does not matter; foreign texts are ignored.
   assert.equal(asm.add('Hola, esto lo lee el chat'), null);
@@ -54,7 +63,7 @@ test('messages wrapped in the game\'s "Start"/"End" bookmarks still reassemble',
   const out = runLua(`
     SPOKEN = {}
     C_VoiceChat = {
-      GetTtsVoices = function() return { { voiceID = 3, name = "AzerothIA - English (United States)" } } end,
+      GetTtsVoices = function() return { { voiceID = 3, name = "ForeverAICompanion - English (United States)" } } end,
       SpeakText = function(id, text) SPOKEN[#SPOKEN + 1] = text end,
     }
     assert(ns.Voice:Available())
@@ -71,7 +80,7 @@ test('messages wrapped in the game\'s "Start"/"End" bookmarks still reassemble',
   assert.equal(payload.toString('utf8'), json);
 });
 
-test('without the AzerothIA voice the addon falls back to the strip', () => {
+test('without the silent voice the addon falls back to the strip', () => {
   const out = runLua(`
     C_VoiceChat = { GetTtsVoices = function() return { { voiceID = 0, name = "Microsoft Zira Desktop" } } end }
     RESULT = tostring(ns.Voice:Available())
@@ -79,21 +88,77 @@ test('without the AzerothIA voice the addon falls back to the strip', () => {
   assert.equal(out, 'false');
 });
 
-test('the voice is called ForeverAICompanion; the old "AzerothIA" one is replaced', () => {
+test('the voice is called ForeverAICompanion; the one from before the rename is replaced', () => {
   assert.equal(VOICE_NAME, 'ForeverAICompanion');
-  const reg = machineRegFile('C:\\x\\AzerothIATts.dll');
-  assert.match(reg, /\[-HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\AzerothIA\]/, 'installing removes the old token');
+  const reg = machineRegFile('C:\\Users\\x\\AppData\\Local\\Programs\\ForeverAICompanion\\ForeverAICompanionTts.dll');
+  assert.match(reg, new RegExp(`\\[-HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\Microsoft\\\\Speech\\\\Voices\\\\Tokens\\\\${LEGACY_VOICE_NAME}\\]`), 'installing removes the old token');
   assert.match(reg, /\[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\ForeverAICompanion\]/);
   assert.match(reg, /"Name"="ForeverAICompanion"/);
+  // Same class id; the old registration is cleared and the current engine registered.
+  const clsid = ENGINE_CLSID.replace(/[{}]/g, '\\$&');
+  assert.ok(reg.indexOf(`[-HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\${ENGINE_CLSID}]`) <
+    reg.indexOf(`[HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID\\${ENGINE_CLSID}]`), 'cleared before registering');
+  assert.match(reg, new RegExp(`CLSID\\\\${clsid}\\]\\r\\n@="ForeverAICompanion\\.Tts\\.Engine"`));
+  assert.match(reg, /"Class"="ForeverAICompanion\.Tts\.Engine"/);
+  assert.match(reg, /"Assembly"="ForeverAICompanionTts, Version=1\.0\.0\.0/);
+  assert.match(reg, /"CodeBase"="file:\/\/\/C:\/Users\/x\/AppData\/Local\/Programs\/ForeverAICompanion\/ForeverAICompanionTts\.dll"/);
+  assert.ok(!reg.includes(LEGACY_ENGINE_CLASS) && !reg.includes(LEGACY_ENGINE_DLL));
   const unreg = machineUnregFile();
   assert.match(unreg, /Tokens\\ForeverAICompanion\]/);
-  assert.match(unreg, /Tokens\\AzerothIA\]/, 'uninstalling also removes the old name');
+  assert.ok(unreg.includes(`Tokens\\${LEGACY_VOICE_NAME}]`), 'uninstalling also removes the old name');
+
+  // The C# engine's names match what gets registered, with the same class id.
+  const cs = ttsEngineSource();
+  assert.match(cs, /namespace ForeverAICompanion\.Tts/);
+  assert.match(cs, /public class Engine\b/);
+  assert.ok(cs.includes(`Guid("${ENGINE_CLSID.replace(/[{}]/g, '')}")`));
+  assert.equal(ENGINE_CLASS, 'ForeverAICompanion.Tts.Engine');
+  assert.equal(ENGINE_DLL, 'ForeverAICompanionTts.dll');
 
   // The addon prefers the new voice and still works with the old one.
   const pick = (names) => runLua(`
     C_VoiceChat = { GetTtsVoices = function() local l = {} for i, n in ipairs(NAMES) do l[i] = { voiceID = i, name = n } end return l end }
     RESULT = tostring(ns.Voice:Find())`, {}, ['Voice.lua'], `NAMES = { ${names.map((n) => JSON.stringify(n)).join(', ')} }`);
-  assert.equal(pick(['Microsoft Zira', 'AzerothIA - English', 'ForeverAICompanion - English']), '3');
-  assert.equal(pick(['Microsoft Zira', 'AzerothIA - English']), '2');
+  assert.equal(pick(['Microsoft Zira', `${LEGACY_VOICE_NAME} - English`, 'ForeverAICompanion - English']), '3');
+  assert.equal(pick(['Microsoft Zira', `${LEGACY_VOICE_NAME} - English`]), '2');
   assert.equal(pick(['Microsoft Zira']), 'nil');
+});
+
+test('an engine registered before the rename is reported as needing the update', () => {
+  const programs = 'C:/Users/x/AppData/Local/Programs';
+  assert.equal(isLegacyEngine({ className: LEGACY_ENGINE_CLASS, codeBase: `file:///${programs}/${LEGACY_VOICE_NAME}/${LEGACY_ENGINE_DLL}` }), true);
+  assert.equal(isLegacyEngine({ className: null, codeBase: `file:///${programs}/${LEGACY_VOICE_NAME}/${LEGACY_ENGINE_DLL}` }), true, 'old DLL alone');
+  assert.equal(isLegacyEngine({ className: LEGACY_ENGINE_CLASS, codeBase: null }), true, 'old class alone');
+  assert.equal(isLegacyEngine({ className: ENGINE_CLASS, codeBase: `file:///${programs}/ForeverAICompanion/${ENGINE_DLL}` }), false);
+  assert.equal(isLegacyEngine(null), false);
+});
+
+test('the app reads the voice inbox and, while it exists, the one from before the rename', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-voice-'));
+  const dir = path.join(root, 'ForeverAICompanion', 'tts-inbox');
+  const legacyDir = path.join(root, LEGACY_VOICE_NAME, 'tts-inbox');
+  const missing = path.join(root, 'nowhere', 'tts-inbox');
+  const frameText = (id, json, prefix) => {
+    const b64 = runLua('RESULT = ns.Voice.Base64(ns.Uplink.Frame(J))', { J: json }, ['Json.lua', 'Uplink.lua', 'Voice.lua']);
+    return `${prefix}:${id}:1/1:${b64}`;
+  };
+  const got = [];
+  const inbox = startVoiceInbox({ dir, legacyDirs: [legacyDir, missing], intervalMs: 1000000, onPayload: (p) => got.push(p.toString('utf8')) });
+  try {
+    assert.ok(fs.existsSync(dir));
+    assert.ok(!fs.existsSync(legacyDir) && !fs.existsSync(missing), 'the old inbox is never created by the app');
+    fs.writeFileSync(path.join(dir, '1.txt'), frameText('n1', '{"id":"n1"}', 'FAIC'));
+    inbox.poll();
+    // The previous voice recreates its folder; an old addon still uses the old prefix and frame mark.
+    fs.mkdirSync(legacyDir, { recursive: true });
+    const oldFrame = Buffer.from(frameText('o1', '{"id":"o1"}', 'FAIC').split(':')[3], 'base64');
+    oldFrame.write('AZIA', 0, 'latin1');
+    fs.writeFileSync(path.join(legacyDir, '2.txt'), `AZIA:o1:1/1:${oldFrame.toString('base64')}`);
+    inbox.poll();
+    assert.deepEqual(got, ['{"id":"n1"}', '{"id":"o1"}']);
+    assert.deepEqual(fs.readdirSync(legacyDir), [], 'read messages are removed');
+  } finally {
+    inbox.stop();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -1,23 +1,37 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Folder of the companion source (dev mode). In the packaged app this is unused.
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const ADDON_SRC = path.resolve(ROOT, '..', 'addon', 'AzerothIA');
-export const ADDON_NAME = 'AzerothIA';
+// Internal id: data and install folders, the in-game addon, the silent voice.
+export const APP_ID = 'ForeverAICompanion';
+export const ADDON_NAME = APP_ID;
+export const ADDON_SRC = path.resolve(ROOT, '..', 'addon', ADDON_NAME);
+// The project's previous name, still found on PCs that had version 1.5.0 or
+// older (addon folders, saved variables, data and install folders). Only used
+// to migrate those installs.
+export const LEGACY_NAME = 'AzerothIA';
 
 // Where config.json, state.json, knowledge/ and logs live.
-// Dev: the companion folder. Packaged app: %APPDATA%\AzerothIA (see app/main.js).
+// Dev: the companion folder. Packaged app: %APPDATA%\ForeverAICompanion (see app/main.js).
 export const env = { dataDir: ROOT };
+
+// %APPDATA%: the packaged app's data folder and the silent voice's inbox live there.
+export const roamingDir = () => process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+
+// Settings from environment variables (FAIC_*). The AZIA_* spelling from
+// before the rename still works.
+export const envVar = (name) => process.env[`FAIC_${name}`] || process.env[`AZIA_${name}`] || '';
 
 // Published guide: the same file as knowledge-builtin/wow-forever.md, read from
 // the project's public repository. Editing it there updates every player.
 export const GUIDE_URL = 'https://raw.githubusercontent.com/lucasmenares/forever-ai-companion/main/companion/knowledge-builtin/wow-forever.md';
 
 export const DEFAULTS = {
-  // Carpeta de WoW Forever (la que contiene Interface/ y Screenshots/).
-  // null = autodetectar. También se puede usar la variable AZIA_WOW_DIR.
+  // WoW Forever folder (the one that contains Interface/ and Screenshots/).
+  // null = detect it. The FAIC_WOW_DIR variable also works.
   wowDir: null,
 
   // "anthropic" | "openai" | "claude-code" | "codex" | "echo"
@@ -27,14 +41,14 @@ export const DEFAULTS = {
     model: 'claude-opus-5-5',
     effort: 'low',
     maxTokens: 2000,
-    apiKey: null, // null = usa ANTHROPIC_API_KEY
+    apiKey: null, // null = use ANTHROPIC_API_KEY
     fallbacks: true,
   },
-  // Cualquier API compatible con OpenAI: OpenAI, Gemini, Ollama, LM Studio, OpenRouter...
+  // Any OpenAI-compatible API: OpenAI, Gemini, Ollama, LM Studio, OpenRouter...
   openai: {
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-5-mini',
-    apiKey: null, // null = usa la variable de apiKeyEnv
+    apiKey: null, // null = use the apiKeyEnv variable
     apiKeyEnv: 'OPENAI_API_KEY',
   },
   // model: "sonnet" | "opus" | "haiku" | "default" (the plan's default) or a full model id.
@@ -61,6 +75,9 @@ export const DEFAULTS = {
   // The app downloads it every few hours; null = only the guide inside the app.
   guideUrl: GUIDE_URL,
 
+  // Language of the app and its messages: "auto" (Windows' language), "en" or "es".
+  language: 'auto',
+
   // Closing the app window: "ask" | "tray" (keep running next to the clock) | "quit".
   closeAction: 'ask',
 };
@@ -83,7 +100,7 @@ export function readUserConfig(file = configFile()) {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (e) {
-    throw new Error(`config.json no es JSON válido: ${e.message}`);
+    throw new Error(`config.json is not valid JSON: ${e.message}`);
   }
 }
 
@@ -119,8 +136,8 @@ export function applyPreset(cfg) {
 
 export function loadConfig(file = configFile()) {
   const cfg = applyPreset(merge(DEFAULTS, readUserConfig(file)));
-  if (process.env.AZIA_WOW_DIR) cfg.wowDir = process.env.AZIA_WOW_DIR;
-  if (process.env.AZIA_PROVIDER) cfg.provider = process.env.AZIA_PROVIDER;
+  if (envVar('WOW_DIR')) cfg.wowDir = envVar('WOW_DIR');
+  if (envVar('PROVIDER')) cfg.provider = envVar('PROVIDER');
   return cfg;
 }
 
@@ -148,32 +165,37 @@ function candidateDirs() {
 
 export function resolveWowDir(cfg) {
   if (cfg.wowDir) {
-    if (!fs.existsSync(cfg.wowDir)) throw new Error(`No existe la carpeta de WoW configurada: ${cfg.wowDir}`);
+    if (!fs.existsSync(cfg.wowDir)) throw new Error(`The configured WoW folder does not exist: ${cfg.wowDir}`);
     return cfg.wowDir;
   }
   const found = candidateDirs().find((d) => fs.existsSync(d));
   if (!found) {
     throw new Error(
-      'No encontré la carpeta de WoW Forever. Pon "wowDir" en config.json ' +
-      '(la carpeta _forever_ que contiene Interface y Screenshots).',
+      'WoW Forever folder not found. Set "wowDir" in config.json ' +
+      '(the _forever_ folder that contains Interface and Screenshots).',
     );
   }
   return found;
 }
 
-export function wowPaths(wowDir) {
+// `name`: the addon's folder name. legacy() gives the same paths for the addon
+// under the project's previous name (see install.js / inbox.js).
+export function wowPaths(wowDir, name = ADDON_NAME) {
   const addons = path.join(wowDir, 'Interface', 'AddOns');
-  const addonDir = path.join(addons, ADDON_NAME);
+  const addonDir = path.join(addons, name);
   const pad = (n, w) => String(n).padStart(w, '0');
   return {
     wowDir,
+    name,
     addons,
     addonDir,
+    inboxGlobal: `${name}_Inbox`,
     screenshots: path.join(wowDir, 'Screenshots'),
     sigDir: path.join(addonDir, 'sig'),
     okSignal: path.join(addonDir, 'sig', 'ok.wav'),
     signal: (i) => path.join(addonDir, 'sig', `${pad(i, 3)}.wav`),
-    slotName: (i) => `${ADDON_NAME}_S${pad(i, 2)}`,
-    slotDir: (i) => path.join(addons, `${ADDON_NAME}_S${pad(i, 2)}`),
+    slotName: (i) => `${name}_S${pad(i, 2)}`,
+    slotDir: (i) => path.join(addons, `${name}_S${pad(i, 2)}`),
+    legacy: name === ADDON_NAME ? () => wowPaths(wowDir, LEGACY_NAME) : null,
   };
 }

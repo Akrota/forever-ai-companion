@@ -9,7 +9,7 @@ import { decodeImage } from '../src/image.js';
 import { GridUnreadableError, decodeGrid } from '../src/grid.js';
 
 // Optional: a real in-game screenshot to check against (not committed).
-const REAL_SHOT = process.env.AZIA_REAL_SHOT || '';
+const REAL_SHOT = process.env.FAIC_REAL_SHOT || '';
 import { encodePNG, encodeTGA, luaSyntaxError, renderGrid, runLua } from './helpers.js';
 
 const REQUEST_LUA = `
@@ -124,7 +124,8 @@ test('a corrupted grid is rejected by the checksum', () => {
   const { W, H, cells } = buildFromLua(240);
   const broken = cells.slice();
   broken[3 * W + 20] ^= 0b010101; // flip a data cell
-  assert.throws(() => decodeGrid(renderGrid(W, H, broken, { pitch: 6 })), /no se pudo leer/);
+  // The message follows the app's language (English or Spanish).
+  assert.throws(() => decodeGrid(renderGrid(W, H, broken, { pitch: 6 })), /could not be read|no se pudo leer/);
 });
 
 test('a grid partly covered by another window is reported, not ignored', () => {

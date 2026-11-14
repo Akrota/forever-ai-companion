@@ -1,4 +1,5 @@
 local ADDON, ns = ...
+local L = ns.L
 
 local Core = {}
 ns.Core = Core
@@ -26,14 +27,14 @@ function Core:HasPending()
   ns.Chats:EachEntry(function(e, c)
     if e.status == "pending" and e.viaVoice and now - (e.t or now) > VOICE_TIMEOUT and not self.working then
       e.status = "error"
-      e.answer = "El envío invisible no llegó a la app; lo reenvié con la línea en pantalla."
+      e.answer = L.VOICE_LOST
       ns.Voice.broken = true
       resend = { question = e.question, chatId = c.id }
       ns.UI:Refresh()
     elseif e.status == "pending" then
       if now - (e.t or now) > PENDING_TIMEOUT then
         e.status = "error"
-        e.answer = "No llegó respuesta. ¿Está abierta la app compañera en tu PC?"
+        e.answer = L.NO_ANSWER
         ns.UI:Refresh()
       else
         any = true
@@ -177,7 +178,7 @@ function Core:BuildFrame(req, step, maxBytes)
     end
     step()
   end
-  self.lastEncode = { failed = string.format("%d bytes (JSON %d) incluso recortando todo", #frame, #json) }
+  self.lastEncode = { failed = string.format(L.FRAME_TOO_BIG, #frame, #json) }
   return nil, self.lastEncode.failed
 end
 
@@ -230,11 +231,11 @@ function Core:Ask(question, extra, chatId)
   if question == "" then return end
   ns.UI:Show()
   if InCombatLockdown() or UnitAffectingCombat("player") then
-    ns.UI:SetStatus("|cffff6060No puedo preguntar durante el combate.|r")
+    ns.UI:SetStatus("|cffff6060" .. L.IN_COMBAT .. "|r")
     return
   end
   if self.working or ns.Uplink.busy then
-    ns.UI:SetStatus("Espera un momento: todavía estoy enviando la pregunta anterior.")
+    ns.UI:SetStatus(L.WAIT_PREVIOUS)
     return
   end
 
@@ -254,6 +255,7 @@ function Core:Ask(question, extra, chatId)
     resetSignals = resetSignals,
     charKey = (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?"),
     assistant = ns.Personas:Current().id,
+    lang = L.code,                  -- the app writes its error messages in this language
     history = self:RecentTurns(chatData, HISTORY_TURNS_SENT),
   }
   for k, v in pairs(extra or {}) do req[k] = v end
@@ -271,7 +273,7 @@ function Core:Ask(question, extra, chatId)
   end
 
   ns.UI:Refresh()
-  ns.UI:SetStatus("Preparando...")
+  ns.UI:SetStatus(L.PREPARING)
   self.working = true
 
   -- The preparation runs a few milliseconds per frame (see Core.step).
@@ -280,11 +282,11 @@ function Core:Ask(question, extra, chatId)
     if ns.Voice:Available() then
       local frame = Core:BuildFrame(req, Core.step, ns.Voice.MAX_FRAME_BYTES)
       if frame and ns.Voice:Send(frame, req.id, Core.step) then
-        Core.lastChannel = "voz"
+        Core.lastChannel = "voice"
         return true, "voice"
       end
     end
-    Core.lastChannel = "franja"
+    Core.lastChannel = "strip"
     local frame, why = Core:BuildFrame(req, Core.step)
     if not frame then return false, why end
     return ns.Uplink:Prepare(frame, Core.step)
@@ -298,11 +300,11 @@ function Core:Ask(question, extra, chatId)
     if coroutine.status(co) ~= "dead" then return end
     f:SetScript("OnUpdate", nil)
     if not resumed then
-      fail("Error preparando la pregunta: " .. tostring(ok))
+      fail(string.format(L.PREP_ERROR, tostring(ok)))
       return
     end
     if not ok then
-      fail("No se pudo preparar la pregunta (" .. tostring(err) .. "). Escribe /ia estado y comparte lo que aparece.")
+      fail(string.format(L.PREP_FAILED, tostring(err)))
       return
     end
     if Core.lastEncode then Core.lastEncode.frames = frames end
@@ -310,14 +312,14 @@ function Core:Ask(question, extra, chatId)
     if err == "voice" then
       entry.viaVoice = true
       Core.working = false
-      ns.UI:SetStatus("Pregunta enviada a " .. ns.Personas:Current().name .. ".")
+      ns.UI:SetStatus(string.format(L.SENT_TO, ns.Personas:Current().name))
       ns.Live:OnSent()
       return
     end
-    ns.UI:SetStatus(string.format("Enviando (%.1f KB)...", ns.Uplink.last.bytes / 1024))
+    ns.UI:SetStatus(string.format(L.SENDING, ns.Uplink.last.bytes / 1024))
     ns.Uplink:Reveal(function()
       Core.working = false
-      ns.UI:SetStatus("Pregunta enviada a " .. ns.Personas:Current().name .. ".")
+      ns.UI:SetStatus(string.format(L.SENT_TO, ns.Personas:Current().name))
       ns.Live:OnSent()
     end)
   end)
@@ -360,7 +362,7 @@ function Core:ApplyInbox(inbox)
     ns.Chats:EachEntry(function(e)
       if e.status == "pending" and e.t and e.t <= failedAt and e.t >= failedAt - 300 then
         e.status = "error"
-        e.answer = (inbox.failMessage or "No se pudo leer la pregunta.") .. " Vuelve a intentarlo."
+        e.answer = (inbox.failMessage or L.READ_FAILED) .. " " .. L.TRY_AGAIN
         arrived = arrived + 1
       end
     end)
@@ -387,8 +389,8 @@ for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "BANKFRAME_OPENED", "BANKFR
 end
 events:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == ADDON then
-    AzerothIA_DB = AzerothIA_DB or {}
-    ns.db = AzerothIA_DB
+    ForeverAICompanion_DB = ForeverAICompanion_DB or {}
+    ns.db = ForeverAICompanion_DB
     ns.Chats:Init()
   elseif event == "PLAYER_LOGIN" then
     ns.Uplink:Init()
@@ -411,46 +413,64 @@ end)
 
 -- Slash commands -------------------------------------------------------------
 
-SLASH_AZEROTHIA1 = "/ia"
-SLASH_AZEROTHIA2 = "/azia"
-SlashCmdList.AZEROTHIA = function(msg)
+-- Subcommands work in English and Spanish, whatever the game's language.
+local COMMANDS = {
+  new = "new", nuevo = "new",
+  data = "data", datos = "data",
+  inbox = "inbox", buzon = "inbox", ["buzón"] = "inbox",
+  status = "status", estado = "status",
+  probe = "probe", probar = "probe", ["probar-canales"] = "probe",
+  ["test-voice"] = "voice", ["probar-voz"] = "voice",
+  button = "button", boton = "button", ["botón"] = "button",
+  sound = "sound", sonido = "sound",
+  assistant = "assistant", asistente = "assistant",
+  help = "help", ayuda = "help",
+}
+Core.COMMANDS = COMMANDS
+
+SLASH_FOREVERAICOMPANION1 = "/ia"
+SLASH_FOREVERAICOMPANION2 = "/azia"
+SLASH_FOREVERAICOMPANION3 = "/ai"
+SlashCmdList.FOREVERAICOMPANION = function(msg)
   msg = strtrim(msg or "")
-  local cmd = msg:lower()
-  if cmd == "" then
+  local lower = msg:lower()
+  local word, rest = lower:match("^(%S+)%s*(.-)$")
+  local cmd = COMMANDS[word or ""]
+  if lower == "" then
     ns.UI:Toggle()
-  elseif cmd == "datos" then
+  elseif cmd == "data" and rest == "" then
     ns.UI:ShowContext()
-  elseif cmd == "buzon" or cmd == "buzón" then
+  elseif cmd == "inbox" and rest == "" then
     ns.Live:LoadNextSlot()
-  elseif cmd == "estado" then
+  elseif cmd == "status" and rest == "" then
     chat(ns.Live:Status())
-  elseif cmd == "probar-canales" or cmd == "probar" then
+  elseif cmd == "probe" and rest == "" then
     ns.Probe:Run()
-  elseif cmd == "probar-voz" then
+  elseif cmd == "voice" and rest == "" then
     ns.Voice:Diagnose()
-  elseif cmd == "boton" or cmd == "botón" then
+  elseif cmd == "button" and rest == "" then
     ns.Button:Toggle()
-  elseif cmd == "boton reset" or cmd == "botón reset" then
+  elseif cmd == "button" and rest == "reset" then
     ns.Button:Reset()
-    chat("botón devuelto a su posición inicial.")
-  elseif cmd == "sonido" then
-    chat(ns.Notify:ToggleSound() and "sonido de notificación activado." or "sonido de notificación desactivado.")
-  elseif cmd == "nuevo" then
+    chat(L.BUTTON_RESET)
+  elseif cmd == "sound" and rest == "" then
+    chat(ns.Notify:ToggleSound() and L.SOUND_ON or L.SOUND_OFF)
+  elseif cmd == "new" and rest == "" then
     ns.Chats:New()
     ns.UI:Show()
     ns.UI:Refresh()
-  elseif cmd == "asistente" then
+  elseif cmd == "assistant" and rest == "" then
     ns.UI:ShowChooser()
-  elseif cmd == "asistente fizzi" or cmd == "asistente rizzik" then
-    ns.Personas:Set(cmd:match("%a+$"))
-    chat(ns.Personas:Current().name .. " es ahora tu asistente.")
-  elseif cmd == "ayuda" then
-    chat("/ia abre la ventana · /ia <pregunta> pregunta en el chat abierto · /ia nuevo crea un chat · /ia asistente elige entre Fizzi y Rizzik · /ia boton muestra u oculta el botón flotante (/ia boton reset lo recoloca) · /ia sonido activa o silencia el aviso · /ia datos muestra lo que se envía · /ia estado · /ia buzon revisa respuestas")
+  elseif cmd == "assistant" and (rest == "fizzi" or rest == "rizzik") then
+    ns.Personas:Set(rest)
+    chat(string.format(L.NOW_YOUR_ASSISTANT, ns.Personas:Current().name))
+  elseif cmd == "help" and rest == "" then
+    chat(L.HELP)
   else
     Core:Ask(msg)
   end
 end
 
-function AzerothIA_Toggle()
+function ForeverAICompanion_Toggle()
   ns.UI:Toggle()
 end

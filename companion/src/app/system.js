@@ -5,16 +5,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile, spawn } from 'node:child_process';
 import * as sea from 'node:sea';
+import { APP_ID, LEGACY_NAME, envVar, roamingDir } from '../config.js';
+import { err, t } from '../i18n.js';
 
 // Name players see (window, shortcuts, messages, start with Windows).
 export const DISPLAY_NAME = 'Forever AI Companion';
 export const EXE_NAME = 'ForeverAICompanion.exe';
-// Internal id from the app's first name (AzerothIA): the data and install
-// folders, the in-game addon folder and the silent voice keep it so updates
-// keep chats, settings and the invisible send (no new administrator prompt).
-export const APP_NAME = 'AzerothIA';
-const LEGACY_EXE = 'AzerothIA.exe';
-const LEGACY_SHORTCUT = 'AzerothIA.lnk';
+// Internal id: the data and install folders.
+export const APP_NAME = APP_ID;
+// The project's previous name: its data and install folders, its first exe,
+// shortcut and "start with Windows" entry, moved away from by main.js.
+const LEGACY_SHORTCUT = `${LEGACY_NAME}.lnk`;
 const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
 const RUN_VALUE = 'ForeverAICompanion';
 
@@ -23,12 +24,12 @@ export const isPackaged = () => {
 };
 export const isWindows = process.platform === 'win32';
 
-export const appDataDir = () =>
-  path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), APP_NAME);
-export const installDir = () =>
-  path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', APP_NAME);
+const programsDir = () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs');
+export const appDataDir = () => path.join(roamingDir(), APP_NAME);
+export const installDir = () => path.join(programsDir(), APP_NAME);
 export const installedExe = () => path.join(installDir(), EXE_NAME);
-export const legacyExe = () => path.join(installDir(), LEGACY_EXE);
+export const legacyAppDataDir = () => path.join(roamingDir(), LEGACY_NAME);
+export const legacyInstallDir = () => path.join(programsDir(), LEGACY_NAME);
 
 export const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 
@@ -39,7 +40,7 @@ export function powershell(script, { vars = {}, sta = false, timeout = 120000 } 
   if (sta) args.push('-STA');
   args.push('-Command', `[Console]::OutputEncoding = [Text.Encoding]::UTF8; ${script}`);
   const envVars = { ...process.env };
-  for (const [k, v] of Object.entries(vars)) envVars[`AZIA_${k}`] = String(v);
+  for (const [k, v] of Object.entries(vars)) envVars[`FAIC_${k}`] = String(v);
   return new Promise((resolve, reject) => {
     execFile('powershell.exe', args, { env: envVars, windowsHide: true, timeout, encoding: 'utf8' }, (err, stdout, stderr) => {
       if (err) reject(new Error((stderr || err.message).trim()));
@@ -49,25 +50,25 @@ export function powershell(script, { vars = {}, sta = false, timeout = 120000 } 
 }
 
 const SHORTCUT_PS = `
-$folder = [Environment]::GetFolderPath($env:AZIA_FOLDER)
-$old = Join-Path $folder $env:AZIA_LEGACY
+$folder = [Environment]::GetFolderPath($env:FAIC_FOLDER)
+$old = Join-Path $folder $env:FAIC_LEGACY
 if (Test-Path $old) { Remove-Item $old -Force }
-$lnk = Join-Path $folder ($env:AZIA_NAME + '.lnk')
+$lnk = Join-Path $folder ($env:FAIC_NAME + '.lnk')
 # A brand-new shortcut file (not an edited one) makes Explorer read the icon again.
 if (Test-Path $lnk) { Remove-Item $lnk -Force }
 $s = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-$s.TargetPath = $env:AZIA_TARGET
-$s.WorkingDirectory = Split-Path $env:AZIA_TARGET
-$s.IconLocation = $env:AZIA_TARGET + ',0'
-$s.Description = $env:AZIA_NAME + ': asistente con IA para WoW Forever'
+$s.TargetPath = $env:FAIC_TARGET
+$s.WorkingDirectory = Split-Path $env:FAIC_TARGET
+$s.IconLocation = $env:FAIC_TARGET + ',0'
+$s.Description = $env:FAIC_NAME + ': AI assistant for WoW Forever'
 $s.Save()`;
 
 // Windows caches program icons by path: after an update it keeps showing the
 // old one. This tells Explorer the files changed and refreshes the cache.
 const REFRESH_ICONS_PS = `
-Add-Type -Namespace Azia -Name Shell -MemberDefinition '[DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern void SHChangeNotify(int e, uint f, string a, System.IntPtr b);'
-foreach ($p in ($env:AZIA_PATHS -split '\\|')) { if ($p -and (Test-Path $p)) { [Azia.Shell]::SHChangeNotify(0x00002000, 0x0005, $p, [IntPtr]::Zero) } }
-[Azia.Shell]::SHChangeNotify(0x08000000, 0, $null, [IntPtr]::Zero)
+Add-Type -Namespace Faic -Name Shell -MemberDefinition '[DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern void SHChangeNotify(int e, uint f, string a, System.IntPtr b);'
+foreach ($p in ($env:FAIC_PATHS -split '\\|')) { if ($p -and (Test-Path $p)) { [Faic.Shell]::SHChangeNotify(0x00002000, 0x0005, $p, [IntPtr]::Zero) } }
+[Faic.Shell]::SHChangeNotify(0x08000000, 0, $null, [IntPtr]::Zero)
 $ie = Join-Path $env:SystemRoot 'System32\\ie4uinit.exe'
 if (Test-Path $ie) { Start-Process $ie -ArgumentList '-show' -WindowStyle Hidden -Wait }`;
 
@@ -76,7 +77,7 @@ export async function refreshIcons(paths) {
 }
 
 export async function createShortcuts(target) {
-  if (process.env.AZIA_NO_SHORTCUTS) return; // tests
+  if (envVar('NO_SHORTCUTS')) return; // tests
   for (const folder of ['Programs', 'Desktop']) {
     await powershell(SHORTCUT_PS, { vars: { FOLDER: folder, TARGET: target, NAME: DISPLAY_NAME, LEGACY: LEGACY_SHORTCUT } });
   }
@@ -86,7 +87,7 @@ export async function createShortcuts(target) {
 export async function removeShortcuts() {
   await powershell(`
 foreach ($f in 'Programs','Desktop') {
-  foreach ($n in @(($env:AZIA_NAME + '.lnk'), $env:AZIA_LEGACY)) {
+  foreach ($n in @(($env:FAIC_NAME + '.lnk'), $env:FAIC_LEGACY)) {
     $p = Join-Path ([Environment]::GetFolderPath($f)) $n
     if (Test-Path $p) { Remove-Item $p -Force }
   }
@@ -103,12 +104,12 @@ export async function getAutostart() {
   if (!isWindows || !isPackaged()) return null;
   const { ok } = await reg(['query', RUN_KEY, '/v', RUN_VALUE]);
   if (ok) return true;
-  return (await reg(['query', RUN_KEY, '/v', APP_NAME])).ok; // first name of the app
+  return (await reg(['query', RUN_KEY, '/v', LEGACY_NAME])).ok; // entry from before the rename
 }
 
 export async function setAutostart(enabled) {
-  if (!isWindows || !isPackaged()) throw new Error('Solo disponible en la versión instalada.');
-  await reg(['delete', RUN_KEY, '/v', APP_NAME, '/f']); // entry of the app's first name
+  if (!isWindows || !isPackaged()) throw err('installedOnly');
+  await reg(['delete', RUN_KEY, '/v', LEGACY_NAME, '/f']); // entry from before the rename
   if (enabled) {
     await reg(['add', RUN_KEY, '/v', RUN_VALUE, '/t', 'REG_SZ', '/d', `"${process.execPath}" --background`, '/f']);
   } else {
@@ -144,13 +145,13 @@ export function openFolder(dir) {
 }
 
 export async function pickFolder() {
-  if (!isWindows) throw new Error('Escribe la ruta en la configuración.');
+  if (!isWindows) throw err('typePath');
   const out = await powershell(`
 Add-Type -AssemblyName System.Windows.Forms
 $owner = New-Object System.Windows.Forms.Form
 $owner.TopMost = $true
 $d = New-Object System.Windows.Forms.FolderBrowserDialog
-$d.Description = 'Elige la carpeta de World of Warcraft (o la carpeta _forever_ dentro de ella)'
+$d.Description = '${t('pickFolder').replace(/'/g, "''")}'
 $d.ShowNewFolderButton = $false
 if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath }`, { sta: true, timeout: 600000 });
   return out || null;
@@ -161,7 +162,7 @@ export async function showError(message) {
   try {
     await powershell(`
 Add-Type -AssemblyName System.Windows.Forms
-[System.Windows.Forms.MessageBox]::Show($env:AZIA_MSG, $env:AZIA_NAME, 'OK', 'Error') | Out-Null`, { vars: { MSG: message, NAME: DISPLAY_NAME } });
+[System.Windows.Forms.MessageBox]::Show($env:FAIC_MSG, $env:FAIC_NAME, 'OK', 'Error') | Out-Null`, { vars: { MSG: message, NAME: DISPLAY_NAME } });
   } catch { /* nothing else we can do */ }
 }
 

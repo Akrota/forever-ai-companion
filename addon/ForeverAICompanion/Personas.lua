@@ -4,7 +4,9 @@
 --   Horde:    Rizzik Bujíaveloz, goblin engineer and dealer of the Bilgewater Cartel.
 -- A persona sets the window colors, the texts, the floating button and the
 -- personality the AI plays (the companion app has the matching prompt).
+-- Texts come from Locale.lua (English names: Fizzi Sparkwrench, Rizzik Fastfuse).
 local _, ns = ...
+local L = ns.L
 
 local Personas = {}
 ns.Personas = Personas
@@ -15,10 +17,10 @@ Personas.list = {
   fizzi = {
     id = "fizzi",
     name = "Fizzi",
-    fullName = "Fizzi Chispatuerca",
-    role = "Inventora de Gnomeregan",
+    fullName = L.FIZZI_FULLNAME,
+    role = L.FIZZI_ROLE,
     faction = "Alliance",
-    factionLabel = "Alianza",
+    factionLabel = L.FACTION_ALLIANCE,
     -- Best first: race icons of the character creator, then icon files.
     portraits = {
       { atlas = "raceicon128-gnome-female" },
@@ -26,27 +28,21 @@ Personas.list = {
       { file = "Interface\\Icons\\Achievement_Character_Gnome_Female" },
     },
     gadget = "Interface\\Icons\\INV_Misc_Gear_01",
-    device = "Comunicador Gnómico de Bolsillo",
+    device = L.FIZZI_DEVICE,
     nameColor = "|cff5fd8f5",
-    pitch = "Ingeniera gnoma, entusiasta y genial. Inventó el comunicador con el que hablas con ella. A veces sus inventos echan humo.",
-    sample = "\"¡Ajá! Mis cálculos dicen: Minas de la Muerte. Peeero ese yelmo está al 60%. ¡Repáralo primero!\"",
-    online = "Comunicador gnómico conectado",
-    hello = "¡Hola, %s! ¿Qué inventamos hoy?",
-    helloNoName = "¡Hola! ¿Qué inventamos hoy?",
-    sub = "Ya tengo los datos de tu personaje: clase, nivel, equipo, misiones y dónde estás.\nPregúntame lo que quieras o elige una idea:",
-    placeholder = "Pregúntale algo a Fizzi...",
-    thinking = {
-      "Ajustando el transmisor",
-      "Apretando tuercas",
-      "Consultando mis planos",
-      "Calculando, calculando",
-      "Casi casi lo tengo",
-    },
-    notifyOk = "¡Fizzi tiene una respuesta!",
-    notifyFail = "Al comunicador le salió humo",
-    errorIntro = "¡Kaboom! Algo se quemó en el comunicador.",
-    tooltipThinking = "Fizzi está trabajando en tu pregunta...",
-    statusOnline = "Comunicador gnómico en línea",
+    pitch = L.FIZZI_PITCH,
+    sample = L.FIZZI_SAMPLE,
+    online = L.FIZZI_ONLINE,
+    hello = L.FIZZI_HELLO,
+    helloNoName = L.FIZZI_HELLO_NONAME,
+    sub = L.FIZZI_SUB,
+    placeholder = L.FIZZI_PLACEHOLDER,
+    thinking = L.FIZZI_THINKING,
+    notifyOk = L.FIZZI_NOTIFY_OK,
+    notifyFail = L.FIZZI_NOTIFY_FAIL,
+    errorIntro = L.FIZZI_ERROR_INTRO,
+    tooltipThinking = L.FIZZI_TOOLTIP_THINKING,
+    statusOnline = L.FIZZI_STATUS_ONLINE,
     colors = {
       window   = { 0.055, 0.067, 0.078, 0.97 },
       sidebar  = { 0.039, 0.047, 0.056, 1 },
@@ -68,10 +64,10 @@ Personas.list = {
   rizzik = {
     id = "rizzik",
     name = "Rizzik",
-    fullName = "Rizzik Bujíaveloz",
-    role = "Ingeniero y negociante goblin",
+    fullName = L.RIZZIK_FULLNAME,
+    role = L.RIZZIK_ROLE,
     faction = "Horde",
-    factionLabel = "Horda",
+    factionLabel = L.FACTION_HORDE,
     portraits = {
       { atlas = "raceicon128-goblin-male" },
       { atlas = "raceicon-goblin-male" },
@@ -79,27 +75,21 @@ Personas.list = {
       { file = "Interface\\Icons\\Achievement_Goblinhead" },
     },
     gadget = "Interface\\Icons\\INV_Misc_Coin_01",
-    device = "Transmisor Goblin Deluxe",
+    device = L.RIZZIK_DEVICE,
     nameColor = "|cffff4b3a",
-    pitch = "Goblin pícaro y encantador del Cártel Pantoque, al servicio de la Horda. Para él todo es una inversión, pero sus consejos valen oro.",
-    sample = "\"Socio, las Minas de la Muerte son una inversión segura. Pero ese yelmo al 60%... mala imagen. Repáralo.\"",
-    online = "Transmisor goblin conectado",
-    hello = "¿Qué negocio hacemos hoy, %s?",
-    helloNoName = "¿Qué negocio hacemos hoy, socio?",
-    sub = "Ya tengo los datos de tu personaje: clase, nivel, equipo, misiones y dónde estás.\nPregunta lo que quieras, la primera consulta va por la casa:",
-    placeholder = "Pregúntale algo a Rizzik...",
-    thinking = {
-      "Revisando la letra chica",
-      "Calculando ganancias",
-      "Consultando a mis contactos",
-      "Engrasando el transmisor",
-      "Cerrando el trato",
-    },
-    notifyOk = "¡Rizzik cerró el trato!",
-    notifyFail = "El transmisor explotó (otra vez)",
-    errorIntro = "¡BOOM! El transmisor explotó. Gajes del oficio, socio.",
-    tooltipThinking = "Rizzik está negociando tu respuesta...",
-    statusOnline = "Transmisor goblin en línea",
+    pitch = L.RIZZIK_PITCH,
+    sample = L.RIZZIK_SAMPLE,
+    online = L.RIZZIK_ONLINE,
+    hello = L.RIZZIK_HELLO,
+    helloNoName = L.RIZZIK_HELLO_NONAME,
+    sub = L.RIZZIK_SUB,
+    placeholder = L.RIZZIK_PLACEHOLDER,
+    thinking = L.RIZZIK_THINKING,
+    notifyOk = L.RIZZIK_NOTIFY_OK,
+    notifyFail = L.RIZZIK_NOTIFY_FAIL,
+    errorIntro = L.RIZZIK_ERROR_INTRO,
+    tooltipThinking = L.RIZZIK_TOOLTIP_THINKING,
+    statusOnline = L.RIZZIK_STATUS_ONLINE,
     colors = {
       window   = { 0.07, 0.055, 0.052, 0.97 },
       sidebar  = { 0.052, 0.04, 0.038, 1 },
@@ -154,10 +144,10 @@ function Personas.SetPortrait(texture, p)
   end
 end
 
--- "atlas raceicon128-goblin-male" (for /ia estado).
+-- "atlas raceicon128-goblin-male" (for /ia status).
 function Personas.PortraitName(p)
   local img = Personas.Portrait(p)
-  return img.atlas and ("atlas " .. img.atlas) or ("archivo " .. tostring(img.file))
+  return img.atlas and ("atlas " .. img.atlas) or (L.PORTRAIT_FILE .. tostring(img.file))
 end
 
 local function charKey()
@@ -194,7 +184,7 @@ function Personas:Set(id)
   if ns.Button and ns.Button.ApplyPersona then ns.Button:ApplyPersona() end
 end
 
--- "Calculando ganancias..." : a new phrase every ~2.7 s, dots every tick.
+-- "Counting the profits..." : a new phrase every ~2.7 s, dots every tick.
 function Personas:ThinkingText(tick)
   tick = tick or 0
   local list = self:Current().thinking

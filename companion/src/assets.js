@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ADDON_SRC, ROOT } from './config.js';
 
-// { "AzerothIA.toc": "...", "Core.lua": "...", ... }
+// { "ForeverAICompanion.toc": "...", "Core.lua": "...", ... }
 export function addonFiles() {
   const out = {};
   for (const name of fs.readdirSync(ADDON_SRC)) {
@@ -20,13 +20,13 @@ export function uiHtml() {
 }
 
 export function sampleContext() {
-  return JSON.parse(fs.readFileSync(path.join(ROOT, 'sample', 'contexto-ejemplo.json'), 'utf8'));
+  return JSON.parse(fs.readFileSync(path.join(ROOT, 'sample', 'sample-context.json'), 'utf8'));
 }
 
 // C# source of the silent voice; compiled on the player's PC with the
 // compiler that ships with Windows.
 export function ttsEngineSource() {
-  return fs.readFileSync(path.join(ROOT, 'tts', 'AzerothIATts.cs'), 'utf8');
+  return fs.readFileSync(path.join(ROOT, 'tts', 'ForeverAICompanionTts.cs'), 'utf8');
 }
 
 export function knowledgeReadme() {

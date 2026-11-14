@@ -106,7 +106,7 @@ export function runLua(script, globals = {}, addonFiles = ['Json.lua', 'Uplink.l
     ns = {}
     for i = 0, ${addonFiles.length - 1} do
       local f = assert(load(_G["SRC_" .. i], "addon" .. i))
-      f("AzerothIA", ns)
+      f("ForeverAICompanion", ns)
     end
     ${script}`;
   const status = lauxlib.luaL_dostring(L, to_luastring(harness));

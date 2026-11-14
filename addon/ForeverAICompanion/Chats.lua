@@ -1,14 +1,17 @@
 -- Conversations, like the Claude / Codex apps: several chats, each with its
 -- own messages. Only the current chat's earlier turns are sent to the AI.
--- Stored in AzerothIA_DB.chats (account-wide).
+-- Stored in ForeverAICompanion_DB.chats (account-wide).
 local _, ns = ...
+local L = ns.L
 
 local Chats = {}
 ns.Chats = Chats
 
 Chats.MAX_CHATS = 60
 Chats.MAX_MESSAGES = 120
-Chats.DEFAULT_TITLE = "Nuevo chat"
+Chats.DEFAULT_TITLE = L.NEW_CHAT
+-- Empty chats created in either language still get their title from the first question.
+local DEFAULT_TITLES = { [""] = true, ["New chat"] = true, ["Nuevo chat"] = true, [L.NEW_CHAT] = true }
 
 local function newId()
   return string.format("c%d%04d", time(), math.random(0, 9999))
@@ -31,7 +34,7 @@ function Chats:Init()
   if type(db.history) == "table" and #db.history > 0 then
     table.insert(db.chats, 1, {
       id = newId(),
-      title = "Conversación anterior",
+      title = L.PREVIOUS_CONVERSATION,
       created = db.history[1].t or time(),
       updated = db.history[#db.history].t or time(),
       messages = db.history,
@@ -124,7 +127,7 @@ end
 
 function Chats:AddMessage(chat, entry)
   table.insert(chat.messages, entry)
-  if not chat.renamed and (chat.title == self.DEFAULT_TITLE or chat.title == "") then
+  if not chat.renamed and (chat.title == self.DEFAULT_TITLE or DEFAULT_TITLES[chat.title or ""]) then
     chat.title = titleFrom(entry.question)
   end
   chat.updated = time()

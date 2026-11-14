@@ -1,8 +1,9 @@
--- Notification cards: "¡Fizzi tiene una respuesta!" (or Rizzik's) with the chat name and a preview of
+-- Notification cards: "Fizzi has an answer!" (or Rizzik's) with the chat name and a preview of
 -- the answer, next to the floating button (or at the top of the screen).
 -- Click a card to open that chat. Cards fade out after a few seconds and
 -- stack when several answers arrive.
 local _, ns = ...
+local L = ns.L
 
 local Notify = {}
 ns.Notify = Notify
@@ -88,7 +89,7 @@ local function card(i)
   c.body = body
   local hint = c:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   hint:SetPoint("BOTTOMRIGHT", -10, 6)
-  hint:SetText("Clic para abrir")
+  hint:SetText(L.CLICK_TO_OPEN)
 
 
   c:SetScript("OnClick", function(self, mouse)
@@ -164,7 +165,7 @@ function Notify:Show(entry, chatData)
   end
   c.title:SetText((ok and (p.nameColor .. p.notifyOk .. "|r") or ("|cffff6060" .. p.notifyFail .. "|r"))
     .. (chatData and ("  |cff999999" .. preview(chatData.title, 22) .. "|r") or ""))
-  c.body:SetText(preview(ok and entry.answer or (entry.answer or "Error"), 110))
+  c.body:SetText(preview(ok and entry.answer or (entry.answer or L.ERROR), 110))
 
   c.expires = GetTime() + SHOW_SECONDS
   c.hovered = false

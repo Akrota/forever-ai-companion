@@ -1,4 +1,4 @@
-// Receives AzerothIA requests from the game, asks the AI, and delivers the
+// Receives Forever AI Companion requests from the game, asks the AI, and delivers the
 // answer back to the addon.
 //
 // Requests arrive as a strip of cells drawn by the addon. They are read
@@ -10,7 +10,7 @@ import { wowPaths } from './config.js';
 import { decodeImage } from './image.js';
 import { GridUnreadableError, decodeGrid } from './grid.js';
 import { publishInbox, resetSignals, ringSignal } from './inbox.js';
-import { buildMessages, buildSystem, cleanAnswer, loadKnowledge } from './prompt.js';
+import { buildMessages, buildSystem, cleanAnswer, loadKnowledge, playerLang } from './prompt.js';
 import { guideFreshness } from './guide.js';
 import { ask, canSearch } from './providers.js';
 import { loadState, saveState } from './state.js';
@@ -18,13 +18,14 @@ import { loadContextCache, resolveContext, saveContextCache } from './context-ca
 import { startScreenReader } from './screen-reader.js';
 import { probeReport, startProbeMonitor } from './probe.js';
 import { startVoiceInbox } from './voice-inbox.js';
+import { runInLang, t } from './i18n.js';
 
 const SCREENSHOT_RE = /^WoWScrnShot_.*\.(png|tga|jpe?g)$/i;
 
 export function parseRequest(payload) {
   const req = JSON.parse(payload.toString('utf8'));
   if (!req || typeof req.id !== 'string' || typeof req.question !== 'string') {
-    throw new Error('Petición sin id o pregunta');
+    throw new Error('Request without id or question');
   }
   return req;
 }
@@ -55,20 +56,20 @@ export async function handleRequest(req, {
   saveCache(contextCache);
   const extra = {};
   if (missing.length) {
-    log(`Faltan en la caché: ${missing.join(', ')}. Se pide al addon que reenvíe todo.`);
+    log(`Missing from the cache: ${missing.join(', ')}. Asking the addon to resend everything.`);
     extra.resync = Math.floor(Date.now() / 1000);
   }
 
   const ch = req.context?.character || {};
   const who = `${ch.name ?? '?'} (${ch.class ?? '?'} ${ch.level ?? '?'})` +
     (req.chat?.title ? ` · chat «${req.chat.title}»` : '');
-  log(`Pregunta de ${who}${req.assistant ? ` para ${req.assistant}` : ''}: ${req.question}`);
+  log(`Question from ${who}${req.assistant ? ` for ${req.assistant}` : ''}: ${req.question}`);
   if (req.context && typeof req.context === 'object') {
     log(`Secciones enviadas: ${sentNow.filter((k) => k !== 'diagnostics').join(', ') || '(ninguna)'}` +
       ` · sin cambios: ${Object.keys(req.same || {}).join(', ') || '(ninguna)'}`);
     // Why the addon could not read some sections: for the log, not for the AI.
     if (req.context.diagnostics) {
-      log(`Secciones con error en el juego: ${JSON.stringify(req.context.diagnostics)}`);
+      log(`Sections with errors in the game: ${JSON.stringify(req.context.diagnostics)}`);
       delete req.context.diagnostics;
     }
   }
@@ -79,8 +80,8 @@ export async function handleRequest(req, {
     // Channel probe: answered by the app itself, not by the AI.
     const { text, model } = req.probe && probeMonitor
       ? { ...(await probeReport(req.probe, probeMonitor)), model: 'prueba de canales' }
-      : await ask(cfg, typeof system === 'function' ? system(req) : system, buildMessages(req), req);
-    answer = { id: req.id, ok: true, answer: cleanAnswer(text) || '(respuesta vacía)', model };
+      : await runInLang(playerLang({ lang: req.lang, client: req.context?.client }), () => ask(cfg, typeof system === 'function' ? system(req) : system, buildMessages(req), req));
+    answer = { id: req.id, ok: true, answer: cleanAnswer(text) || t('emptyAnswer'), model };
     log(`Respuesta (${model}, ${((Date.now() - started) / 1000).toFixed(1)} s):\n${answer.answer}`);
   } catch (e) {
     answer = { id: req.id, ok: false, answer: `Error: ${e.message}` };
@@ -112,7 +113,7 @@ export function startWatcher({ cfg, wowDir, log = () => {}, onEvent = () => {}, 
     // The game was patched after the guide: fetch a newer guide for next time
     // (this answer already tells the AI to double-check).
     if (guide && guideFreshness(guide, { client }).gameNewer) guides.onPatch();
-    return buildSystem(knowledge, req.assistant, { canSearch: canSearch(cfg), client, ...(guide ? { guide } : {}) });
+    return buildSystem(knowledge, req.assistant, { canSearch: canSearch(cfg), client, lang: req.lang, ...(guide ? { guide } : {}) });
   };
   const contextCache = loadContextCache();
   const probeMonitor = startProbeMonitor({ wowDir, log });
@@ -155,7 +156,7 @@ export function startWatcher({ cfg, wowDir, log = () => {}, onEvent = () => {}, 
           if (e instanceof GridUnreadableError && img.attempt >= 3) {
             doneSeqs.add(img.seq);
             log(`Franja ilegible: ${e.message}`);
-            reportFailure('No pude leer la pregunta en la pantalla: algo tapaba el borde superior de la ventana del juego.');
+            reportFailure(t('unreadableScreen'));
           }
           return;
         }
@@ -164,7 +165,7 @@ export function startWatcher({ cfg, wowDir, log = () => {}, onEvent = () => {}, 
         try {
           enqueue(parseRequest(payload));
         } catch (e) {
-          log(`Petición inválida: ${e.message}`);
+          log(`Invalid request: ${e.message}`);
         }
       },
     })
@@ -177,7 +178,7 @@ export function startWatcher({ cfg, wowDir, log = () => {}, onEvent = () => {}, 
       try {
         enqueue(parseRequest(payload));
       } catch (e) {
-        log(`Petición por voz inválida: ${e.message}`);
+        log(`Invalid voice request: ${e.message}`);
       }
     },
   });

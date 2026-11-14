@@ -1,10 +1,11 @@
-// AzerothIA silent "voice": a SAPI 5 text-to-speech engine that produces no
-// sound. When the game asks Windows to read text aloud with this voice, the
-// text is handed to the AzerothIA app instead (as a file in its data folder).
+// Forever AI Companion silent "voice": a SAPI 5 text-to-speech engine that
+// produces no sound. When the game asks Windows to read text aloud with this
+// voice, the text is handed to the app instead (as a file in its data folder).
 //
 // Built with the C# compiler included in Windows (.NET Framework 4):
-//   csc /target:library /out:AzerothIATts.dll AzerothIATts.cs
-// and registered per user (no admin) as a COM class + a SAPI voice token.
+//   csc /target:library /out:ForeverAICompanionTts.dll ForeverAICompanionTts.cs
+// and registered as a COM class + a SAPI voice token (see src/tts-voice.js).
+// The class GUID never changes, so re-registering just updates the voice.
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -13,7 +14,7 @@ using System.Threading;
 
 [assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
 
-namespace AzerothIA.Tts
+namespace ForeverAICompanion.Tts
 {
     [ComImport, Guid("5B559F40-E952-11D2-BB91-00C04F8EE6C0"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     public interface ISpObjectWithToken
@@ -38,10 +39,10 @@ namespace AzerothIA.Tts
 
         static string DataDir()
         {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AzerothIA");
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ForeverAICompanion");
         }
 
-        // Diagnostics: %APPDATA%\AzerothIA\tts-engine.log (small, rotated).
+        // Diagnostics: %APPDATA%\ForeverAICompanion\tts-engine.log (small, rotated).
         static void Log(string msg)
         {
             try

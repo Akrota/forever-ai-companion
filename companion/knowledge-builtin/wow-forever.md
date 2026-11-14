@@ -1,61 +1,61 @@
 ---
-fecha: 2026-11-13
-versionJuego: 1.60.1
+date: 2026-11-13
+gameVersion: 1.60.1
 build: 70938
 ---
-## Guía base de World of Warcraft: Forever
+## World of Warcraft: Forever base guide
 
-Datos de Blizzard y de guías públicas reunidos 9 días después del lanzamiento. Lo marcado como "según guías" puede cambiar o estar incompleto: si la respuesta depende de ese dato y puedes buscar en internet, verifícalo. Las fechas son absolutas: compáralas con la fecha de hoy.
+Facts from Blizzard and public guides, gathered 9 days after launch. Anything marked "per guides" may change or be incomplete: if the answer depends on it and you can search the internet, verify it. Dates are absolute: compare them with today's date. Names in the Spanish client are given as "es: ...".
 
-### Qué es
-- Versión permanente de WoW publicada por Blizzard el 4 de noviembre de 2026, junto a WoW moderno y WoW Classic (no es un modo ni una temporada de Classic). Incluida en la suscripción de WoW.
-- Ambientada en el primer año del WoW original de 2004, en una continuidad propia: después de la campaña "Forsaken Kingdom" de Warcraft III y antes de Molten Core.
-- Nivel máximo 60, sin aumentos previstos. Sin monturas voladoras ni escalado de nivel.
-- Usa el cliente moderno (interfaz 1.60, número de interfaz 16001). El contenido original de 2004 sigue siendo la base, pero hay más de 1.000 misiones nuevas y cambios de clases y sistemas: no supongas que todo es igual a Classic.
+### What it is
+- A permanent version of WoW released by Blizzard on November 4, 2026, alongside modern WoW and WoW Classic (it is not a mode or a Classic season). Included in the WoW subscription.
+- Set in the first year of the original 2004 WoW, in its own continuity: after Warcraft III's "Forsaken Kingdom" campaign and before Molten Core.
+- Level cap 60, with no increases planned. No flying mounts and no level scaling.
+- Uses the modern client (interface 1.60, interface number 16001). The original 2004 content is still the base, but there are over 1,000 new quests and class and system changes: don't assume everything is the same as Classic.
 
-### Zonas nuevas
-- Zephras Isle: zona inicial de los Skyborne, niveles 1-12.
-- The Riverglades: frontera de los Reinos del Este, más de 150 misiones, niveles mediados de 30 a mediados de 40. Ambas facciones (según guías: entre Crestagrana/Redridge y el Pantano de las Penas). Allí está la fortaleza Krol'dok del Martillo Crepuscular.
-- Shen'dralas: área oculta entre Mulgore y Desolace, ligada a los Shen'dralar, Eldre'Thalas (La Masacre) y los centauros.
-- Mount Hyjal (Monte Hyjal): después de Archimonde; zona de nivel alto y entrada a las bandas Hyjal Summit y The Barrow Deeps.
-- Zonas originales con cambios visuales (ríos en Elwynn, niebla en Costa Oscura, luz de luna en Vallefresno).
+### New zones
+- Zephras Isle: the Skyborne starting zone, levels 1-12.
+- The Riverglades: an Eastern Kingdoms frontier, over 150 quests, levels mid 30s to mid 40s. Both factions (per guides: between Redridge and the Swamp of Sorrows). It holds Krol'dok, the Twilight's Hammer fortress.
+- Shen'dralas: a hidden area between Mulgore and Desolace, tied to the Shen'dralar, Eldre'Thalas (Dire Maul) and the centaurs.
+- Mount Hyjal (es: Monte Hyjal): after Archimonde; a high-level zone and the entrance to the Hyjal Summit and The Barrow Deeps raids.
+- Original zones with visual changes (rivers in Elwynn, fog in Darkshore, moonlight in Ashenvale).
 
-### Mazmorras nuevas (5 jugadores; niveles según guías)
-- Hall of Thanes: bajo Forjaz, 13-18.
+### New dungeons (5 players; levels per guides)
+- Hall of Thanes: under Ironforge, 13-18.
 - Ruins of Lordaeron: Lordaeron, 15-20.
-- Whelgar's Excavation Site: Los Humedales, ~24-31.
-- City of Dalaran: Montañas de Alterac, 28-33.
-- The Drowned City ("La Ciudad Anegada" en el cliente en español): frente a la costa de Tuercespina (Stranglethorn), 35-40; entrada submarina.
-- Krol'dok Stronghold: The Riverglades, mazmorra al aire libre, ~40-45.
-- Alcaz Prison: isla de Alcaz (Marjal Revolcafango), 48-53.
+- Whelgar's Excavation Site: Wetlands, ~24-31.
+- City of Dalaran: Alterac Mountains, 28-33.
+- The Drowned City (es: "La Ciudad Anegada"): off the coast of Stranglethorn (es: Tuercespina), 35-40; underwater entrance.
+- Krol'dok Stronghold: The Riverglades, open-air dungeon, ~40-45.
+- Alcaz Prison: Alcaz Island (Dustwallow Marsh, es: Marjal Revolcafango), 48-53.
 - Blackmaw Hold: Azshara, 55-60.
-- Shaper's Terrace: Cráter de Un'Goro, 58-60.
-- Las mazmorras originales (Minas de la Muerte, Gnomeregan, Monasterio Escarlata...) siguen existiendo.
+- Shaper's Terrace: Un'Goro Crater (es: Cráter de Un'Goro), 58-60.
+- The original dungeons (Deadmines, Gnomeregan, Scarlet Monastery...) still exist.
 
-### Bandas
-- Abren el 9 de diciembre de 2026: The Barrow Deeps (10 jugadores), Hyjal Summit (20 jugadores) y, según guías, la Guarida de Onyxia (40, con la sintonización del Amuleto de Fuegodraco).
-- Del 4 de noviembre al 8 de diciembre de 2026 no hay bandas de Forever disponibles. Desde el 9 de diciembre sí: si hoy es esa fecha o después, ya están abiertas (busca su estado actual si importa).
+### Raids
+- Open on December 9, 2026: The Barrow Deeps (10 players), Hyjal Summit (20 players) and, per guides, Onyxia's Lair (40, with the Drakefire Amulet attunement).
+- From November 4 to December 8, 2026 there are no WoW Forever raids available. From December 9 on there are: if today is that date or later, they are open (search their current state if it matters).
 
-### Raza nueva: Skyborne ("Cielonata" en el cliente en español)
-- Elfos de la isla de Zephras, de origen Altonato. Al crear el personaje se elige facción: rama de la Alianza "High Order" (en español "de la Suma Orden", arcana) o rama de la Horda (según guías "Windshapers", elemental).
-- Clases: guerrero, cazador, pícaro, druida (ambas facciones); chamán solo Horda; mago solo Alianza. Formas de druida propias.
-- Empiezan en Zephras Isle (1-12). Tienen racial de desplazamiento por aire (en español "Caminar en el aire") y otra arcana ("Leer línea ley"): busca su efecto exacto si importa.
+### New race: Skyborne (es: "Cielonata")
+- Elves from Zephras Isle, of Highborne origin. Players choose a faction at character creation: the Alliance branch "High Order" (es: "de la Suma Orden", arcane) or the Horde branch (per guides "Windshapers", elemental).
+- Classes: warrior, hunter, rogue, druid (both factions); shaman Horde only; mage Alliance only. Their own druid forms.
+- They start on Zephras Isle (1-12). They have an air movement racial (es: "Caminar en el aire") and an arcane one (es: "Leer línea ley"): search their exact effect if it matters.
 
-### Otros cambios
-- Combinaciones nuevas de raza y clase: gnomo sacerdote, humano cazador, enano chamán, orco mago, trol brujo, no-muerto paladín.
-- Talentos desde el nivel 10, con hitos en 11, 16, 21 y 31. Algunos beneficios clásicos (Espíritu divino, Bendición de reyes, Marca de lo salvaje mejorada) son parte base de la clase.
-- Cada raza tiene dos raciales activas y dos pasivas.
-- Equitación al estilo de The Burning Crusade: el coste está en el entrenamiento y aprenderla da una montura.
-- Campamentos: la Hoguera de cocina pasa a ser una fogata compartida con beneficios de campamento. "Bien alimentado" da +5 % de experiencia por muerte.
-- Legado: puntos de cuenta (por clases, profesiones, JcJ, exploración, mazmorras y bandas) que se gastan en ventajas por personaje.
-- Transfiguración opcional, gráficos HD/SD, soporte de mando. Reglas de reino: Normal, JcJ y Rol; al 13 de noviembre de 2026 el modo Hardcore estaba anunciado para más adelante, sin fecha.
-- JcJ: nuevo campo de batalla Darkspear Islands (15 contra 15) además de Garganta Grito de Guerra, Cuenca de Arathi y Valle de Alterac; sistema de honor renovado.
-- Experiencia de mazmorras ajustada tras el lanzamiento (según guías, aumentó el 8 de noviembre de 2026).
+### Other changes
+- New race and class combinations: gnome priest, human hunter, dwarf shaman, orc mage, troll warlock, undead paladin.
+- Talents from level 10, with milestones at 11, 16, 21 and 31. Some classic buffs (Divine Spirit, Blessing of Kings, Improved Mark of the Wild) are part of the base class.
+- Each race has two active and two passive racials.
+- Burning Crusade-style riding: the cost is in the training, and learning it gives a mount.
+- Camps: the cooking fire becomes a shared campfire with camp bonuses. "Well Fed" gives +5% experience from kills.
+- Legacy: account points (from classes, professions, PvP, exploration, dungeons and raids) spent on per-character perks.
+- Optional transmog, HD/SD graphics, controller support. Realm rules: Normal, PvP and RP; as of November 13, 2026 Hardcore mode was announced for later, with no date.
+- PvP: new battleground Darkspear Islands (15 vs 15) besides Warsong Gulch, Arathi Basin and Alterac Valley; revamped honor system.
+- Dungeon experience was adjusted after launch (per guides, it was increased on November 8, 2026).
 
-### Calendario
-- Lanzamiento: 4 de noviembre de 2026. Bandas: 9 de diciembre de 2026.
-- Plan anunciado (al 13 de noviembre de 2026, sin fechas exactas): primavera de 2027, dos bandas, dos mazmorras, una zona y una cadena legendaria; verano de 2027, una banda clásica renovada, otra banda y dos mazmorras. Si hoy ya es esa temporada o después, busca qué salió realmente.
+### Calendar
+- Launch: November 4, 2026. Raids: December 9, 2026.
+- Announced plan (as of November 13, 2026, no exact dates): spring 2027, two raids, two dungeons, a zone and a legendary questline; summer 2027, a revamped classic raid, another raid and two dungeons. If today is already that season or later, search what was actually released.
 
-### Dónde buscar información de Forever
-- Wowhead (sección de WoW Forever), icy-veins.com/wow-forever, maxroll.gg/wow-forever, warcrafttavern.com/forever, wowforever.wiki.fextralife.com, metaforge.app/wow-forever.
-- Para contenido original de 2004 (misiones con ID menor a 90000, zonas y mazmorras clásicas) sirven las guías de WoW Classic, pero confirma si Forever lo cambió.
+### Where to look for WoW Forever information
+- Wowhead (WoW Forever section), icy-veins.com/wow-forever, maxroll.gg/wow-forever, warcrafttavern.com/forever, wowforever.wiki.fextralife.com, metaforge.app/wow-forever.
+- For original 2004 content (quests with an ID below 90000, classic zones and dungeons) WoW Classic guides work, but confirm whether Forever changed it.

@@ -1,14 +1,30 @@
 // Installs / removes the silent "ForeverAICompanion" Windows voice (see
-// tts/AzerothIATts.cs). Until v1.0 it was called "AzerothIA": installing the new
-// voice removes that one in the same administrator prompt.
+// tts/ForeverAICompanionTts.cs).
+//
+// Installs from before the rename (see config.LEGACY_NAME) registered it
+// differently, and it keeps working that way until the player updates it
+// (one administrator prompt, offered by the app window):
+//  - until v1.0 the voice itself had the previous name;
+//  - until v1.5 its engine was the previous name's DLL and class, in the
+//    previous install folder, writing to the previous data folder.
+// The engine's COM class id never changed, so installing the current voice
+// replaces all of that in the same prompt.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
+import { LEGACY_NAME } from './config.js';
+import { err, err as i18nErr } from './i18n.js';
 
 export const VOICE_NAME = 'ForeverAICompanion';
-export const LEGACY_VOICE_NAME = 'AzerothIA';
+export const LEGACY_VOICE_NAME = LEGACY_NAME;
 const VENDOR = 'Forever AI Companion';
 export const ENGINE_CLSID = '{DE6988DD-75DB-43E9-9021-43C884474FEE}';
+// Must match tts/ForeverAICompanionTts.cs (namespace + class) and the DLL's file name.
+export const ENGINE_CLASS = 'ForeverAICompanion.Tts.Engine';
+const ENGINE_ASSEMBLY = 'ForeverAICompanionTts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null';
+export const ENGINE_DLL = 'ForeverAICompanionTts.dll';
+export const LEGACY_ENGINE_CLASS = `${LEGACY_NAME}.Tts.Engine`;
+export const LEGACY_ENGINE_DLL = `${LEGACY_NAME}Tts.dll`;
 const TOKEN_KEY = `HKCU\\Software\\Microsoft\\Speech\\Voices\\Tokens\\${VOICE_NAME}`;
 const LEGACY_TOKEN_KEY = `HKCU\\Software\\Microsoft\\Speech\\Voices\\Tokens\\${LEGACY_VOICE_NAME}`;
 const CLSID_KEY = `HKCU\\Software\\Classes\\CLSID\\${ENGINE_CLSID}`;
@@ -30,11 +46,11 @@ const reg = (...args) => run('reg.exe', [...args, '/f']);
 // A process that used the voice (the game) keeps the DLL open, so it is
 // compiled next to it and swapped in: an open DLL can still be renamed.
 export async function compileEngine(sourceFile, outFile) {
-  if (!fs.existsSync(CSC)) throw new Error('No se encontró el compilador de C# de Windows (.NET Framework 4).');
+  if (!fs.existsSync(CSC)) throw err('noCsc');
   const target = path.resolve(outFile);
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  // The output file name becomes the assembly name, which must stay
-  // "AzerothIATts": build into a temporary folder under the final name.
+  // The output file name becomes the assembly name, which must match the
+  // registered one (ENGINE_ASSEMBLY): build into a temporary folder under the final name.
   const buildDir = path.join(path.dirname(target), `.build-${Date.now()}`);
   fs.mkdirSync(buildDir, { recursive: true });
   const fresh = path.join(buildDir, path.basename(target));
@@ -71,12 +87,14 @@ export function cleanupOldEngines(target) {
 export async function installVoice(dllPath) {
   const codeBase = 'file:///' + dllPath.replace(/\\/g, '/');
   for (const key of [CLSID_KEY, CLSID_KEY_32]) {
-    await reg('add', key, '/ve', '/d', 'AzerothIA.Tts.Engine');
+    // Starts clean: drops what an install from before the rename left there.
+    try { await reg('delete', key); } catch { /* not there */ }
+    await reg('add', key, '/ve', '/d', ENGINE_CLASS);
     const inproc = `${key}\\InprocServer32`;
     await reg('add', inproc, '/ve', '/d', 'mscoree.dll');
     await reg('add', inproc, '/v', 'ThreadingModel', '/d', 'Both');
-    await reg('add', inproc, '/v', 'Class', '/d', 'AzerothIA.Tts.Engine');
-    await reg('add', inproc, '/v', 'Assembly', '/d', 'AzerothIATts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null');
+    await reg('add', inproc, '/v', 'Class', '/d', ENGINE_CLASS);
+    await reg('add', inproc, '/v', 'Assembly', '/d', ENGINE_ASSEMBLY);
     await reg('add', inproc, '/v', 'RuntimeVersion', '/d', 'v4.0.30319');
     await reg('add', inproc, '/v', 'CodeBase', '/d', codeBase);
   }
@@ -125,14 +143,18 @@ export function machineRegFile(dllPath) {
     '"Language"="409"',
     `\"Vendor\"=\"${VENDOR}\"`,
     '',
+    // Same class id as before the rename: cleared first, then registered with
+    // the current DLL and class.
+    `[-${HKLM_CLSID}]`,
+    '',
     `[${HKLM_CLSID}]`,
-    '@="AzerothIA.Tts.Engine"',
+    `@="${ENGINE_CLASS}"`,
     '',
     `[${HKLM_CLSID}\\InprocServer32]`,
     '@="mscoree.dll"',
     '"ThreadingModel"="Both"',
-    '"Class"="AzerothIA.Tts.Engine"',
-    '"Assembly"="AzerothIATts, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"',
+    `"Class"="${ENGINE_CLASS}"`,
+    `"Assembly"="${ENGINE_ASSEMBLY}"`,
     '"RuntimeVersion"="v4.0.30319"',
     `"CodeBase"="${codeBase}"`,
     '',
@@ -146,20 +168,20 @@ export function machineUnregFile() {
 // Imports a .reg file as administrator (shows the Windows UAC prompt).
 async function importElevated(content, tmpDir) {
   fs.mkdirSync(tmpDir, { recursive: true });
-  const file = path.join(tmpDir, `azerothia-voice-${Date.now()}.reg`);
+  const file = path.join(tmpDir, `forever-ai-companion-voice-${Date.now()}.reg`);
   fs.writeFileSync(file, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(content, 'utf16le')]));
   const script = `
 try {
-  $p = Start-Process -FilePath reg.exe -ArgumentList @('import', ('"' + $env:AZIA_REG + '"'), '/reg:64') -Verb RunAs -Wait -PassThru -WindowStyle Hidden
+  $p = Start-Process -FilePath reg.exe -ArgumentList @('import', ('"' + $env:FAIC_REG + '"'), '/reg:64') -Verb RunAs -Wait -PassThru -WindowStyle Hidden
   exit $p.ExitCode
 } catch { exit 1223 }`;
   try {
     await new Promise((resolve, reject) => {
       execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
-        { windowsHide: true, timeout: 300000, env: { ...process.env, AZIA_REG: file } }, (err) => {
+        { windowsHide: true, timeout: 300000, env: { ...process.env, FAIC_REG: file } }, (err) => {
           if (!err) return resolve();
-          if (err.code === 1223) reject(new Error('Se canceló el permiso de administrador.'));
-          else reject(new Error(`No se pudo registrar la voz (código ${err.code}).`));
+          if (err.code === 1223) reject(i18nErr('adminCancelled'));
+          else reject(i18nErr('voiceRegisterFailed', { code: err.code }));
         });
     });
   } finally {
@@ -188,8 +210,41 @@ async function hklmKeyExists(key) {
 
 // True when SAPI (and so the game) can list the voice.
 export const isVoiceVisible = () => hklmKeyExists(HKLM_TOKEN);
-// The voice under its first name ("AzerothIA"): still works, should be renamed.
+// The voice under the previous name (until v1.0): still works, should be renamed.
 export const isLegacyVoiceVisible = () => hklmKeyExists(HKLM_LEGACY_TOKEN);
+
+// Class and DLL Windows loads for the voice's engine, per registry view.
+// The game (not elevated) uses the per-user one when it exists.
+async function engineAt(key, args = []) {
+  try {
+    const out = await run('reg.exe', ['query', `${key}\\InprocServer32`, ...args]);
+    const value = (name) => (out.match(new RegExp(`^\\s*${name}\\s+REG_\\w+\\s+(.*)$`, 'mi')) || [])[1]?.trim() || null;
+    return { className: value('Class'), codeBase: value('CodeBase') };
+  } catch {
+    return null; // not registered there
+  }
+}
+
+export async function registeredEngines() {
+  const found = await Promise.all([
+    engineAt(CLSID_KEY), engineAt(CLSID_KEY_32), engineAt(HKLM_CLSID.replace('HKEY_LOCAL_MACHINE', 'HKLM'), ['/reg:64']),
+  ]);
+  return found.filter(Boolean);
+}
+
+// An engine registered by an install from before the rename: its class or
+// DLL has the previous name (and the DLL lives in the previous install folder).
+export function isLegacyEngine(engine) {
+  if (!engine) return false;
+  const cls = String(engine.className || '').toLowerCase();
+  const dll = path.basename(String(engine.codeBase || '').replace(/^file:\/+/i, '')).toLowerCase();
+  return cls === LEGACY_ENGINE_CLASS.toLowerCase() || dll === LEGACY_ENGINE_DLL.toLowerCase();
+}
+
+// True while Windows would still load the engine from before the rename.
+export async function isLegacyEngineRegistered() {
+  return (await registeredEngines()).some(isLegacyEngine);
+}
 
 export async function isVoiceInstalled() {
   try {

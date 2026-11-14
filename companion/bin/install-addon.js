@@ -9,7 +9,7 @@ try {
   const i = args.indexOf('--wow');
   if (i >= 0 && args[i + 1]) {
     const dir = normalizeWowDir(args[i + 1]);
-    if (!dir) throw new Error(`No encontré WoW Forever en ${args[i + 1]}`);
+    if (!dir) throw new Error(`WoW Forever not found in ${args[i + 1]}`);
     cfg = saveConfig({ wowDir: dir }); // remember it for `npm start`
   }
   install(cfg, { wowDir: resolveWowDir(cfg) });

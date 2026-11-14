@@ -16,7 +16,7 @@ import { luaString as toLuaString } from '../src/inbox.js';
 import { encodePNG, renderGrid, runLua } from './helpers.js';
 
 function tempWow() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'azia-wow-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-wow-'));
   fs.mkdirSync(path.join(dir, 'Interface', 'AddOns'), { recursive: true });
   return dir;
 }
@@ -24,10 +24,10 @@ function tempWow() {
 test('install creates addon, slots and empty signal files', () => {
   const cfg = { ...loadConfig(path.join(os.tmpdir(), 'no-config.json')), wowDir: tempWow(), slots: 3, signals: 5 };
   const p = install(cfg, { log: () => {}, resetState: false });
-  assert.ok(fs.existsSync(path.join(p.addonDir, 'AzerothIA.toc')));
+  assert.ok(fs.existsSync(path.join(p.addonDir, 'ForeverAICompanion.toc')));
   assert.equal(fs.statSync(p.signal(1)).size, 0);
   assert.ok(fs.statSync(p.okSignal).size > 44);
-  const toc = fs.readFileSync(path.join(p.slotDir(3), 'AzerothIA_S03.toc'), 'utf8');
+  const toc = fs.readFileSync(path.join(p.slotDir(3), 'ForeverAICompanion_S03.toc'), 'utf8');
   assert.match(toc, /## LoadOnDemand: 1/);
   assert.match(toc, /## Interface: 16001/);
 });
@@ -38,7 +38,7 @@ test('screenshot request -> answer in every slot + signal rung', async () => {
 
   // The addon builds the request (real Lua) and "takes the screenshot".
   const out = runLua(`
-    local json = ns.Json.Encode({ v = 1, id = "abc123", sig = 2, question = "¿Dónde estoy?",
+    local json = ns.Json.Encode({ v = 1, id = "abc123", sig = 2, lang = "es", question = "¿Dónde estoy?",
       context = { character = { name = "Thoradin", class = "Paladín", level = 24, race = "Enano" },
                   position = { zone = "Montañas de Alterac", x = 38.2, y = 46.7 } } })
     local W, H, cells = ns.Uplink.BuildGrid(ns.Uplink.Frame(json), 240)
@@ -53,7 +53,9 @@ test('screenshot request -> answer in every slot + signal rung', async () => {
   const state = { nextSig: 1, answers: [], processed: [] };
   const answer = await handleRequest(req, { cfg, paths: wowPaths(cfg.wowDir), state, system: buildSystem(''), save: () => {} });
   assert.ok(answer.ok);
+  // The request came from a Spanish game client: the app answers in Spanish.
   assert.match(answer.answer, /Thoradin, Enano Paladín nivel 24/);
+  assert.match(answer.answer, /Prueba de conexión OK/);
 
   // The addon asked for signal 2, so that one must now be playable.
   assert.equal(fs.statSync(p.signal(1)).size, 0);
@@ -68,7 +70,7 @@ test('screenshot request -> answer in every slot + signal rung', async () => {
   const result = runLua(`
     local chunk = assert(load(INBOX))
     chunk()
-    local a = AzerothIA_Inbox.answers[1]
+    local a = ForeverAICompanion_Inbox.answers[1]
     RESULT = a.id .. "|" .. tostring(a.ok) .. "|" .. a.answer`, { INBOX: inbox }, []);
   const [id, ok, text] = result.split('|');
   assert.equal(id, 'abc123');
@@ -81,8 +83,8 @@ test('inbox escaping survives quotes, backslashes, newlines and accents', () => 
   const out = runLua(`
     local chunk = assert(load(INBOX))
     chunk()
-    RESULT = AzerothIA_Inbox.answers[1].answer`,
-  { INBOX: `AzerothIA_Inbox = { answers = { { answer = ${toLuaString(tricky)} } } }` }, []);
+    RESULT = ForeverAICompanion_Inbox.answers[1].answer`,
+  { INBOX: `ForeverAICompanion_Inbox = { answers = { { answer = ${toLuaString(tricky)} } } }` }, []);
   assert.equal(out, tricky);
 });
 
@@ -115,22 +117,28 @@ test('subscription mode runs Claude Code as a plain chat model', () => {
 test('each assistant has its own personality over the same rules', () => {
   const fizzi = buildSystem('', 'fizzi');
   const rizzik = buildSystem('', 'rizzik');
-  assert.match(fizzi, /Fizzi Chispatuerca/);
-  assert.match(rizzik, /Rizzik/);
+  assert.match(fizzi, /Fizzi Sparkwrench/, 'English names by default');
+  assert.match(rizzik, /Rizzik Fastfuse/);
   assert.ok(!rizzik.includes('Fizzi'), 'no mixing of personalities');
-  for (const s of [fizzi, rizzik]) assert.match(s, /Formato de la respuesta/);
+  for (const s of [fizzi, rizzik]) assert.match(s, /Answer format/);
   assert.match(buildSystem('', undefined), /Fizzi/, 'old addons without the field get Fizzi');
   assert.match(buildSystem('', '<script>'), /Fizzi/, 'unknown names are ignored');
-  assert.match(buildSystem('Dato del servidor', 'rizzik'), /Conocimiento del servidor[\s\S]*Dato del servidor/);
+  assert.match(buildSystem('Server fact', 'rizzik'), /Server knowledge[\s\S]*Server fact/);
+  // Spanish players: Spanish names, and the AI is told the client is in Spanish.
+  const es = buildSystem('', 'fizzi', { lang: 'es' });
+  assert.match(es, /Fizzi Chispatuerca/);
+  assert.match(es, /client is in Spanish/);
+  assert.match(buildSystem('', 'rizzik', { client: { locale: 'esMX' } }), /Rizzik Bujíaveloz/, 'old addons: from the client locale');
+  assert.match(fizzi, /client is in English/);
 });
 test('the AI knows WoW Forever and searches only when it can', () => {
   const withSearch = buildSystem('', 'fizzi', { canSearch: true });
   const without = buildSystem('', 'fizzi', { canSearch: false });
-  assert.match(withSearch, /4 de noviembre de 2026/, 'explains Forever is newer than the model');
+  assert.match(withSearch, /November 4, 2026/, 'explains Forever is newer than the model');
   assert.match(withSearch, /The Drowned City/, 'built-in Forever guide is included');
-  assert.match(withSearch, /## Buscar en internet/);
-  assert.match(without, /No puedes buscar en internet/);
-  assert.match(withSearch, /Nunca incluyas enlaces/);
+  assert.match(withSearch, /## Searching the internet/);
+  assert.match(without, /You cannot search the internet/);
+  assert.match(withSearch, /Never include links/);
 
   // Which providers search, and with what.
   assert.equal(canSearch({ provider: 'claude-code' }), true);

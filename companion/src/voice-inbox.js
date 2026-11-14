@@ -1,19 +1,27 @@
-// Receives requests through the silent "AzerothIA" voice: the voice engine
-// (tts/AzerothIATts.cs) drops every text the game "speaks" with it as a file
-// in %APPDATA%\AzerothIA\tts-inbox. Messages are
-//   AZIA:<request id>:<part>/<parts>:<base64 chunk>
+// Receives requests through the silent "ForeverAICompanion" voice: the voice
+// engine (tts/ForeverAICompanionTts.cs) drops every text the game "speaks"
+// with it as a file in %APPDATA%\ForeverAICompanion\tts-inbox. Messages are
+//   FAIC:<request id>:<part>/<parts>:<base64 chunk>
 // and the joined chunks are a frame (see grid.parseFrame).
+//
+// Until the player updates the invisible sending (one administrator prompt),
+// the voice registered by an install from before the rename keeps writing to
+// the inbox under the project's previous name, and an addon from before the
+// rename still loaded in a running game uses the previous prefix: both are
+// still accepted.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { APP_ID, LEGACY_NAME, roamingDir } from './config.js';
 import { parseFrame } from './grid.js';
 
-export const voiceInboxDir = () =>
-  path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'AzerothIA', 'tts-inbox');
+export const voiceInboxDir = () => path.join(roamingDir(), APP_ID, 'tts-inbox');
+export const legacyVoiceInboxDir = () => path.join(roamingDir(), LEGACY_NAME, 'tts-inbox');
 
 // The game wraps what it speaks in bookmarks named "Start" and "End"; older
 // versions of the voice passed them through, so they may surround the message.
-const MESSAGE = /AZIA:([^:\s]+):(\d+)\/(\d+):([A-Za-z0-9+/=\s]*)/;
+// "AZIA" is the prefix used before the rename.
+const MESSAGE = /(?:FAIC|AZIA):([^:\s]+):(\d+)\/(\d+):([A-Za-z0-9+/=\s]*)/;
+const LOOKS_LIKE_MESSAGE = /(?:FAIC|AZIA):/;
 
 function decodeParts(parts) {
   try {
@@ -49,34 +57,42 @@ export function createAssembler() {
   };
 }
 
-// Polls the inbox folder. onPayload(Buffer) for each complete request.
-export function startVoiceInbox({ onPayload, log = () => {}, dir = voiceInboxDir(), intervalMs = 100 }) {
+// Polls the inbox folder (and the one from before the rename, when it
+// exists). onPayload(Buffer) for each complete request.
+export function startVoiceInbox({
+  onPayload, log = () => {}, dir = voiceInboxDir(), legacyDirs = [legacyVoiceInboxDir()], intervalMs = 100,
+}) {
   fs.mkdirSync(dir, { recursive: true });
   const assembler = createAssembler();
   let busy = false;
+  const readDir = (d) => {
+    const names = fs.readdirSync(d).filter((n) => n.endsWith('.txt')).sort();
+    for (const name of names) {
+      const file = path.join(d, name);
+      let text;
+      try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
+      fs.rmSync(file, { force: true });
+      try {
+        if (!LOOKS_LIKE_MESSAGE.test(text)) {
+          log(`Text received by the voice (not a question, ${text.length} characters): ${text.slice(0, 60)}`);
+        }
+        const payload = assembler.add(text);
+        if (payload) onPayload(payload);
+      } catch (e) {
+        log(`Invalid voice message: ${e.message}`);
+      }
+    }
+  };
   const poll = () => {
     if (busy) return;
     busy = true;
     try {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); // someone deleted it
-      const names = fs.readdirSync(dir).filter((n) => n.endsWith('.txt')).sort();
-      for (const name of names) {
-        const file = path.join(dir, name);
-        let text;
-        try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
-        fs.rmSync(file, { force: true });
-        try {
-          if (!text.includes('AZIA:')) {
-            log(`Texto recibido por la voz (no es una pregunta, ${text.length} caracteres): ${text.slice(0, 60)}`);
-          }
-          const payload = assembler.add(text);
-          if (payload) onPayload(payload);
-        } catch (e) {
-          log(`Mensaje por voz inválido: ${e.message}`);
-        }
-      }
+      readDir(dir);
+      // Never created here: it only exists while a voice from before the rename writes to it.
+      for (const d of legacyDirs) if (d && fs.existsSync(d)) readDir(d);
     } catch (e) {
-      log(`Error leyendo la voz: ${e.message}`);
+      log(`Error reading the voice inbox: ${e.message}`);
     } finally {
       busy = false;
     }

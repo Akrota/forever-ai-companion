@@ -1,7 +1,11 @@
+import { t } from './i18n.js';
 // Decodes the cell grid the addon draws before taking a screenshot.
-// Layout documented in addon/AzerothIA/Uplink.lua.
+// Layout documented in addon/ForeverAICompanion/Uplink.lua.
 
-export const MAGIC = 'AZIA';
+export const MAGIC = 'FAIC';
+// Mark used before the rename: an addon from then may still be loaded in a
+// game that was running when the app updated.
+export const LEGACY_MAGIC = 'AZIA';
 export const VERSION = 1;
 
 export function adler32(buf) {
@@ -22,7 +26,7 @@ export function symbolsToBytes(symbols) {
   return Buffer.from(out);
 }
 
-// LZW with codes growing from 9 to 16 bits (see addon/AzerothIA/Uplink.lua).
+// LZW with codes growing from 9 to 16 bits (see addon/ForeverAICompanion/Uplink.lua).
 export function lzwDecompress(data, outLength) {
   const dict = [];
   for (let i = 0; i < 256; i++) dict.push(Buffer.from([i]));
@@ -43,7 +47,7 @@ export function lzwDecompress(data, outLength) {
     let entry;
     if (code < dict.length) entry = dict[code];
     else if (code === dict.length && prev) entry = Buffer.concat([prev, prev.subarray(0, 1)]);
-    else throw new Error('Código LZW inválido');
+    else throw new Error('Invalid LZW code');
     out.push(entry);
     produced += entry.length;
     if (prev && dict.length < 65536) dict.push(Buffer.concat([prev, entry.subarray(0, 1)]));
@@ -55,22 +59,23 @@ export function lzwDecompress(data, outLength) {
 
 // Returns the payload Buffer, or throws if the frame is corrupt.
 export function parseFrame(bytes) {
-  if (bytes.length < 12 || bytes.toString('latin1', 0, 4) !== MAGIC) throw new Error('Sin marca AZIA');
+  const mark = bytes.length >= 12 ? bytes.toString('latin1', 0, 4) : '';
+  if (mark !== MAGIC && mark !== LEGACY_MAGIC) throw new Error('No frame mark');
   const u24 = (i) => (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
   let payload, end;
   if (bytes[4] === 1) {
     const len = u24(5);
     end = 8 + len;
-    if (end + 4 > bytes.length) throw new Error('Longitud inválida');
+    if (end + 4 > bytes.length) throw new Error('Invalid length');
     payload = bytes.subarray(8, end);
   } else if (bytes[4] === 2) {
     const compLen = u24(5);
     const len = u24(8);
     end = 11 + compLen;
-    if (end + 4 > bytes.length) throw new Error('Longitud inválida');
+    if (end + 4 > bytes.length) throw new Error('Invalid length');
     payload = lzwDecompress(bytes.subarray(11, end), len);
   } else {
-    throw new Error(`Versión de protocolo ${bytes[4]} desconocida`);
+    throw new Error(`Unknown protocol version ${bytes[4]}`);
   }
   if (adler32(payload) !== bytes.readUInt32BE(end)) throw new Error('Checksum incorrecto');
   return payload;
@@ -117,7 +122,7 @@ function pitchFrom(bounds, count) {
   return k > 0 ? bounds[k - 1] / k : null;
 }
 
-// Returns the payload Buffer if the image contains an AzerothIA grid,
+// Returns the payload Buffer if the image contains one of the addon's grids,
 // null if it does not look like one, and throws if it does but is corrupt.
 export function decodeGrid(img) {
   const rd = makeReader(img);
@@ -184,11 +189,11 @@ export function decodeGrid(img) {
     return quantize(rgb[0], 0) * 16 + quantize(rgb[1], 1) * 4 + quantize(rgb[2], 2);
   };
 
-  // From here on the black/white ruler clearly says "this is an AzerothIA
-  // capture": failures are reported (something covered it) instead of the
+  // From here on the black/white ruler clearly says "this is a Forever AI
+  // Companion capture": failures are reported (something covered it) instead of the
   // screenshot being silently treated as a normal one.
   const covered = () => new GridUnreadableError(
-    'La captura con la pregunta no se pudo leer: algo tapaba la esquina superior izquierda de la pantalla.');
+    t('unreadable'));
   if (!calibrate()) throw covered();
   const W = symbol(5, 1) * 64 + symbol(6, 1);
   const H = symbol(7, 1) * 64 + symbol(8, 1);

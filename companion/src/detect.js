@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 
 const FOREVER = '_forever_';
 
@@ -87,12 +87,25 @@ export function findWowDirs() {
   return [...found];
 }
 
-export function isWowRunning() {
+const WOW_PROCESS = /^"wow[^"]*\.exe"/im;
+
+// unknown: the answer when tasklist fails.
+export function isWowRunning({ unknown = false } = {}) {
   if (process.platform !== 'win32') return false;
   try {
     const out = execFileSync('tasklist', ['/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true, timeout: 10000 });
-    return /^"wow[^"]*\.exe"/im.test(out);
+    return WOW_PROCESS.test(out);
   } catch {
-    return false;
+    return unknown;
   }
+}
+
+// Same without blocking. When the answer is unknown, says "running" (the safe
+// side for callers that must not touch files the game may be using).
+export function isWowRunningAsync() {
+  if (process.platform !== 'win32') return Promise.resolve(false);
+  return new Promise((resolve) => {
+    execFile('tasklist', ['/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true, timeout: 10000 },
+      (err, out) => resolve(err ? true : WOW_PROCESS.test(out)));
+  });
 }

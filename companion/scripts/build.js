@@ -15,7 +15,7 @@ import { ROOT } from '../src/config.js';
 import { addonFiles, appIconIco, appIconPng, foreverGuide, knowledgeReadme, sampleContext, trayCsSource, ttsEngineSource, uiHtml } from '../src/assets.js';
 
 const DIST = path.join(ROOT, 'dist');
-const BUNDLE = path.join(DIST, 'azerothia.cjs');
+const BUNDLE = path.join(DIST, 'forever-ai-companion.cjs');
 const EXE = path.join(DIST, 'ForeverAICompanion.exe');
 
 fs.mkdirSync(DIST, { recursive: true });
@@ -50,7 +50,7 @@ const embedAssets = {
   },
 };
 
-console.log('1/3 Empaquetando el código…');
+console.log('1/4 Bundling the code…');
 await build({
   entryPoints: [path.join(ROOT, 'src', 'app', 'main.js')],
   outfile: BUNDLE,
@@ -59,12 +59,12 @@ await build({
   format: 'cjs',
   target: 'node22',
   plugins: [embedAssets],
-  define: { 'import.meta.url': '__azia_import_meta_url' },
-  banner: { js: 'const __azia_import_meta_url = require("url").pathToFileURL(__filename).href;' },
+  define: { 'import.meta.url': '__faic_import_meta_url' },
+  banner: { js: 'const __faic_import_meta_url = require("url").pathToFileURL(__filename).href;' },
   logLevel: 'warning',
 });
 
-console.log('2/4 Poniendo el ícono y el nombre…');
+console.log('2/4 Setting the icon and name…');
 // --build-sea copies the Node executable that runs it, resources included:
 // a copy of Node with our icon and version info gives the exe both.
 const VERSION = fs.readFileSync(path.join(ROOT, 'src', 'app', 'controller.js'), 'utf8').match(/VERSION = '([\d.]+)'/)[1];
@@ -82,7 +82,7 @@ execFileSync(rcedit, [base,
   '--set-version-string', 'OriginalFilename', 'ForeverAICompanion.exe',
 ], { stdio: 'inherit' });
 
-console.log('3/4 Creando ForeverAICompanion.exe…');
+console.log('3/4 Creating ForeverAICompanion.exe…');
 const seaConfig = path.join(DIST, 'sea-config.json');
 fs.writeFileSync(seaConfig, JSON.stringify({
   main: BUNDLE,
@@ -94,7 +94,7 @@ fs.rmSync(EXE, { force: true });
 execFileSync(base, ['--build-sea', seaConfig], { stdio: 'inherit' });
 fs.rmSync(base, { force: true });
 
-console.log('4/4 Configurando como programa de ventana (sin consola)…');
+console.log('4/4 Making it a window program (no console)…');
 // PE header: e_lfanew at 0x3C -> "PE\0\0" + 20-byte COFF header + optional
 // header, whose Subsystem field is at offset 68. 2 = Windows GUI, 3 = console.
 const exe = fs.readFileSync(EXE);
@@ -111,4 +111,4 @@ if (process.platform === 'win32') {
 }
 
 const mb = (fs.statSync(EXE).size / 1024 / 1024).toFixed(1);
-console.log(`Listo: ${EXE} (${mb} MB)`);
+console.log(`Done: ${EXE} (${mb} MB)`);
