@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PRESETS, env, loadConfig, saveConfig } from '../config.js';
+import { PRESETS, env, envVar, loadConfig, saveConfig } from '../config.js';
 import { findWowDirs, isWowRunning, isWowRunningAsync, normalizeWowDir } from '../detect.js';
 import {
   bundledAddonVersion, ensureAddon, finishLegacyMigration, hasLegacyAddon, install, installedAddonVersion, isAddonInstalled,
@@ -24,8 +24,9 @@ import { removeLegacyInstallDir } from '../migrate.js';
 import * as sys from './system.js';
 import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { currentGuide, guideFreshness, startGuideUpdates } from '../guide.js';
+import { createUpdater } from '../updater.js';
 
-export const VERSION = '1.6.0';
+export const VERSION = '1.7.0';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
 const voiceDll = () => path.join(sys.isPackaged() ? sys.installDir() : env.dataDir, ENGINE_DLL);
@@ -33,7 +34,8 @@ const voiceDll = () => path.join(sys.isPackaged() ? sys.installDir() : env.dataD
 // project's previous name is still in the AddOns folder.
 const LEGACY_ADDON_CHECK_MS = 10000;
 
-export function createController({ log = () => {} } = {}) {
+// onUpdateAvailable(version): a newer release was found (tray notice).
+export function createController({ log = () => {}, onUpdateAvailable = () => {} } = {}) {
   let cfg = loadConfig();
   setAppLang(cfg.language && cfg.language !== 'auto' ? cfg.language : null);
   let watcher = null;
@@ -52,6 +54,16 @@ export function createController({ log = () => {} } = {}) {
     }
   };
   ensureKnowledgeDir();
+
+  // Updates from GitHub releases: only the installed app (or a test server).
+  const updateApi = envVar('UPDATE_API');
+  const updater = sys.isPackaged() || updateApi ? createUpdater({
+    currentVersion: VERSION,
+    dir: path.join(env.dataDir, 'updates'),
+    log,
+    onAvailable: onUpdateAvailable,
+    ...(updateApi ? { apiUrl: updateApi, allowUrl: (u) => /^http:\/\/127\.0\.0\.1:\d+\//.test(u) } : {}),
+  }) : null;
 
   // WoW Forever guide: the one inside the app or a newer downloaded one.
   const guideDir = path.join(env.dataDir, 'guide');
@@ -201,7 +213,23 @@ export function createController({ log = () => {} } = {}) {
           stale: guideFreshness(guide).stale,
           autoUpdate: Boolean(cfg.guideUrl),
         } : null,
+        update: updater ? updater.state() : null,
       };
+    },
+
+    async checkUpdate() {
+      if (!updater) return { status: 'unsupported' };
+      return updater.check();
+    },
+
+    // Downloads and verifies the new version, then runs it: it closes this
+    // app, replaces it and starts again in the background (the window reloads).
+    async installUpdate() {
+      if (!updater) throw err('updateUnsupported');
+      const exe = await updater.download();
+      log(`Installing update from ${exe}`);
+      sys.relaunch(exe, ['--background']);
+      return { restarting: true };
     },
 
     async checkGuide() {
@@ -334,12 +362,23 @@ export function createController({ log = () => {} } = {}) {
 
     openKnowledge() {
       ensureKnowledgeDir();
+
+  // Updates from GitHub releases: only the installed app (or a test server).
+  const updateApi = envVar('UPDATE_API');
+  const updater = sys.isPackaged() || updateApi ? createUpdater({
+    currentVersion: VERSION,
+    dir: path.join(env.dataDir, 'updates'),
+    log,
+    onAvailable: onUpdateAvailable,
+    ...(updateApi ? { apiUrl: updateApi, allowUrl: (u) => /^http:\/\/127\.0\.0\.1:\d+\//.test(u) } : {}),
+  }) : null;
       sys.openFolder(knowledgeDir());
       return {};
     },
 
     stop() {
       guideUpdates.stop();
+      updater?.stop();
       if (legacyTimer) clearInterval(legacyTimer);
       legacyTimer = null;
       if (watcher) watcher.stop();

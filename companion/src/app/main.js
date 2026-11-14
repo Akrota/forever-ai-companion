@@ -126,7 +126,7 @@ async function main() {
   // Running from the install folder: move shortcuts and "start with Windows"
   // to this exe, and clean up what the previous name left behind.
   if (sys.isPackaged() && sys.isWindows && sys.samePath(process.execPath, sys.installedExe())) {
-    await cleanUpPreviousName(log).catch((e) => log(`Cleaning up the previous name: ${e.message}`));
+    if (!sys.isSandbox()) await cleanUpPreviousName(log).catch((e) => log(`Cleaning up the previous name: ${e.message}`));
     if (await sys.getAutostart()) await sys.setAutostart(true).catch((e) => log(`Start with Windows: ${e.message}`));
     // First run of a new version: fresh shortcuts so Windows shows the current
     // icon (and, coming from before the rename, they point to this exe).
@@ -139,12 +139,16 @@ async function main() {
     }
   }
 
-  const controller = createController({ log });
   let tray = null;
+  // A newer version on GitHub: a notice next to the clock (click opens the window).
+  const controller = createController({
+    log,
+    onUpdateAvailable: (version) => tray?.notify(t('updateNoticeTitle', { version }), t('updateNoticeText')),
+  });
   const quit = () => {
     controller.stop();
     tray?.stop();
-    log('Forever AI Companion cerrada.');
+    log('Forever AI Companion closed.');
     setTimeout(() => process.exit(0), 150); // lets the tray icon go away first
   };
   // Closing the window: ask, keep running next to the clock, or quit.
@@ -191,7 +195,7 @@ async function main() {
 
 main().catch(async (e) => {
   try { fs.appendFileSync(path.join(env.dataDir, LOG_FILE), `[fatal] ${e.stack || e}\n`); } catch { /* ignore */ }
-  if (sys.isPackaged()) await sys.showError(`Forever AI Companion no pudo iniciarse:\n\n${e.message}`);
+  if (sys.isPackaged()) await sys.showError(`${t('startFailed')}\n\n${e.message}`);
   else console.error(e);
   process.exit(1);
 });

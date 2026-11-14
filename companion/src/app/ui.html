@@ -520,6 +520,23 @@ const I18N = {
     'guide.bundled': 'included in the app',
     'guide.old': '{n} days old: the AI checks the internet for anything that may have changed',
     'guide.text': 'What the AI knows about Forever. Reviewed on {date} · {how}{old}',
+    'upd.title': 'Version {v} is available',
+    'upd.text': 'Update in one click: your chats, settings and keys stay as they are.',
+    'upd.now': 'Update now',
+    'upd.downloading': 'Downloading… {n}%',
+    'upd.notes': 'What\'s new',
+    'upd.row': 'Updates',
+    'upd.latest': 'You have the latest version ({v})',
+    'upd.checking': 'Checking for a new version…',
+    'upd.error': 'Could not check right now; it will try again later',
+    'upd.idle': 'Checks GitHub for new versions every few hours',
+    'upd.check': 'Check now',
+    'upd.checkingBtn': 'Checking…',
+    'upd.restartTitle': 'Updating Forever AI Companion',
+    'upd.restartText': 'The app is restarting with the new version. This window will reload by itself.',
+    'upd.slowText': 'It is taking longer than expected. If nothing happens, open Forever AI Companion from the Start menu.',
+    'toast.updLatest': 'You already have the latest version.',
+    'toast.updAvailable': 'Version {v} is available.',
     'dash.ok': 'Everything is working',
     'dash.okText': 'In the game, click the floating button (top right, next to the minimap) and ask anything.',
     'dash.testMode': '<b>You\'re in Test mode:</b> once you see it works, choose an AI.',
@@ -803,6 +820,23 @@ const I18N = {
     'guide.bundled': 'incluida en la app',
     'guide.old': 'tiene {n} días: la IA comprueba en internet lo que pudo cambiar',
     'guide.text': 'Lo que la IA sabe de Forever. Revisada el {date} · {how}{old}',
+    'upd.title': 'Hay una versión nueva: {v}',
+    'upd.text': 'Actualiza con un clic: tus chats, configuración y claves quedan igual.',
+    'upd.now': 'Actualizar ahora',
+    'upd.downloading': 'Descargando… {n}%',
+    'upd.notes': 'Novedades',
+    'upd.row': 'Actualizaciones',
+    'upd.latest': 'Tienes la versión más reciente ({v})',
+    'upd.checking': 'Buscando una versión nueva…',
+    'upd.error': 'No se pudo revisar ahora; lo intentará más tarde',
+    'upd.idle': 'Revisa en GitHub si hay versiones nuevas cada pocas horas',
+    'upd.check': 'Buscar ahora',
+    'upd.checkingBtn': 'Buscando…',
+    'upd.restartTitle': 'Actualizando Forever AI Companion',
+    'upd.restartText': 'La app se está reiniciando con la versión nueva. Esta ventana se recargará sola.',
+    'upd.slowText': 'Está tardando más de lo normal. Si no pasa nada, abre Forever AI Companion desde el menú Inicio.',
+    'toast.updLatest': 'Ya tienes la versión más reciente.',
+    'toast.updAvailable': 'Hay una versión nueva: {v}.',
     'dash.ok': 'Todo funciona',
     'dash.okText': 'En el juego pulsa el botón flotante (arriba a la derecha, junto al minimapa) y pregunta lo que quieras.',
     'dash.testMode': '<b>Estás en Modo prueba:</b> cuando veas que funciona, elige una IA.',
@@ -978,6 +1012,7 @@ const ICON = {
   puzzle: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4a2 2 0 114 0v2h4v4h-2a2 2 0 100 4h2v4h-4v-2a2 2 0 10-4 0v2H6v-4h2a2 2 0 100-4H6V6h4z"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.3l5-.7z"/></svg>',
   hide: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><path d="M4 4l16 16"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>',
   book: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 016.5 3H20v15H6.5A2.5 2.5 0 004 20.5z"/><path d="M4 20.5A2.5 2.5 0 016.5 18H20v3H6.5A2.5 2.5 0 014 20.5z"/></svg>',
   power: '<svg viewBox="0 0 24 24" fill="none" stroke="#a3abb9" stroke-width="1.9" stroke-linecap="round"><path d="M12 3v8M6.3 6.3a8 8 0 1011.4 0"/></svg>',
 };
@@ -1368,7 +1403,12 @@ function renderDash() {
   const ok = setupComplete() && s.running;
   const p = ALL[s.ai.preset];
   const row = (icon, title, sub, btn) => `<div class="rowi"><span class="ic">${icon}</span><div class="t"><b>${title}</b><span>${sub}</span></div>${btn}</div>`;
+  const u = s.update;
+  const updating = u && ['available', 'downloading', 'ready'].includes(u.status);
   const html = `
+    ${updating ? `<div class="callout info"><span class="ic">${ICON.info}</span><div><b>${t('upd.title', { v: esc(u.latest) })}</b><p>${t('upd.text')}</p>
+      <div class="links" style="margin-top:10px"><button class="btn primary small" data-act="update" ${busyAction || u.status === 'downloading' ? 'disabled' : ''}>${u.status === 'downloading' || busyAction === 'update' ? `<span class="spin"></span>${t('upd.downloading', { n: u.progress || 0 })}` : t('upd.now')}</button>
+      <a class="btn small" href="${esc(u.notesUrl)}" target="_blank" rel="noopener">${t('upd.notes')}</a></div></div></div>` : ''}
     ${ok
       ? callout('ok', t('dash.ok'), `${t('dash.okText')}${s.ai.preset === 'echo' ? ` ${t('dash.testMode')}` : ''}`)
       : callout('warn', t('dash.missing'), esc(s.problem || t('dash.missingText')))}
@@ -1381,6 +1421,8 @@ function renderDash() {
         <label class="switch" title="${esc(t('dash.web'))}"><input type="checkbox" id="web-search" ${s.ai.webSearch ? 'checked' : ''}><i></i></label></div>` : ''}
       ${s.guide ? row(ICON.book, t('dash.guide'), guideText(s.guide),
         s.guide.autoUpdate ? `<button class="btn small" data-act="guide">${spinner('guide', t('dash.guideCheck'), t('dash.guideChecking'))}</button>` : '') : ''}
+      ${u ? row(ICON.download, t('upd.row'), u.status === 'checking' ? t('upd.checking') : u.status === 'error' ? t('upd.error') : updating ? t('upd.title', { v: esc(u.latest) }) : u.status === 'latest' ? t('upd.latest', { v: esc(u.current) }) : t('upd.idle'),
+        updating ? '' : `<button class="btn small" data-act="updateCheck">${spinner('updateCheck', t('upd.check'), t('upd.checkingBtn'))}</button>`) : ''}
       ${voiceStepNeeded() && voice ? row(ICON.hide, t('dash.voice'), voice.legacy ? `<span style="color:var(--warn)">${t('dash.voiceLegacy')}</span>` : voice.active ? t('dash.voiceOn') : t('dash.voiceOff'), `<button class="btn small" data-open="voice">${voice.legacy ? t('dash.voiceUpdate') : voice.active ? t('btn.change') : t('dash.voiceActivate')}</button>`) : ''}
       ${s.tray ? `<div class="rowi"><span class="ic"><img src="/icon.png" alt="" style="width:22px;height:22px"></span><div class="t"><b>${t('dash.close')}</b><span>${t('dash.closeText')}</span></div>
         <select id="close-action" class="select" title="${esc(t('dash.close'))}">
@@ -1515,6 +1557,26 @@ const ACTIONS = {
     try { await api(`${CLI[id].api}-login`); cli[id] = { ...(cli[id] || {}), waiting: true }; render(); } catch (e) { toast('bad', esc(e.message)); }
   },
   knowledge: () => api('knowledge').catch((e) => toast('bad', esc(e.message))),
+  updateCheck: () => run('updateCheck', async () => {
+    const r = await api('update-check');
+    toast('ok', ['available', 'ready'].includes(r.status) ? t('toast.updAvailable', { v: esc(r.latest) }) : r.status === 'latest' ? t('toast.updLatest') : esc(r.error || t('upd.error')));
+  }),
+  update: () => run('update', async () => {
+    const before = status.version;
+    await api('update-install');
+    // The new version closes this one and starts again: wait for it, then reload.
+    endScreen(t('upd.restartTitle'), t('upd.restartText'));
+    const started = Date.now();
+    const poll = async () => {
+      try {
+        const s = await (await fetch('/api/status')).json();
+        if (s.version && s.version !== before) return location.reload();
+      } catch { /* restarting */ }
+      if (Date.now() - started > 90000) document.querySelector('p').textContent = t('upd.slowText');
+      setTimeout(poll, 1500);
+    };
+    setTimeout(poll, 3000);
+  }),
   guide: () => run('guide', async () => {
     const r = await api('guide-check');
     toast('ok', r.updated ? t('toast.guideUpdated') : t('toast.guideLatest'));

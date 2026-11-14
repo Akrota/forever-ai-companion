@@ -104,6 +104,11 @@ const MESSAGES = {
     consoleInstallClaude: 'Install Claude Code',
     consoleInstallCodex: 'Install Codex',
 
+    updateUnsupported: 'Updates are only available in the installed app.',
+    updateNoticeTitle: 'Forever AI Companion {version} is available',
+    updateNoticeText: 'Click here to update it in one click.',
+    startFailed: 'Forever AI Companion could not start:',
+
     trayRunning: `${APP}: running`,
     trayOpen: `Open ${APP}`,
     trayClose: `Close ${APP}`,
@@ -177,6 +182,11 @@ const MESSAGES = {
     consoleSignInChatGPT: 'Iniciar sesion en ChatGPT',
     consoleInstallClaude: 'Instalar Claude Code',
     consoleInstallCodex: 'Instalar Codex',
+
+    updateUnsupported: 'Las actualizaciones solo están disponibles en la app instalada.',
+    updateNoticeTitle: 'Hay una versión nueva: Forever AI Companion {version}',
+    updateNoticeText: 'Haz clic aquí para actualizarla con un clic.',
+    startFailed: 'Forever AI Companion no pudo iniciarse:',
 
     trayRunning: `${APP}: funcionando`,
     trayOpen: `Abrir ${APP}`,

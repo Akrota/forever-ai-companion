@@ -26,7 +26,10 @@ export const isWindows = process.platform === 'win32';
 
 const programsDir = () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs');
 export const appDataDir = () => path.join(roamingDir(), APP_NAME);
-export const installDir = () => path.join(programsDir(), APP_NAME);
+// FAIC_INSTALL_DIR: a test install somewhere else; then nothing machine-wide
+// is touched (start with Windows, the previous name's folders).
+export const isSandbox = () => Boolean(envVar('INSTALL_DIR'));
+export const installDir = () => envVar('INSTALL_DIR') || path.join(programsDir(), APP_NAME);
 export const installedExe = () => path.join(installDir(), EXE_NAME);
 export const legacyAppDataDir = () => path.join(roamingDir(), LEGACY_NAME);
 export const legacyInstallDir = () => path.join(programsDir(), LEGACY_NAME);
@@ -101,14 +104,14 @@ function reg(args) {
 }
 
 export async function getAutostart() {
-  if (!isWindows || !isPackaged()) return null;
+  if (!isWindows || !isPackaged() || isSandbox()) return null;
   const { ok } = await reg(['query', RUN_KEY, '/v', RUN_VALUE]);
   if (ok) return true;
   return (await reg(['query', RUN_KEY, '/v', LEGACY_NAME])).ok; // entry from before the rename
 }
 
 export async function setAutostart(enabled) {
-  if (!isWindows || !isPackaged()) throw err('installedOnly');
+  if (!isWindows || !isPackaged() || isSandbox()) throw err('installedOnly');
   await reg(['delete', RUN_KEY, '/v', LEGACY_NAME, '/f']); // entry from before the rename
   if (enabled) {
     await reg(['add', RUN_KEY, '/v', RUN_VALUE, '/t', 'REG_SZ', '/d', `"${process.execPath}" --background`, '/f']);

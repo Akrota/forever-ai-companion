@@ -85,6 +85,7 @@ export function startTray({ exe, icoPath, onOpen = () => {}, onQuit = () => {}, 
   return {
     ask: () => send('ask'),
     balloon: (text) => send(`balloon ${String(text).replace(/[\r\n]+/g, ' ')}`),
+    notify: (title, text) => send(`notify ${String(title).replace(/[\r\n\t]+/g, ' ')}\t${String(text).replace(/[\r\n\t]+/g, ' ')}`),
     stop: () => { try { child.stdin.end(); } catch { /* ignore */ } },
   };
 }

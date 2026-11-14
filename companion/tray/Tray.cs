@@ -4,6 +4,7 @@
 // Arguments: icon path, then the texts (base64 of "key=value" lines; see tray.js).
 //   app -> tray (stdin):  "ask"            show "keep running or close?"
 //                         "balloon <text>" small notice next to the icon
+//                         "notify <title><TAB><text>" notice with its own title
 //   tray -> app (stdout): "open" | "quit" | "choice tray 0|1" | "choice quit 0|1"
 // When the app exits its end of stdin closes and the icon goes away with it.
 using System;
@@ -97,6 +98,14 @@ static class Program {
       while ((line = Console.In.ReadLine()) != null) {
         string cmd = line.Trim();
         if (cmd == "ask") ui.BeginInvoke((Action)Ask);
+        else if (cmd.StartsWith("notify ")) {
+          // "notify <title><TAB><text>": a notice with its own title (e.g. an update).
+          string rest = cmd.Substring(7);
+          int tab = rest.IndexOf('\t');
+          string title = tab > 0 ? rest.Substring(0, tab) : Name;
+          string body = tab > 0 ? rest.Substring(tab + 1) : rest;
+          ui.BeginInvoke((Action)(() => icon.ShowBalloonTip(10000, title, body, ToolTipIcon.Info)));
+        }
         else if (cmd.StartsWith("balloon ")) {
           string text = cmd.Substring(8);
           ui.BeginInvoke((Action)(() => icon.ShowBalloonTip(6000, T["stillRunning"], text, ToolTipIcon.Info)));

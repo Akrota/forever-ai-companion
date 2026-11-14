@@ -87,7 +87,11 @@ If the game was open, **close it completely and open it again** (`/reload` is no
 
 ### Updating
 
-Download the new `.exe` and open it: it replaces the old version and updates the addon by itself, keeping your chats and settings. The WoW Forever guide the AI uses updates by itself from the internet, with nothing to download.
+**From version 1.7.0 on, the app updates itself.** Every few hours it checks this repository for a new release. When there is one, you get a notice next to the Windows clock and an **Update now** button in the app's dashboard: one click downloads it, checks that it is exactly the file published here (SHA-256), and restarts the app with the new version, keeping your chats, settings and keys. The addon is updated with it (restart WoW or `/reload` afterwards).
+
+For older versions, download the new `.exe` and open it: it replaces the old version in the same way.
+
+The WoW Forever guide the AI uses updates by itself from the internet, with nothing to download.
 
 Coming from version 1.5.0 or earlier, the app and the addon move to new folder names on their own: your chats, settings and API keys come along. Restart WoW once afterwards. If you use invisible sending, the app window will offer **Update invisible sending** (Windows asks for permission once); until then it keeps working as before.
 
@@ -343,13 +347,15 @@ npm start
 npm run ask -- "Which dungeon do you recommend?"
 ```
 
-Test variables: `FAIC_DATA_DIR` (data folder), `FAIC_WOW_DIR`, `FAIC_PROVIDER`, `FAIC_NO_SHORTCUTS`, `FAIC_LANG` (`en` / `es`). `.exe` arguments: `--no-install`, `--no-window`, `--background`.
+Test variables: `FAIC_DATA_DIR` (data folder), `FAIC_WOW_DIR`, `FAIC_PROVIDER`, `FAIC_NO_SHORTCUTS`, `FAIC_LANG` (`en` / `es`), `FAIC_INSTALL_DIR` (install into a test folder; nothing machine-wide is touched) and `FAIC_UPDATE_API` (a local stand-in for GitHub's latest-release API, for testing updates). `.exe` arguments: `--no-install`, `--no-window`, `--background`.
 
 ### Releasing a new version
 
-1. Bump the number in `companion/src/app/controller.js` (`VERSION`) and, if the addon changed, in `addon/ForeverAICompanion/ForeverAICompanion.toc`.
+Installed apps (1.7.0 and later) pick up every new release by themselves (`src/updater.js`), so:
+
+1. Bump the number in `companion/src/app/controller.js` (`VERSION`) and, if the addon changed, in `addon/ForeverAICompanion/ForeverAICompanion.toc`. If Blizzard raised the game's interface number, update `## Interface:` in the toc too, or WoW will treat the addon as out of date.
 2. `npm test` and `npm run build`.
-3. On GitHub, **Releases → Draft a new release**, create the tag (for example `v1.6.0`) and attach `dist/ForeverAICompanion.exe` with that exact name: this README's download link always points to the latest one.
+3. On GitHub, **Releases → Draft a new release**, create the tag **`v` + the exact `VERSION`** (for example `v1.7.0`) and attach `dist/ForeverAICompanion.exe` with that exact name. Don't mark it as a pre-release (pre-releases are not offered to players). The README's download link and the in-app updater always use the latest release.
 
 ### To do
 
