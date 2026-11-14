@@ -7,8 +7,55 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
-  codexAssetName, codexInstallState, codexVersion, findCodex, installCodex, ownCodexExe, pickCodexAsset,
+  codexAssetName, codexInstallState, codexSearchState, codexVersion, findCodex, installCodex, isDesktopApp, ownCodexExe,
+  pickCodexAsset, searchCodex, walkForCodex,
 } from '../src/codex.js';
+
+const touch = (file) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, 'x'); return file; };
+
+test('the disk search finds Codex and skips what is not worth walking', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-walk-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const deep = touch(path.join(root, 'tools', 'ai', 'codex', 'bin', 'codex.exe'));
+  const npm = touch(path.join(root, 'npm', 'node_modules', '@openai', 'codex-win32-x64', 'vendor', 'codex.exe'));
+  touch(path.join(root, 'npm', 'node_modules', 'left-pad', 'codex.exe')); // other packages are skipped
+  touch(path.join(root, 'World of Warcraft', '_forever_', 'codex.exe')); // game folders are skipped
+  touch(path.join(root, 'tools', 'codex-code-mode-host.exe')); // Codex helpers are not Codex
+  const r = await walkForCodex([[root, 8]]);
+  assert.deepEqual(r.found.sort(), [deep, npm].sort());
+  assert.ok(r.complete);
+  const shallow = await walkForCodex([[root, 1]]);
+  assert.deepEqual(shallow.found, [], 'depth is respected');
+});
+
+test('Codex is found inside the open desktop app, which itself is never run', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-app-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const app = touch(path.join(root, 'Codex', 'Codex.exe'));
+  touch(path.join(root, 'Codex', 'ffmpeg.dll'));
+  fs.mkdirSync(path.join(root, 'Codex', 'resources'), { recursive: true });
+  const cli = touch(path.join(root, 'Codex', 'resources', 'bin', 'codex.exe'));
+  assert.ok(isDesktopApp(app));
+  assert.ok(!isDesktopApp(cli));
+  const ran = [];
+  const check = async (p) => { ran.push(p); return p === cli; };
+  const found = await searchCodex({ running: async () => [app], check, roots: [] });
+  assert.equal(found, cli);
+  assert.ok(!ran.includes(app), 'the desktop app is never started');
+  assert.equal(codexSearchState().status, 'found');
+  assert.equal(codexSearchState().runningApp, true);
+});
+
+test('nothing found: the window is told so', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-none-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  touch(path.join(root, 'a', 'b', 'notes.txt'));
+  const fakeOnly = touch(path.join(root, 'a', 'codex.exe')); // a file named codex.exe that isn't Codex
+  const found = await searchCodex({ running: async () => [], check: async () => false, roots: [[root, 4]] });
+  // A real Codex elsewhere on this PC (usual places) could still be found.
+  if (found) assert.notEqual(found, fakeOnly);
+  else assert.equal(codexSearchState().status, 'notfound');
+});
 
 const isWin = process.platform === 'win32';
 const CSC = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';

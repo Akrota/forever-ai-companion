@@ -131,10 +131,10 @@ export function findCodex(configured) {
 }
 
 // `codex --version` -> "0.169.0", or null if that file doesn't run as Codex.
-export function codexVersion(bin) {
+export function codexVersion(bin, timeout = 20000) {
   return new Promise((resolve) => {
     const { file, shell } = spawnArgs(bin);
-    execFile(file, ['--version'], { shell, windowsHide: true, timeout: 20000, encoding: 'utf8' }, (err, stdout) => {
+    execFile(file, ['--version'], { shell, windowsHide: true, timeout, encoding: 'utf8' }, (err, stdout) => {
       const m = /codex[-\w]*\s+v?(\d+\.\d+\.\d+)/i.exec(String(stdout || ''));
       resolve(!err && m ? m[1] : null);
     });
@@ -229,6 +229,148 @@ export function installCodex({ log = () => {}, fetchImpl = fetch, apiUrl = CODEX
     }
   })();
   return installing;
+}
+
+// --- Searching the PC for Codex ----------------------------------------------
+// When Codex isn't in any usual place: look at running programs first (Codex
+// open in a terminal, or the Codex desktop app, which carries the command-line
+// Codex inside its folder), then walk the disks for a while. Nothing found is
+// run except with --version, and desktop apps (Electron) are never run.
+
+const CLI_NAMES = ['codex.exe', 'codex.cmd'];
+const isCliName = (name) => CLI_NAMES.includes(name.toLowerCase()) || RELEASE_EXE.test(name);
+
+// A desktop (Electron) app next to its runtime files: running it would open a window.
+export function isDesktopApp(exe) {
+  const dir = path.dirname(exe);
+  return fs.existsSync(path.join(dir, 'resources'))
+    && ['ffmpeg.dll', 'v8_context_snapshot.bin', 'resources.pak', 'icudtl.dat'].some((f) => fs.existsSync(path.join(dir, f)));
+}
+
+// Folders never worth walking (system, caches, big game and cloud folders).
+const SKIP_DIRS = new Set([
+  'windows', '$recycle.bin', 'system volume information', 'recovery', 'perflogs', '$windows.~bt', '$windows.~ws',
+  '.git', '.cache', 'cache', 'caches', 'temp', 'tmp', 'logs', 'crashdumps', 'packages', 'onedrive',
+  'steamapps', 'steamlibrary', 'world of warcraft', 'battle.net', 'riot games', 'epic games', 'ea games', 'xboxgames',
+  'windowsapps', 'windows kits', 'microsoft visual studio', 'dotnet', 'nvidia corporation', 'intel', 'amd',
+]);
+
+// Walks `roots` breadth-first (each [dir, depth]) for Codex files, giving the
+// event loop a turn now and then. Stops after `budgetMs`.
+export async function walkForCodex(roots, { budgetMs = 60000, onProgress = () => {}, shouldStop = () => false } = {}) {
+  const found = [];
+  const queue = roots.filter(([d]) => d).map(([d, depth]) => [d, depth]);
+  const seen = new Set();
+  const until = Date.now() + budgetMs;
+  let dirs = 0;
+  while (queue.length && Date.now() < until && !shouldStop()) {
+    const [dir, depth] = queue.shift();
+    const key = dir.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    dirs++;
+    const inNodeModules = /[\\/]node_modules$/i.test(dir);
+    for (const e of entries) {
+      if (e.isFile() && isCliName(e.name)) found.push(path.join(dir, e.name));
+      else if (e.isDirectory() && !e.isSymbolicLink() && depth > 0) {
+        const name = e.name.toLowerCase();
+        if (SKIP_DIRS.has(name)) continue;
+        // node_modules: only OpenAI's packages (npm installs Codex there).
+        if (inNodeModules && !(name === '@openai' || name.startsWith('codex'))) continue;
+        queue.push([path.join(dir, e.name), depth - 1]);
+      }
+    }
+    if (dirs % 200 === 0) {
+      onProgress(dirs);
+      await new Promise((r) => setImmediate(r));
+    }
+  }
+  onProgress(dirs);
+  return { found, dirs, complete: queue.length === 0 };
+}
+
+// Executable paths of running programs named like Codex.
+export function runningCodexPaths() {
+  if (!isWin) return Promise.resolve([]);
+  return new Promise((resolve) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      "Get-CimInstance Win32_Process -Filter \"Name LIKE 'codex%'\" | ForEach-Object { $_.ExecutablePath }"],
+    { windowsHide: true, timeout: 20000, encoding: 'utf8' }, (err, stdout) => {
+      resolve([...new Set(String(stdout || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean))]);
+    });
+  });
+}
+
+function driveRoots() {
+  if (!isWin) return [];
+  const out = [];
+  for (let c = 67; c <= 90; c++) { // C: to Z:
+    const root = `${String.fromCharCode(c)}:\\`;
+    try { if (fs.statSync(root).isDirectory()) out.push(root); } catch { /* no drive */ }
+  }
+  return out;
+}
+
+const searchState = { status: 'idle', dirs: 0, path: null, runningApp: false, error: null };
+export const codexSearchState = () => ({ ...searchState });
+let searching = null;
+
+// Finds a working Codex anywhere on this PC. Resolves to its path or null.
+export function searchCodex({ log = () => {}, budgetMs = 60000, roots = null, running = runningCodexPaths, check = (p) => codexVersion(p, 8000) } = {}) {
+  if (searching) return searching;
+  searching = (async () => {
+    Object.assign(searchState, { status: 'searching', dirs: 0, path: null, runningApp: false, error: null });
+    const tried = new Set();
+    const tryOne = async (file) => {
+      const k = file.toLowerCase();
+      if (tried.has(k) || !fs.existsSync(file)) return null;
+      tried.add(k);
+      if (isDesktopApp(file)) return null;
+      return (await check(file)) ? file : null;
+    };
+    try {
+      // 1. Codex running right now (in a terminal, or inside the desktop app).
+      for (const exe of await running()) {
+        if (isDesktopApp(exe)) {
+          searchState.runningApp = true;
+          const inside = await walkForCodex([[path.dirname(exe), 6]], { budgetMs: 15000 });
+          for (const f of inside.found) { const ok = await tryOne(f); if (ok) return finish(ok, 'running app'); }
+        } else {
+          const ok = await tryOne(exe);
+          if (ok) return finish(ok, 'running');
+        }
+      }
+      // 2. The usual places.
+      for (const [f] of codexCandidates(null)) { const ok = await tryOne(f); if (ok) return finish(ok, 'known place'); }
+      // 3. The disks.
+      const home = os.homedir();
+      const walkRoots = roots || [
+        [home, 7],
+        [process.env.ProgramFiles, 5], [process.env['ProgramFiles(x86)'], 5], [process.env.ProgramData, 5],
+        ...driveRoots().map((d) => [d, 5]),
+      ];
+      const walk = await walkForCodex(walkRoots, { budgetMs, onProgress: (n) => { searchState.dirs = n; } });
+      // Prefer real executables over npm's .cmd launchers, shallow paths first.
+      walk.found.sort((a, b) => (a.endsWith('.cmd') - b.endsWith('.cmd')) || (a.split(/[\\/]/).length - b.split(/[\\/]/).length));
+      for (const f of walk.found) { const ok = await tryOne(f); if (ok) return finish(ok, 'disk search'); }
+      Object.assign(searchState, { status: 'notfound' });
+      log(`Codex search: not found (${walk.dirs} folders${walk.complete ? '' : ', time limit reached'}).`);
+      return null;
+    } catch (e) {
+      Object.assign(searchState, { status: 'notfound', error: e.message });
+      return null;
+    } finally {
+      searching = null;
+    }
+    function finish(file, how) {
+      Object.assign(searchState, { status: 'found', path: file });
+      log(`Codex found (${how}): ${file}`);
+      return file;
+    }
+  })();
+  return searching;
 }
 
 // `codex login status`: "Logged in using ChatGPT" / "Not logged in" (exit 1).

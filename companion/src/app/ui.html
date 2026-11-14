@@ -371,7 +371,11 @@ const I18N = {
     'ai.codexDownloading': 'Downloading Codex from OpenAI… {n}%',
     'ai.codexExtracting': 'Installing Codex…',
     'ai.codexError': 'Could not install it: {error}. Try again or, if you already have Codex, find it with the button below.',
-    'ai.cliPick': 'I already have it: find it…',
+    'ai.cliPick': 'Choose it by hand…',
+    'ai.codexSearching': 'Looking for Codex on your PC… ({n} folders checked)',
+    'ai.codexSearchingBtn': 'Searching…',
+    'ai.codexNotFound': 'Codex isn\'t on this PC. If you do have it, open it (the Codex app, or Codex in a terminal) and click "Search again". If not, install it with one click.',
+    'ai.codexSearchAgain': 'Search again',
     'ai.cliPicking': 'Waiting for your choice…',
 
     // Welcome
@@ -683,7 +687,11 @@ const I18N = {
     'ai.codexDownloading': 'Descargando Codex de OpenAI… {n}%',
     'ai.codexExtracting': 'Instalando Codex…',
     'ai.codexError': 'No se pudo instalar: {error}. Vuelve a intentarlo o, si ya tienes Codex, búscalo con el botón de abajo.',
-    'ai.cliPick': 'Ya lo tengo: buscarlo…',
+    'ai.cliPick': 'Elegirlo a mano…',
+    'ai.codexSearching': 'Buscando Codex en tu PC… ({n} carpetas revisadas)',
+    'ai.codexSearchingBtn': 'Buscando…',
+    'ai.codexNotFound': 'No encontramos Codex en este PC. Si lo tienes, ábrelo (la app de Codex, o Codex en una terminal) y pulsa «Buscar de nuevo». Si no, instálalo con un clic.',
+    'ai.codexSearchAgain': 'Buscar de nuevo',
     'ai.cliPicking': 'Esperando tu elección…',
 
     'welcome.kicker': 'Te damos la bienvenida',
@@ -1188,15 +1196,29 @@ const VIEWS = {
       const c = cli[id] || {};
       const m = CLI[id];
       // Codex is installed by the app itself (with progress); Claude Code in a console window.
-      const inst = id === 'codex' && !c.installed ? c.install : null;
+      // Codex: the app looks for it by itself first (running programs, then the
+      // disks), and installs it itself (with progress); Claude Code in a console window.
+      const codex = id === 'codex' && !c.installed;
+      const inst = codex ? c.install : null;
+      const search = codex ? c.search : null;
       const busyInstall = inst && ['downloading', 'extracting'].includes(inst.status);
+      const searching = search?.status === 'searching';
       const installText = c.installed ? t('ai.cliInstalled')
         : inst?.status === 'downloading' ? t('ai.codexDownloading', { n: inst.progress || 0 })
           : inst?.status === 'extracting' ? t('ai.codexExtracting')
-            : inst?.status === 'error' ? `<span style="color:var(--bad)">${t('ai.codexError', { error: esc(inst.error) })}</span>` : m.about;
-      items.push([c.installed, t('ai.cliInstall', { app: m.app }), installText,
-        c.installed ? '' : `<button class="btn primary small" data-act="cli-install" ${busyInstall ? 'disabled' : ''}>${busyInstall ? `<span class="spin"></span>${t('ai.codexExtracting')}` : t('ai.cliInstall', { app: m.app })}</button>`
-          + (id === 'codex' && !busyInstall ? ` <button class="btn small" data-act="cli-pick">${spinner('cli-pick', t('ai.cliPick'), t('ai.cliPicking'))}</button>` : '')]);
+            : inst?.status === 'error' ? `<span style="color:var(--bad)">${t('ai.codexError', { error: esc(inst.error) })}</span>`
+              : searching ? t('ai.codexSearching', { n: search.dirs || 0 })
+                : search?.status === 'notfound' ? t('ai.codexNotFound') : m.about;
+      let actions = '';
+      if (!c.installed && searching) actions = `<button class="btn small" disabled><span class="spin"></span>${t('ai.codexSearchingBtn')}</button>`;
+      else if (!c.installed) {
+        actions = `<button class="btn primary small" data-act="cli-install" ${busyInstall ? 'disabled' : ''}>${busyInstall ? `<span class="spin"></span>${t('ai.codexExtracting')}` : t('ai.cliInstall', { app: m.app })}</button>`;
+        if (codex && !busyInstall) {
+          actions += ` <button class="btn small" data-act="cli-search">${t('ai.codexSearchAgain')}</button>`
+            + ` <button class="btn small ghost" data-act="cli-pick">${spinner('cli-pick', t('ai.cliPick'), t('ai.cliPicking'))}</button>`;
+        }
+      }
+      items.push([c.installed, t('ai.cliInstall', { app: m.app }), installText, actions]);
       items.push([c.loggedIn, t('ai.cliLogin', { account: m.account }), c.loggedIn ? t('ai.cliLoggedIn') : t('ai.cliLoginText'),
         c.installed && !c.loggedIn ? `<button class="btn primary small" data-act="cli-login">${t('ai.cliLoginBtn')}</button>` : '']);
       if (c.waiting && !(c.installed && c.loggedIn)) items.push([false, t('ai.cliWaiting'), t('ai.cliWaitingText'), '']);
@@ -1576,6 +1598,9 @@ const ACTIONS = {
       await checkCli(id);
     } catch (e) { toast('bad', esc(e.message)); }
   },
+  'cli-search': async () => {
+    try { await api('codex-search'); await checkCli('codex'); } catch (e) { toast('bad', esc(e.message)); }
+  },
   'cli-pick': () => run('cli-pick', async () => {
     const r = await api('codex-pick');
     if (!r.cancelled) await checkCli('codex');
@@ -1639,8 +1664,14 @@ async function checkCli(id) {
     if (cli[id]?.waiting && !(next.installed && next.loggedIn)) next.waiting = true;
   } catch { next = { installed: false, loggedIn: false }; }
   cli[id] = next;
+  // Codex not in the usual places: search the PC once, without being asked.
+  if (id === 'codex' && !next.installed && next.search?.status === 'idle' && !codexAutoSearched) {
+    codexAutoSearched = true;
+    api('codex-search').then(() => checkCli('codex')).catch(() => {});
+  }
   if (mode === 'wizard' && step === 'ai') render();
 }
+let codexAutoSearched = false;
 setInterval(() => {
   if (!stopped && mode === 'wizard' && step === 'ai' && CLI[aiChoice] && !(cli[aiChoice]?.installed && cli[aiChoice]?.loggedIn)) checkCli(aiChoice);
 }, 3000);

@@ -15,7 +15,7 @@ import { ask, canSearch } from '../providers.js';
 import { startWatcher } from '../watcher.js';
 import { authStatus, findClaudeCode, openInstall, openLogin } from '../claude-code.js';
 import {
-  codexAuthStatus, codexInstallState, codexVersion, findCodex, installCodex, openCodexLogin,
+  codexAuthStatus, codexInstallState, codexSearchState, codexVersion, findCodex, installCodex, openCodexLogin, searchCodex,
 } from '../codex.js';
 import { ttsEngineSource } from '../assets.js';
 import {
@@ -28,7 +28,7 @@ import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { currentGuide, guideFreshness, startGuideUpdates } from '../guide.js';
 import { createUpdater } from '../updater.js';
 
-export const VERSION = '1.7.1';
+export const VERSION = '1.7.2';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
 const voiceDll = () => path.join(sys.isPackaged() ? sys.installDir() : env.dataDir, ENGINE_DLL);
@@ -341,9 +341,10 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
 
     async codexStatus() {
       const install = codexInstallState();
+      const search = codexSearchState();
       const found = findCodex(cfg.codex.bin);
-      if (!found) return { installed: false, loggedIn: false, install };
-      return { installed: true, source: found.source, install, ...(await codexAuthStatus(found.path)) };
+      if (!found) return { installed: false, loggedIn: false, install, search };
+      return { installed: true, source: found.source, install, search, ...(await codexAuthStatus(found.path)) };
     },
 
     // Already installed (any way): nothing to do. Otherwise the app downloads
@@ -352,6 +353,15 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
       const found = findCodex(cfg.codex.bin);
       if (found) return { already: true, source: found.source };
       installCodex({ log }).catch(() => { /* reported by codexStatus */ });
+      return { started: true };
+    },
+
+    // Looks for Codex all over the PC (running programs, then the disks) in the
+    // background; codexStatus reports how it goes. What it finds is remembered.
+    codexSearch() {
+      const found = findCodex(cfg.codex.bin);
+      if (found) return { already: true, source: found.source };
+      searchCodex({ log }).then((file) => { if (file) save({ codex: { bin: file } }); }).catch(() => {});
       return { started: true };
     },
 
