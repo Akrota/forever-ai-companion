@@ -1,12 +1,14 @@
 // Codex (OpenAI's official CLI): lets players use their ChatGPT Plus / Pro
 // plan. Finds it on this PC, checks the sign-in, helps install it and sign
 // in, and turns it into a plain chat model (see codexArgs).
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
 import { spawnArgs, visibleConsole } from './claude-code.js';
 import { t } from './i18n.js';
+import { installDir } from './app/system.js';
 
 const isWin = process.platform === 'win32';
 
@@ -17,31 +19,216 @@ export const CODEX_MODELS = {
   'gpt-6-astra': 'GPT-6 Astra',
 };
 
-function onPath() {
+// --- Finding Codex ----------------------------------------------------------
+// Codex can be installed many ways (OpenAI's installer, winget, npm, Scoop,
+// this app...). Windows only gives a running program the PATH it had when it
+// started, so the current PATH is also read from the registry: a Codex
+// installed after the app was opened is found without restarting it.
+
+// Where this app installs Codex itself (see installCodex).
+export const ownCodexDir = () => path.join(installDir(), 'codex');
+export const ownCodexExe = () => path.join(ownCodexDir(), 'codex.exe');
+
+function registryPath() {
+  if (!isWin) return [];
+  const read = (key) => {
+    try {
+      const out = execFileSync('reg.exe', ['query', key, '/v', 'Path'], { encoding: 'utf8', windowsHide: true, timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] });
+      const m = /\sPath\s+REG_(?:EXPAND_)?SZ\s+(.*)$/mi.exec(out);
+      return m ? m[1].trim() : '';
+    } catch {
+      return '';
+    }
+  };
+  const expand = (s) => s.replace(/%([^%]+)%/g, (all, name) => process.env[name] ?? all);
+  return [read('HKCU\\Environment'), read('HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment')]
+    .flatMap((v) => expand(v).split(';'));
+}
+
+let pathCache = { at: 0, dirs: [] };
+function pathDirs() {
+  if (Date.now() - pathCache.at > 15000) {
+    const dirs = [...String(process.env.PATH || '').split(path.delimiter), ...registryPath()]
+      .map((d) => d.trim().replace(/^"|"$/g, ''))
+      .filter(Boolean);
+    pathCache = { at: Date.now(), dirs: [...new Set(dirs.map((d) => d.toLowerCase()))].map((l) => dirs.find((d) => d.toLowerCase() === l)) };
+  }
+  return pathCache.dirs;
+}
+
+// Executables named like Codex inside `dir`, down to `depth` folders.
+function findExe(dir, depth, names) {
+  const out = [];
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isFile() && names.includes(e.name.toLowerCase())) out.push(p);
+    else if (e.isDirectory() && depth > 0 && !/^(node_modules|\.git|cache|logs?)$/i.test(e.name)) out.push(...findExe(p, depth - 1, names));
+  }
+  return out;
+}
+
+const RELEASE_EXE = /^codex-(x86_64|aarch64)-pc-windows-msvc\.exe$/i;
+
+// Every place a Codex install can be, most reliable first: [path, source].
+export function codexCandidates(configured) {
+  const out = [];
+  if (configured && path.isAbsolute(configured)) out.push([configured, 'config']);
+  if (!isWin) {
+    for (const d of pathDirs()) out.push([path.join(d, 'codex'), 'path']);
+    out.push([path.join(os.homedir(), '.local', 'bin', 'codex'), 'native']);
+    return out;
+  }
+  const local = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+  const roaming = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+  out.push([ownCodexExe(), 'app']);
+  out.push([path.join(local, 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'), 'native']);
+  for (const d of pathDirs()) {
+    out.push([path.join(d, 'codex.exe'), 'path']);
+    out.push([path.join(d, 'codex.cmd'), 'path']);
+  }
+  out.push([path.join(local, 'Microsoft', 'WinGet', 'Links', 'codex.exe'), 'winget']);
+  for (const pkg of findDirs(path.join(local, 'Microsoft', 'WinGet', 'Packages'), /^OpenAI\.Codex/i)) {
+    for (const exe of findExe(pkg, 3, ['codex.exe'])) out.push([exe, 'winget']);
+    for (const exe of findExeMatching(pkg, 3, RELEASE_EXE)) out.push([exe, 'winget']);
+  }
+  out.push([path.join(roaming, 'npm', 'codex.cmd'), 'npm']);
+  out.push([path.join(os.homedir(), 'scoop', 'shims', 'codex.exe'), 'scoop']);
+  out.push([path.join(local, 'Volta', 'bin', 'codex.exe'), 'volta']);
+  out.push([path.join(local, 'pnpm', 'codex.cmd'), 'pnpm']);
+  out.push([path.join(os.homedir(), '.bun', 'bin', 'codex.exe'), 'bun']);
+  // Anything else installed for this user under Programs or OpenAI (e.g. a desktop app).
+  for (const exe of findExe(path.join(local, 'Programs'), 4, ['codex.exe'])) out.push([exe, 'programs']);
+  for (const exe of findExe(path.join(local, 'OpenAI'), 4, ['codex.exe'])) out.push([exe, 'programs']);
+  return out;
+}
+
+function findDirs(dir, re) {
   try {
-    const out = execFileSync(isWin ? 'where.exe' : 'which', ['codex'], { encoding: 'utf8', windowsHide: true, timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] });
-    return out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
-      // `where` also lists the extension-less npm shim, which Windows can't run.
-      .filter((p) => !isWin || /\.(exe|cmd|bat)$/i.test(p));
+    return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && re.test(e.name)).map((e) => path.join(dir, e.name));
   } catch {
     return [];
   }
 }
 
-// Returns { path, source } or null. The official installer puts it in
-// %LOCALAPPDATA%\Programs\OpenAI\Codex\bin; npm in %APPDATA%\npm. Both are
-// checked directly: right after installing, this app's PATH is still the old one.
-export function findCodex(configured) {
-  const candidates = [];
-  if (configured && path.isAbsolute(configured)) candidates.push([configured, 'config']);
-  if (isWin) {
-    candidates.push([path.join(process.env.LOCALAPPDATA || '', 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'), 'native']);
+function findExeMatching(dir, depth, re) {
+  const out = [];
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isFile() && re.test(e.name)) out.push(p);
+    else if (e.isDirectory() && depth > 0) out.push(...findExeMatching(p, depth - 1, re));
   }
-  for (const p of onPath()) candidates.push([p, 'path']);
-  if (isWin) candidates.push([path.join(process.env.APPDATA || '', 'npm', 'codex.cmd'), 'npm']);
-  else candidates.push([path.join(os.homedir(), '.local', 'bin', 'codex'), 'native']);
-  const hit = candidates.find(([p]) => p && fs.existsSync(p));
+  return out;
+}
+
+// Returns { path, source } or null.
+export function findCodex(configured) {
+  const hit = codexCandidates(configured).find(([p]) => p && fs.existsSync(p));
   return hit ? { path: hit[0], source: hit[1] } : null;
+}
+
+// `codex --version` -> "0.169.0", or null if that file doesn't run as Codex.
+export function codexVersion(bin) {
+  return new Promise((resolve) => {
+    const { file, shell } = spawnArgs(bin);
+    execFile(file, ['--version'], { shell, windowsHide: true, timeout: 20000, encoding: 'utf8' }, (err, stdout) => {
+      const m = /codex[-\w]*\s+v?(\d+\.\d+\.\d+)/i.exec(String(stdout || ''));
+      resolve(!err && m ? m[1] : null);
+    });
+  });
+}
+
+// --- Installing Codex -------------------------------------------------------
+// OpenAI's install script fails on some PCs with Windows PowerShell
+// ("OSArchitecture" not found), so the app installs Codex itself: the official
+// build from OpenAI's GitHub releases, checked against the SHA-256 GitHub
+// publishes, unpacked with the tar.exe that ships with Windows.
+export const CODEX_RELEASES_API = 'https://api.github.com/repos/openai/codex/releases/latest';
+const CODEX_DOWNLOAD_PREFIX = 'https://github.com/openai/codex/releases/download/';
+
+export function codexAssetName(arch = process.arch) {
+  return `codex-${arch === 'arm64' ? 'aarch64' : 'x86_64'}-pc-windows-msvc.exe.tar.gz`;
+}
+
+// The asset to download from GitHub's "latest release" answer, or null.
+export function pickCodexAsset(json, arch = process.arch) {
+  if (!json || json.draft || json.prerelease) return null;
+  const asset = (json.assets || []).find((a) => a.name === codexAssetName(arch));
+  if (!asset || !String(asset.browser_download_url || '').startsWith(CODEX_DOWNLOAD_PREFIX)) return null;
+  const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest || '');
+  if (!digest) return null; // never install something that can't be checked
+  return { url: asset.browser_download_url, size: Number(asset.size) || null, sha256: digest[1].toLowerCase(), version: json.tag_name };
+}
+
+const installState = { status: 'idle', progress: 0, error: null };
+export const codexInstallState = () => ({ ...installState });
+let installing = null;
+
+// Downloads, checks and installs Codex into this app's folder. Returns { path, version }.
+export function installCodex({ log = () => {}, fetchImpl = fetch, apiUrl = CODEX_RELEASES_API, tarExe = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), pickAsset = pickCodexAsset } = {}) {
+  if (installing) return installing;
+  installing = (async () => {
+    Object.assign(installState, { status: 'downloading', progress: 0, error: null });
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-codex-'));
+    try {
+      const res = await fetchImpl(apiUrl, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'ForeverAICompanion' }, signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error(`GitHub: HTTP ${res.status}`);
+      const asset = pickAsset(await res.json());
+      if (!asset) throw new Error('no verifiable Codex download for Windows was found');
+      const archive = path.join(work, 'codex.tar.gz');
+      const dl = await fetchImpl(asset.url, { headers: { 'user-agent': 'ForeverAICompanion' }, signal: AbortSignal.timeout(30 * 60000) });
+      if (!dl.ok || !dl.body) throw new Error(`download: HTTP ${dl.status}`);
+      const total = asset.size || Number(dl.headers.get('content-length')) || 0;
+      const hash = crypto.createHash('sha256');
+      const fd = fs.openSync(archive, 'w');
+      let got = 0;
+      try {
+        for await (const chunk of dl.body) {
+          const buf = Buffer.from(chunk);
+          got += buf.length;
+          hash.update(buf);
+          fs.writeSync(fd, buf);
+          if (total) installState.progress = Math.min(99, Math.floor((got / total) * 100));
+        }
+      } finally {
+        fs.closeSync(fd);
+      }
+      if (asset.size && got !== asset.size) throw new Error(`incomplete download (${got} of ${asset.size} bytes)`);
+      if (hash.digest('hex') !== asset.sha256) throw new Error('the download does not match the file OpenAI published (SHA-256)');
+
+      installState.status = 'extracting';
+      const out = path.join(work, 'x');
+      fs.mkdirSync(out);
+      await new Promise((resolve, reject) => {
+        execFile(tarExe, ['-xzf', archive, '-C', out], { windowsHide: true, timeout: 10 * 60000 }, (err, so, se) => (err ? reject(new Error(`tar: ${(se || err.message).trim()}`)) : resolve()));
+      });
+      const exe = findExeMatching(out, 2, RELEASE_EXE)[0] || findExe(out, 2, ['codex.exe'])[0];
+      if (!exe) throw new Error('codex.exe was not in the download');
+
+      fs.mkdirSync(ownCodexDir(), { recursive: true });
+      const target = ownCodexExe();
+      if (fs.existsSync(target)) {
+        try { fs.rmSync(target); } catch { fs.renameSync(target, `${target}.old-${Date.now()}`); }
+      }
+      fs.copyFileSync(exe, target);
+      const version = await codexVersion(target);
+      if (!version) throw new Error('the installed Codex does not start');
+      Object.assign(installState, { status: 'done', progress: 100 });
+      log(`Codex ${version} installed in ${target}`);
+      return { path: target, version };
+    } catch (e) {
+      Object.assign(installState, { status: 'error', error: e.message });
+      log(`Codex install failed: ${e.message}`);
+      throw e;
+    } finally {
+      fs.rmSync(work, { recursive: true, force: true });
+      installing = null;
+    }
+  })();
+  return installing;
 }
 
 // `codex login status`: "Logged in using ChatGPT" / "Not logged in" (exit 1).
@@ -67,12 +254,6 @@ export function codexAuthStatus(bin) {
 
 export function openCodexLogin(bin) {
   visibleConsole(t('consoleSignInChatGPT'), `cmd /k ""${bin}" login && echo. && echo ${t('consoleDone')}"`);
-}
-
-// OpenAI's official installer (no Node.js needed).
-export function openCodexInstall() {
-  visibleConsole(t('consoleInstallCodex'),
-    `powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm https://chatgpt.com/codex/install.ps1 | iex; Write-Host; Write-Host '${t('consoleDone')}'"`);
 }
 
 // Codex features that only matter to a coding agent. Unknown names are an

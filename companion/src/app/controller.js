@@ -14,7 +14,9 @@ import { buildMessages, buildSystem, cleanAnswer, loadKnowledge } from '../promp
 import { ask, canSearch } from '../providers.js';
 import { startWatcher } from '../watcher.js';
 import { authStatus, findClaudeCode, openInstall, openLogin } from '../claude-code.js';
-import { codexAuthStatus, findCodex, openCodexInstall, openCodexLogin } from '../codex.js';
+import {
+  codexAuthStatus, codexInstallState, codexVersion, findCodex, installCodex, openCodexLogin,
+} from '../codex.js';
 import { ttsEngineSource } from '../assets.js';
 import {
   ENGINE_DLL, compileEngine, installVoiceMachineWide, isLegacyEngineRegistered, isLegacyVoiceVisible, isVoiceVisible,
@@ -26,7 +28,7 @@ import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { currentGuide, guideFreshness, startGuideUpdates } from '../guide.js';
 import { createUpdater } from '../updater.js';
 
-export const VERSION = '1.7.0';
+export const VERSION = '1.7.1';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
 const voiceDll = () => path.join(sys.isPackaged() ? sys.installDir() : env.dataDir, ENGINE_DLL);
@@ -338,14 +340,28 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
     },
 
     async codexStatus() {
+      const install = codexInstallState();
       const found = findCodex(cfg.codex.bin);
-      if (!found) return { installed: false, loggedIn: false };
-      return { installed: true, source: found.source, ...(await codexAuthStatus(found.path)) };
+      if (!found) return { installed: false, loggedIn: false, install };
+      return { installed: true, source: found.source, install, ...(await codexAuthStatus(found.path)) };
     },
 
+    // Already installed (any way): nothing to do. Otherwise the app downloads
+    // the official build in the background; codexStatus reports the progress.
     codexInstall() {
-      openCodexInstall();
-      return {};
+      const found = findCodex(cfg.codex.bin);
+      if (found) return { already: true, source: found.source };
+      installCodex({ log }).catch(() => { /* reported by codexStatus */ });
+      return { started: true };
+    },
+
+    // The player points at a codex.exe Codex installed some other way.
+    async codexPick() {
+      const file = await sys.pickFile({ title: t('pickCodex'), filter: 'Codex (codex*.exe;codex.cmd)|codex*.exe;codex.cmd' });
+      if (!file) return { cancelled: true };
+      if (!(await codexVersion(file))) throw err('codexPickInvalid');
+      save({ codex: { bin: file } });
+      return { path: file };
     },
 
     codexLogin() {

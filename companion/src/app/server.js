@@ -38,6 +38,7 @@ export function createServer(controller, { onQuit = () => {}, onWindowClosed = (
     'codex-status': () => controller.codexStatus(),
     'codex-install': () => controller.codexInstall(),
     'codex-login': () => controller.codexLogin(),
+    'codex-pick': () => controller.codexPick(),
     'guide-check': () => controller.checkGuide(),
     'update-check': () => controller.checkUpdate(),
     'update-install': () => controller.installUpdate(),

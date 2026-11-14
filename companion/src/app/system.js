@@ -160,6 +160,21 @@ if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.Sele
   return out || null;
 }
 
+// Windows "Open file" dialog. Returns the chosen path or null.
+export async function pickFile({ title = '', filter = 'All files (*.*)|*.*' } = {}) {
+  if (!isWindows) throw err('typePath');
+  const out = await powershell(`
+Add-Type -AssemblyName System.Windows.Forms
+$owner = New-Object System.Windows.Forms.Form
+$owner.TopMost = $true
+$d = New-Object System.Windows.Forms.OpenFileDialog
+$d.Title = $env:FAIC_TITLE
+$d.Filter = $env:FAIC_FILTER
+$d.CheckFileExists = $true
+if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.FileName }`, { sta: true, timeout: 600000, vars: { TITLE: title, FILTER: filter } });
+  return out || null;
+}
+
 export async function showError(message) {
   if (!isWindows) return;
   try {

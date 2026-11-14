@@ -1,0 +1,102 @@
+// Codex: found however it was installed, and installed by the app when missing.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import {
+  codexAssetName, codexInstallState, codexVersion, findCodex, installCodex, ownCodexExe, pickCodexAsset,
+} from '../src/codex.js';
+
+const isWin = process.platform === 'win32';
+const CSC = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';
+const canBuildExe = isWin && fs.existsSync(CSC);
+
+// A stand-in codex.exe that answers --version like the real one.
+function fakeCodexExe(dir, name = 'codex.exe') {
+  const src = path.join(dir, 'fake.cs');
+  fs.writeFileSync(src, 'class P { static void Main(string[] a) { System.Console.WriteLine("codex-cli 9.9.9"); } }');
+  const exe = path.join(dir, name);
+  execFileSync(CSC, ['/nologo', `/out:${exe}`, src], { windowsHide: true });
+  fs.rmSync(src);
+  return exe;
+}
+
+// Points the user folders at a temp dir for the test.
+function sandboxEnv(t) {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-codex-home-'));
+  const saved = {};
+  for (const k of ['LOCALAPPDATA', 'APPDATA', 'USERPROFILE', 'HOME', 'FAIC_INSTALL_DIR']) saved[k] = process.env[k];
+  Object.assign(process.env, {
+    LOCALAPPDATA: path.join(home, 'Local'), APPDATA: path.join(home, 'Roaming'), USERPROFILE: home, HOME: home,
+    FAIC_INSTALL_DIR: path.join(home, 'Local', 'Programs', 'ForeverAICompanion'),
+  });
+  t.after(() => {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+  return home;
+}
+
+test('only the official, checkable Codex build is downloaded', () => {
+  const asset = (name, over = {}) => ({ name, size: 10, digest: `sha256:${'a'.repeat(64)}`, browser_download_url: `https://github.com/openai/codex/releases/download/rust-v1/${name}`, ...over });
+  const rel = { tag_name: 'rust-v1', assets: [asset(codexAssetName('x64')), asset(codexAssetName('arm64'))] };
+  assert.equal(codexAssetName('x64'), 'codex-x86_64-pc-windows-msvc.exe.tar.gz');
+  assert.match(pickCodexAsset(rel, 'arm64').url, /aarch64/);
+  assert.equal(pickCodexAsset({ ...rel, prerelease: true }, 'x64'), null);
+  assert.equal(pickCodexAsset({ assets: [asset(codexAssetName('x64'), { digest: undefined })] }, 'x64'), null, 'no SHA-256, no install');
+  assert.equal(pickCodexAsset({ assets: [asset(codexAssetName('x64'), { browser_download_url: 'https://evil.example/codex.tar.gz' })] }, 'x64'), null);
+});
+
+test('Codex installed with winget (or by this app) is found', { skip: !canBuildExe }, async (t) => {
+  const home = sandboxEnv(t);
+  // Nothing installed in the sandbox folders (a Codex on this PC's PATH may still be found).
+  const before = findCodex(null);
+  assert.ok(!before || ['path', 'config'].includes(before.source));
+
+  const links = path.join(home, 'Local', 'Microsoft', 'WinGet', 'Links');
+  fs.mkdirSync(links, { recursive: true });
+  const exe = fakeCodexExe(links);
+  const found = findCodex(null);
+  if (found.source !== 'path') assert.deepEqual(found, { path: exe, source: 'winget' });
+  assert.equal(await codexVersion(exe), '9.9.9');
+  assert.equal(await codexVersion(path.join(home, 'nope.exe')), null);
+});
+
+test('the app installs the official Codex when it is missing, verified', { skip: !canBuildExe }, async (t) => {
+  const home = sandboxEnv(t);
+  // The release archive, as OpenAI publishes it.
+  const build = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-codex-build-'));
+  t.after(() => fs.rmSync(build, { recursive: true, force: true }));
+  fakeCodexExe(build, 'codex-x86_64-pc-windows-msvc.exe');
+  const archive = path.join(build, 'codex.tar.gz');
+  execFileSync(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), ['-czf', archive, '-C', build, 'codex-x86_64-pc-windows-msvc.exe'], { windowsHide: true });
+  const bytes = fs.readFileSync(archive);
+  const sha = crypto.createHash('sha256').update(bytes).digest('hex');
+  const release = (digest) => ({
+    tag_name: 'rust-v9.9.9',
+    assets: [{ name: codexAssetName('x64'), size: bytes.length, digest: `sha256:${digest}`, browser_download_url: `https://github.com/openai/codex/releases/download/rust-v9.9.9/${codexAssetName('x64')}` }],
+  });
+  let published = release(sha);
+  const fetchImpl = async (url) => (url.includes('api.github.com')
+    ? new Response(JSON.stringify(published))
+    : new Response(bytes, { headers: { 'content-length': String(bytes.length) } }));
+  const pickAsset = (json) => pickCodexAsset(json, 'x64');
+
+  // A tampered download is refused and nothing is installed.
+  published = release('b'.repeat(64));
+  await assert.rejects(installCodex({ fetchImpl, pickAsset }), /SHA-256/);
+  assert.equal(codexInstallState().status, 'error');
+  assert.ok(!fs.existsSync(ownCodexExe()));
+
+  published = release(sha);
+  const r = await installCodex({ fetchImpl, pickAsset });
+  assert.equal(r.path, ownCodexExe());
+  assert.equal(r.version, '9.9.9');
+  assert.equal(codexInstallState().status, 'done');
+  assert.ok(ownCodexExe().startsWith(home));
+  const found = findCodex(null);
+  if (found.source !== 'path') assert.deepEqual(found, { path: ownCodexExe(), source: 'app' });
+});

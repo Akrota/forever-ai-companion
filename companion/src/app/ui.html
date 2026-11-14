@@ -367,7 +367,12 @@ const I18N = {
     'p.ollama.local1': 'Install <a href="https://ollama.com" target="_blank">Ollama</a>.',
     'p.ollama.local2': 'Download a model (for example <code>llama3.2</code>) from the Ollama app.',
     'cli.claudeCode.about': 'It\'s Anthropic\'s free, official program that connects your subscription. It installs with one click.',
-    'cli.codex.about': 'It\'s OpenAI\'s free, official program that connects your ChatGPT plan. It installs with one click.',
+    'cli.codex.about': 'It\'s OpenAI\'s free, official program that connects your ChatGPT plan. The app downloads and installs it for you (about 130 MB).',
+    'ai.codexDownloading': 'Downloading Codex from OpenAI… {n}%',
+    'ai.codexExtracting': 'Installing Codex…',
+    'ai.codexError': 'Could not install it: {error}. Try again or, if you already have Codex, find it with the button below.',
+    'ai.cliPick': 'I already have it: find it…',
+    'ai.cliPicking': 'Waiting for your choice…',
 
     // Welcome
     'welcome.kicker': 'Welcome',
@@ -674,7 +679,12 @@ const I18N = {
     'p.ollama.local1': 'Instala <a href="https://ollama.com" target="_blank">Ollama</a>.',
     'p.ollama.local2': 'Descarga un modelo (por ejemplo <code>llama3.2</code>) desde la app de Ollama.',
     'cli.claudeCode.about': 'Es el programa oficial y gratuito de Anthropic que conecta tu suscripción. Se instala con un clic.',
-    'cli.codex.about': 'Es el programa oficial y gratuito de OpenAI que conecta tu plan de ChatGPT. Se instala con un clic.',
+    'cli.codex.about': 'Es el programa oficial y gratuito de OpenAI que conecta tu plan de ChatGPT. La app lo descarga e instala por ti (unos 130 MB).',
+    'ai.codexDownloading': 'Descargando Codex de OpenAI… {n}%',
+    'ai.codexExtracting': 'Instalando Codex…',
+    'ai.codexError': 'No se pudo instalar: {error}. Vuelve a intentarlo o, si ya tienes Codex, búscalo con el botón de abajo.',
+    'ai.cliPick': 'Ya lo tengo: buscarlo…',
+    'ai.cliPicking': 'Esperando tu elección…',
 
     'welcome.kicker': 'Te damos la bienvenida',
     'welcome.title': 'Tu compañero con IA para WoW Forever',
@@ -1177,8 +1187,16 @@ const VIEWS = {
     if (CLI[id]) {
       const c = cli[id] || {};
       const m = CLI[id];
-      items.push([c.installed, t('ai.cliInstall', { app: m.app }), c.installed ? t('ai.cliInstalled') : m.about,
-        c.installed ? '' : `<button class="btn primary small" data-act="cli-install">${t('ai.cliInstall', { app: m.app })}</button>`]);
+      // Codex is installed by the app itself (with progress); Claude Code in a console window.
+      const inst = id === 'codex' && !c.installed ? c.install : null;
+      const busyInstall = inst && ['downloading', 'extracting'].includes(inst.status);
+      const installText = c.installed ? t('ai.cliInstalled')
+        : inst?.status === 'downloading' ? t('ai.codexDownloading', { n: inst.progress || 0 })
+          : inst?.status === 'extracting' ? t('ai.codexExtracting')
+            : inst?.status === 'error' ? `<span style="color:var(--bad)">${t('ai.codexError', { error: esc(inst.error) })}</span>` : m.about;
+      items.push([c.installed, t('ai.cliInstall', { app: m.app }), installText,
+        c.installed ? '' : `<button class="btn primary small" data-act="cli-install" ${busyInstall ? 'disabled' : ''}>${busyInstall ? `<span class="spin"></span>${t('ai.codexExtracting')}` : t('ai.cliInstall', { app: m.app })}</button>`
+          + (id === 'codex' && !busyInstall ? ` <button class="btn small" data-act="cli-pick">${spinner('cli-pick', t('ai.cliPick'), t('ai.cliPicking'))}</button>` : '')]);
       items.push([c.loggedIn, t('ai.cliLogin', { account: m.account }), c.loggedIn ? t('ai.cliLoggedIn') : t('ai.cliLoginText'),
         c.installed && !c.loggedIn ? `<button class="btn primary small" data-act="cli-login">${t('ai.cliLoginBtn')}</button>` : '']);
       if (c.waiting && !(c.installed && c.loggedIn)) items.push([false, t('ai.cliWaiting'), t('ai.cliWaitingText'), '']);
@@ -1550,8 +1568,18 @@ const ACTIONS = {
   install: installAddon,
   'cli-install': async () => {
     const id = aiChoice;
-    try { await api(`${CLI[id].api}-install`); cli[id] = { ...(cli[id] || {}), waiting: true }; render(); } catch (e) { toast('bad', esc(e.message)); }
+    try {
+      const r = await api(`${CLI[id].api}-install`);
+      // Codex: installed by the app (progress comes with the status); Claude Code: a console window.
+      if (id !== 'codex') cli[id] = { ...(cli[id] || {}), waiting: true };
+      if (r.already) toast('ok', t('ai.cliInstalled'));
+      await checkCli(id);
+    } catch (e) { toast('bad', esc(e.message)); }
   },
+  'cli-pick': () => run('cli-pick', async () => {
+    const r = await api('codex-pick');
+    if (!r.cancelled) await checkCli('codex');
+  }),
   'cli-login': async () => {
     const id = aiChoice;
     try { await api(`${CLI[id].api}-login`); cli[id] = { ...(cli[id] || {}), waiting: true }; render(); } catch (e) { toast('bad', esc(e.message)); }
