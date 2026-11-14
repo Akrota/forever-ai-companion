@@ -16,9 +16,9 @@
 <p align="center"><sub>English and Spanish · Inglés y español</sub></p>
 
 <p align="center">
-  <img src="docs/in-game-chat.webp" width="900" alt="The Forever AI Companion window in WoW Forever: asked which dungeon to run, Fizzi suggests Gnomeregan using the player's own quests, experience, items and gear durability">
+  <img src="docs/in-game-chat.webp" width="900" alt="The Forever AI Companion window in WoW Forever: asked which dungeon to run, Fizzi suggests Gnomeregan using the player's level, quests, rested experience, location, bags and gear durability">
   <br>
-  <sub>Asking Fizzi which dungeon to run: the answer uses your own quests, experience, bags and gear.</sub>
+  <sub>Asking Fizzi which dungeon to run: the answer uses your own level, quests, location, bags and gear.</sub>
 </p>
 
 ---
