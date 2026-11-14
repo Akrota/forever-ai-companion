@@ -59,6 +59,35 @@ test('a request spoken in chunks by the addon is reassembled by the app', () => 
   assert.equal(payload.toString('utf8'), json);
 });
 
+// Every phrase makes Windows open the sound output (a faint "pop" on some PCs),
+// so a normal question must go in one phrase, and none may pass the game's cut.
+test('a real-sized question is one phrase, and no phrase reaches the game\'s cut', () => {
+  const GAME_CUT = 29997; // measured in WoW Forever: a 64 000-character phrase arrives with this many
+  const out = runLua(`
+    SPOKEN = {}
+    C_VoiceChat = {
+      GetTtsVoices = function() return { { voiceID = 3, name = "ForeverAICompanion" } } end,
+      SpeakText = function(id, text) SPOKEN[#SPOKEN + 1] = #text end,
+    }
+    assert(ns.Voice:Available())
+    local function ask(base64Chars)
+      SPOKEN = {}
+      -- Random-ish bytes: base64 makes 4 characters of every 3 bytes.
+      local bytes = {}
+      for i = 1, math.floor(base64Chars * 3 / 4) do bytes[i] = string.char((i * 37) % 256) end
+      assert(ns.Voice:Send(table.concat(bytes), "17946751069423"))
+      return #SPOKEN .. ":" .. math.max(table.unpack(SPOKEN))
+    end
+    -- Sizes seen in the game: 12 800 to 17 800 characters; the largest frame allowed.
+    RESULT = ask(17800) .. "," .. ask(23900) .. "," .. ask(ns.Voice.MAX_FRAME_BYTES * 4 / 3)
+  `, {}, ['Json.lua', 'Uplink.lua', 'Voice.lua']);
+  const [normal, big, max] = out.split(',').map((s) => s.split(':').map(Number));
+  assert.equal(normal[0], 1, 'a normal question is a single phrase');
+  assert.equal(big[0], 1);
+  assert.ok(max[0] > 1);
+  for (const [, longest] of [normal, big, max]) assert.ok(longest < GAME_CUT - 4000, `phrase of ${longest} characters`);
+});
+
 test('messages wrapped in the game\'s "Start"/"End" bookmarks still reassemble', () => {
   const out = runLua(`
     SPOKEN = {}

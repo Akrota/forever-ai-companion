@@ -3,7 +3,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PRESETS, env, envVar, loadConfig, saveConfig } from '../config.js';
+import { PRESETS, env, envVar, loadConfig, readUserConfig, saveConfig, wowPaths } from '../config.js';
+import { startBeacon } from '../beacon.js';
 import { findWowDirs, isWowRunning, isWowRunningAsync, normalizeWowDir } from '../detect.js';
 import {
   bundledAddonVersion, ensureAddon, finishLegacyMigration, hasLegacyAddon, install, installedAddonVersion, isAddonInstalled,
@@ -28,13 +29,15 @@ import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { currentGuide, guideFreshness, startGuideUpdates } from '../guide.js';
 import { createUpdater } from '../updater.js';
 
-export const VERSION = '1.7.2';
+export const VERSION = '1.8.0';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
 const voiceDll = () => path.join(sys.isPackaged() ? sys.installDir() : env.dataDir, ENGINE_DLL);
 // How often to check whether the game was closed, while the addon under the
 // project's previous name is still in the AddOns folder.
 const LEGACY_ADDON_CHECK_MS = 10000;
+// How often to check that the chosen subscription AI is still signed in.
+const LOGIN_CHECK_MS = 5 * 60 * 1000;
 
 // onUpdateAvailable(version): a newer release was found (tray notice).
 export function createController({ log = () => {}, onUpdateAvailable = () => {} } = {}) {
@@ -42,6 +45,8 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
   setAppLang(cfg.language && cfg.language !== 'auto' ? cfg.language : null);
   let watcher = null;
   let watcherError = null;
+  let beacon = null;     // app status for the game (see beacon.js)
+  let loginTimer = null;
   let autostart; // cached: reading it spawns reg.exe
   let trayReady = false; // icon next to the Windows clock is running
   const events = [];
@@ -143,6 +148,58 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
   function save(patch) {
     cfg = saveConfig(patch);
     restartWatcher();
+    checkLogin();
+  }
+
+  // Whether the chosen subscription AI (Claude Code, Codex) is installed and
+  // signed in: true / false, or null when unknown or not needed. Checked now
+  // and then (it runs the AI's own program), and whenever settings change.
+  let aiSignedIn = null;
+  let loginCheck = null;
+  function checkLogin() {
+    const provider = cfg.provider;
+    if (provider !== 'claude-code' && provider !== 'codex') {
+      aiSignedIn = null;
+      beacon?.refresh();
+      return Promise.resolve();
+    }
+    // Not installed: false. The status check itself failing: unknown.
+    const run = (async () => {
+      const found = provider === 'claude-code' ? findClaudeCode(cfg.claudeCode.bin) : findCodex(cfg.codex.bin);
+      if (!found) return false;
+      const s = provider === 'claude-code' ? await authStatus(found.path) : await codexAuthStatus(found.path);
+      return s.error ? null : s.loggedIn;
+    })();
+    loginCheck = run;
+    return run
+      .then((ok) => { if (loginCheck === run) aiSignedIn = typeof ok === 'boolean' ? ok : null; })
+      .catch(() => { if (loginCheck === run) aiSignedIn = null; })
+      .finally(() => beacon?.refresh());
+  }
+
+  // The window checked the sign-in itself (setup and dashboard): use that too,
+  // so signing in shows up in the game right away.
+  function noteSignIn(provider, s) {
+    if (cfg.provider !== provider || s.error) return;
+    const ok = Boolean(s.installed && s.loggedIn);
+    if (ok !== aiSignedIn) { aiSignedIn = ok; beacon?.refresh(); }
+  }
+
+  // Why questions from the game can't be answered right now (null: ready).
+  // Shown in the addon's chat header (beacon.js).
+  function notReadyReason() {
+    if (watcherError) return 'problem';
+    // Without a choice the app falls back to "echo" (a test that repeats the
+    // question): that is no AI. A provider set by hand in config.json counts.
+    const preset = cfg.preset || null;
+    let configured = Boolean(preset) || Boolean(envVar('PROVIDER'));
+    if (!configured) {
+      try { configured = Boolean(readUserConfig().provider); } catch { configured = false; }
+    }
+    if (!configured) return 'need-ai';
+    if (preset && PRESETS[preset]?.needsKey && !cfg.keys?.[preset]) return 'need-ai';
+    if (aiSignedIn === false) return 'need-login';
+    return null;
   }
 
   // (Re)compiles the silent voice when its source changed (app updates).
@@ -178,7 +235,17 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
   }
   restartWatcher();
 
-  const mask = (k) => (k ? `••••${String(k).slice(-4)}` : null);
+  // Tells the game whether this app is open and ready (the addon's chat header).
+  beacon = startBeacon({
+    paths: () => (addonOk() ? wowPaths(cfg.wowDir) : null),
+    reason: notReadyReason,
+    log,
+  });
+  checkLogin();
+  loginTimer = setInterval(checkLogin, LOGIN_CHECK_MS);
+  loginTimer.unref?.();
+
+  const mask =(k) => (k ? `••••${String(k).slice(-4)}` : null);
 
   return {
     async status() {
@@ -323,8 +390,11 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
 
     async claudeStatus() {
       const found = findClaudeCode(cfg.claudeCode.bin);
-      if (!found) return { installed: false, loggedIn: false };
-      return { installed: true, source: found.source, ...(await authStatus(found.path)) };
+      const out = found
+        ? { installed: true, source: found.source, ...(await authStatus(found.path)) }
+        : { installed: false, loggedIn: false };
+      noteSignIn('claude-code', out);
+      return out;
     },
 
     claudeInstall() {
@@ -343,8 +413,11 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
       const install = codexInstallState();
       const search = codexSearchState();
       const found = findCodex(cfg.codex.bin);
-      if (!found) return { installed: false, loggedIn: false, install, search };
-      return { installed: true, source: found.source, install, search, ...(await codexAuthStatus(found.path)) };
+      const out = found
+        ? { installed: true, source: found.source, install, search, ...(await codexAuthStatus(found.path)) }
+        : { installed: false, loggedIn: false, install, search };
+      noteSignIn('codex', out);
+      return out;
     },
 
     // Already installed (any way): nothing to do. Otherwise the app downloads
@@ -388,21 +461,13 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
 
     openKnowledge() {
       ensureKnowledgeDir();
-
-  // Updates from GitHub releases: only the installed app (or a test server).
-  const updateApi = envVar('UPDATE_API');
-  const updater = sys.isPackaged() || updateApi ? createUpdater({
-    currentVersion: VERSION,
-    dir: path.join(env.dataDir, 'updates'),
-    log,
-    onAvailable: onUpdateAvailable,
-    ...(updateApi ? { apiUrl: updateApi, allowUrl: (u) => /^http:\/\/127\.0\.0\.1:\d+\//.test(u) } : {}),
-  }) : null;
       sys.openFolder(knowledgeDir());
       return {};
     },
 
     stop() {
+      beacon.stop();
+      clearInterval(loginTimer);
       guideUpdates.stop();
       updater?.stop();
       if (legacyTimer) clearInterval(legacyTimer);

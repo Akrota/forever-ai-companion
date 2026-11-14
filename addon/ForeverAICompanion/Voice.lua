@@ -10,9 +10,11 @@ local Voice = {}
 ns.Voice = Voice
 
 -- Measured in WoW Forever: a phrase of 16 000 characters arrives intact, one
--- of 64 000 is cut at ~30 000; and the voice still gets the text at volume 0.
--- Fewer, silent phrases = the game touches the audio as little as possible.
-Voice.CHUNK = 16000            -- base64 characters per spoken message
+-- of 64 000 is cut at 29 997; and the voice still gets the text at volume 0.
+-- Every phrase makes Windows open the sound output for an instant, which some
+-- PCs hear as a faint "pop": as few phrases as possible, so a normal question
+-- (12-18 000 characters) goes in one. 24 000 + the header stays well under the cut.
+Voice.CHUNK = 24000            -- base64 characters per spoken message
 Voice.VOLUME = 0               -- volume passed to SpeakText
 Voice.MAX_FRAME_BYTES = 60000  -- no screen limits on this channel
 
@@ -100,8 +102,7 @@ function Voice:Diagnose()
   -- Does the voice still get the text at volume 0? How long can one phrase be?
   local tests = {
     function() self:Speak("FAIC-VOICE-TEST volume0 " .. time(), 0) end,
-    function() self:Speak("FAIC-VOICE-LONG 4000 " .. string.rep("x", 4000), 0) end,
-    function() self:Speak("FAIC-VOICE-LONG 16000 " .. string.rep("x", 16000), 0) end,
+    function() self:Speak("FAIC-VOICE-LONG " .. self.CHUNK .. " " .. string.rep("x", self.CHUNK), 0) end,
     function() self:Speak("FAIC-VOICE-LONG 64000 " .. string.rep("x", 64000), 0) end,
   }
   for i, fn in ipairs(tests) do

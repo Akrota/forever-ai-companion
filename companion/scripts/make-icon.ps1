@@ -2,7 +2,7 @@
 # button, an engineering gear and the AI sparkle) at every size Windows uses,
 # and packs them into assets/app.ico. Also writes PNGs for the app window.
 #   powershell -ExecutionPolicy Bypass -File scripts/make-icon.ps1
-param([string]$OutDir = (Join-Path $PSScriptRoot '..\assets'))
+param([string]$OutDir = (Join-Path $PSScriptRoot '..\assets'), [int]$LogoSize = 0, [string]$LogoPath = '')
 
 Add-Type -AssemblyName System.Drawing
 New-Item -ItemType Directory -Force $OutDir | Out-Null
@@ -104,6 +104,14 @@ function Dib($bmp) {
   $w.Write((New-Object byte[] ($maskRow * $s)))
   $w.Flush()
   return , $ms.ToArray()
+}
+
+# -LogoSize 400 -LogoPath x.png: only a big PNG of the same icon (store pages).
+if ($LogoSize -gt 0) {
+  $bmp = Draw $LogoSize
+  $bmp.Save($LogoPath, [System.Drawing.Imaging.ImageFormat]::Png)
+  $bmp.Dispose()
+  return
 }
 
 $sizes = 16, 20, 24, 32, 40, 48, 64, 128, 256

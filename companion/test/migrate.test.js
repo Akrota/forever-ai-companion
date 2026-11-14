@@ -123,7 +123,7 @@ test('updating from before the rename installs the new addon; the old one goes o
     assert.equal(ensureAddon(cfg, { wowDir: wow, wowRunning: true, log: (m) => logs.push(m) }), true);
     assert.ok(isAddonInstalled(wow, cfg));
     assert.equal(installedAddonVersion(wow), bundledAddonVersion());
-    assert.equal(installedAddonVersion(wow), '1.8.0');
+    assert.match(installedAddonVersion(wow), /^\d+\.\d+\.\d+$/);
     const toc = fs.readFileSync(path.join(wowPaths(wow).slotDir(2), 'ForeverAICompanion_S02.toc'), 'utf8');
     assert.match(toc, /## Dependencies: ForeverAICompanion\n## Group: ForeverAICompanion\n/);
     assert.ok(fs.existsSync(newFile(files.account)) && fs.existsSync(newFile(files.character)));

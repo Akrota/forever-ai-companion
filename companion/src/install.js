@@ -14,6 +14,7 @@ import { ADDON_NAME, LEGACY_NAME, wowPaths } from './config.js';
 import { addonFiles } from './assets.js';
 import { isWowRunning } from './detect.js';
 import { inboxSource, silentWav, writeAtomic } from './inbox.js';
+import { createStatusFiles } from './beacon.js';
 import { migrateSavedVariables } from './migrate.js';
 import { saveState, loadState } from './state.js';
 
@@ -94,6 +95,7 @@ export function install(cfg, { wowDir = cfg.wowDir, files = addonFiles(), log = 
   fs.mkdirSync(p.sigDir, { recursive: true });
   writeAtomic(p.okSignal, silentWav());
   for (let i = 1; i <= cfg.signals; i++) writeAtomic(p.signal(i), Buffer.alloc(0));
+  createStatusFiles(p);
 
   for (let i = 1; i <= cfg.slots; i++) {
     const dir = p.slotDir(i);
@@ -146,6 +148,8 @@ export function ensureAddon(cfg, { wowDir = cfg.wowDir, files = addonFiles(), lo
     writeAddonFiles(wowDir, files);
     log(`Addon updated to ${bundled}`);
   }
+  // Installs from before the app status in the game (addon 1.9.0) lack them.
+  createStatusFiles(wowPaths(wowDir));
   finishLegacyMigration(wowDir, { wowRunning, log });
   return true;
 }

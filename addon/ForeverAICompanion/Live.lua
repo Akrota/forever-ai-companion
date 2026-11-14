@@ -21,6 +21,11 @@ local OK_PATH = "Interface\\AddOns\\ForeverAICompanion\\sig\\ok.wav"
 -- Seconds after sending at which a slot is loaded anyway.
 local SCHEDULE_NO_SOUND = { 8, 20, 40, 75, 120, 240 } -- sound disabled: no signals
 local SCHEDULE_SAFETY = { 90, 240 }                   -- signals on: only as a safety net
+-- App status (see Live:CheckApp).
+local STATUS_PATH = "Interface\\AddOns\\ForeverAICompanion\\sig\\%s.wav"
+local APP_TICK = 2  -- the app switches its beat every 3 s: check faster than that
+local STALE = 15    -- seconds without a switch: the app stopped (crashed or frozen)
+local REASONS = { "need-ai", "need-login", "problem" }
 
 local LoadAddOn = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
 local IsAddOnLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
@@ -53,6 +58,74 @@ function Live:Init()
   -- Pick up anything answered while we were away.
   if ns.Core:HasPending() then self:LoadNextSlot() end
   C_Timer.NewTicker(TICK, function() Live:Tick() end)
+  -- Is the app open and ready? Checked while the window is open (it opening
+  -- checks right away, see UI.lua).
+  C_Timer.NewTicker(APP_TICK, function()
+    if ns.UI:IsShown() then Live:CheckApp() end
+  end)
+end
+
+-- App status ------------------------------------------------------------------
+-- The app keeps a few more sound files in sig/ (see companion/src/beacon.js),
+-- created by the installer like the signals:
+--   st.wav         always plays: these files existed when the game started.
+--   beat1, beat2   while the app runs it switches every few seconds which one
+--                  plays; both are silent once it is closed.
+--   need-ai, need-login, problem
+--                  at most one plays: why the app can't answer yet.
+
+-- "checking" | "ready" | "closed" | "stuck" | "need-ai" | "need-login" |
+-- "problem" | "restart" (files newer than the game) | "nosound" (can't
+-- check) | "unknown" (this game doesn't notice files going silent).
+function Live:AppState()
+  return self.app and self.app.state or "checking"
+end
+
+function Live:CheckApp()
+  local app = self.app or {}
+  self.app = app
+  local before = app.state
+  local now = GetTime()
+  -- After a pause (window closed) the beat may have switched any number of
+  -- times: start watching it again, keeping what we knew meanwhile.
+  if app.lastCheck and now - app.lastCheck > APP_TICK * 2.5 then
+    app.pattern, app.changedAt = nil, nil
+  end
+  app.lastCheck = now
+  if not playable(OK_PATH) then
+    app.state = "nosound"
+  elseif not playable(STATUS_PATH:format("st")) then
+    app.state = "restart"
+  else
+    local pattern = (playable(STATUS_PATH:format("beat1")) and 1 or 0)
+      + (playable(STATUS_PATH:format("beat2")) and 2 or 0)
+    if pattern ~= app.pattern then
+      if app.pattern and pattern ~= 0 and app.pattern ~= 0 then app.switched = true end
+      app.pattern, app.changedAt = pattern, now
+    end
+    if pattern == 0 then
+      -- One silent check can be the app switching files: wait for a second one.
+      app.silent = (app.silent or 0) + 1
+      if app.silent >= 2 then app.state, app.switched = "closed", nil end
+    elseif pattern == 3 and now - app.changedAt >= 6 then
+      app.silent = 0
+      app.state = "unknown"
+    else
+      app.silent = 0
+      if now - app.changedAt > STALE then
+        app.state = "stuck"
+      elseif not app.switched then
+        app.state = app.state == "closed" and "closed" or "checking"
+      else
+        app.state = "ready"
+        for _, reason in ipairs(REASONS) do
+          if playable(STATUS_PATH:format(reason)) then app.state = reason break end
+        end
+      end
+    end
+  end
+  if app.state ~= before then ns.UI:RefreshStatusBar() end
+  return self:AppState()
 end
 
 -- Fields every request carries so the companion knows which signal to ring.

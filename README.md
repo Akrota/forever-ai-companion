@@ -104,6 +104,7 @@ Coming from version 1.5.0 or earlier, the app and the addon move to new folder n
 3. **Type your question** and click Send. The answer arrives in a few seconds; if the window was closed, you get a notification.
 
 - **Chats by topic**: each chat remembers its conversation (gear, quests, dungeons…). Right-click the floating button to start a new chat.
+- **Is the app ready?** The line under the chat title tells you. Green: the app is open and ready. Red: questions won't be answered yet, and it says why (the app is closed or not responding, no AI is chosen, or your AI needs you to sign in). Hover it for what to do.
 - **See what is sent**: in the window click **See the data I send**.
 - **In combat** you can't ask (on purpose): wait until combat ends.
 
@@ -199,6 +200,7 @@ Technically, the voice is a small SAPI engine that the app compiles on your PC w
 - Installing the addon creates **50 "inbox" addons** (`ForeverAICompanion_S01` … `S50`) that the game loads only on request. The app writes the answers into them.
 - To signal an answer, the app "rings a bell": 500 `sig/NNN.wav` files start empty, and the app turns the next one into a 50 ms silent sound. Every 2 seconds the addon tries to play it; if it can, it stops it instantly and loads the next inbox, which reads the freshly written answer.
 - Each inbox can be loaded once per session (that's why there are 50; `/reload` resets them). If the game's sound is off, the addon checks the inboxes on a timer.
+- The same trick tells the game whether the app is ready (the line under the chat title). While the app runs it switches every 3 seconds which of `sig/beat1.wav` and `sig/beat2.wav` plays; both silent means it is closed, one stuck means it crashed or froze. `need-ai.wav`, `need-login.wav` and `problem.wav` say why it can't answer yet, and `st.wav` (always playing) shows the files existed when the game started.
 
 That's why you need to **restart WoW** after installing: the game only sees files that existed when it started.
 
@@ -262,6 +264,7 @@ Each player can also add their own knowledge from the app's dashboard (**Server 
 The app is free. With your Claude or ChatGPT subscription you pay nothing extra (questions count toward your plan's limit). With an API key you pay per use.
 
 **The answer doesn't arrive.**
+- Look at the line under the chat title in the game: if it's red, it says what's wrong.
 - Open the app and check that it says **Running** at the top.
 - If you just installed the addon or invisible sending, close WoW completely and open it again.
 - Type `/ia inbox` in the game to check for new answers.

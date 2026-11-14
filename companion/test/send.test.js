@@ -689,3 +689,80 @@ test('Spanish falls back to English for a missing key, and every key is translat
   assert.equal(thinking, '5');
   assert.equal(untranslated, '', 'both languages have the same keys');
 });
+// --- App status in the chat header -------------------------------------------
+// The app keeps sig/*.wav files that play or not (beacon.js); the addon reads
+// them with PlaySoundFile and shows the result under the chat title.
+const STATUS_UI = RECORD_TEXT + PRELUDE_DRIVE + `
+  PLAYING = {}
+  PlaySoundFile = function(path) return PLAYING[path:match("sig\\\\([%w%-]+)%.wav$") or ""] == true end
+`;
+
+test('chat header shows whether the app is open, ready, and why not', () => {
+  const out = runLua(`
+    START()
+    ns.Personas:Set("fizzi")
+    ns.UI:Show()
+    local states = {}
+    local function check(note)
+      NOW = NOW + 2
+      states[#states + 1] = (note or "") .. ns.Live:CheckApp()
+    end
+    PLAYING = { ok = true, st = true }
+    check(); check()                          -- nothing beats: closed
+    local closedText = ns.UI.channel.textValue
+    PLAYING.beat1 = true; check()             -- the app starts: still closed until it switches
+    PLAYING.beat1, PLAYING.beat2 = nil, true; check()   -- it switches: ready
+    local readyText = ns.UI.channel.textValue
+    PLAYING["need-login"] = true; PLAYING.beat1, PLAYING.beat2 = true, nil; check()
+    local loginText = ns.UI.channel.textValue
+    PLAYING["need-login"] = nil; PLAYING.beat1, PLAYING.beat2 = nil, true; check()
+    PLAYING.beat1, PLAYING.beat2 = nil, nil; check("1:")  -- one silent check: maybe switching
+    PLAYING.beat1 = true; check()
+    for i = 1, 8 do check() end               -- the same beat for 16 s: stuck
+    PLAYING.beat1, PLAYING.beat2 = nil, true; check()   -- alive again
+    -- Window closed for a minute: no "stuck" right after reopening.
+    NOW = NOW + 60; check("gap:")
+    PLAYING.st = nil; check()                 -- files newer than the game
+    PLAYING.ok = nil; check()                 -- game sound off
+    PLAYING = { ok = true, st = true, beat1 = true, beat2 = true }
+    check(); check(); check(); check()        -- both always play: can't tell
+    local tip = select(1, ns.UI:AppStatusHelp())
+    RESULT = table.concat(states, ",") .. "#" .. closedText .. "#" .. readyText .. "#" .. loginText .. "#" .. tip
+  `, {}, ALL_FILES, STATUS_UI);
+  const [states, closedText, readyText, loginText, tip] = out.split('#');
+  assert.equal(states, [
+    'checking', 'closed', 'closed', 'ready', 'need-login', 'ready', '1:ready', 'ready',
+    // 2..14 s on the same beat is fine; 16 s is more than STALE (15).
+    'ready', 'ready', 'ready', 'ready', 'ready', 'ready', 'ready', 'stuck', 'ready',
+    'gap:ready', 'restart', 'nosound', 'ready', 'ready', 'ready', 'unknown',
+  ].join(','));
+  assert.match(closedText, /\|cffff6060Forever AI Companion is closed/);
+  assert.match(readyText, /Fizzi .* invisible link|Fizzi .* on-screen strip/);
+  assert.match(loginText, /sign in/);
+  assert.equal(tip, 'App status unknown');
+});
+
+test('the "thinking" bubble is big enough for every phrase it cycles through', () => {
+  const out = runLua(`
+    START()
+    ns.Personas:Set("rizzik")
+    ns.Core:Ask("What now?")
+    local b = ns.UI.bubbles[2]
+    local textW = b.box.w - 20
+    local worst = 0
+    for _, phrase in ipairs(ns.Personas:Current().thinking) do
+      b.text.w = textW
+      b.text.textValue = phrase .. "..."
+      worst = math.max(worst, b.text:GetStringHeight() + 16 - b.box.h)
+    end
+    RESULT = tostring(b.pending) .. "#" .. worst .. "#" .. textW
+  `, {}, ALL_FILES, RECORD_TEXT.replace(
+    'GetStringHeight" then return function() return 10 end end',
+    'GetStringHeight" then return function(self) return 14 * math.max(1, math.ceil(#(self.textValue or "") * 6 / math.max(1, self.w))) end end')
+    .replace('k == "GetStringWidth" or k == "GetUnboundedStringWidth" then return function() return 100 end end',
+      'k == "GetStringWidth" or k == "GetUnboundedStringWidth" then return function(self) return #(self.textValue or "") * 6 end end')
+    + PRELUDE_DRIVE);
+  const [pending, worst] = out.split('#');
+  assert.equal(pending, 'true');
+  assert.ok(Number(worst) <= 0, `a phrase is ${worst} px taller than its box`);
+});

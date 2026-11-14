@@ -54,6 +54,7 @@ local C = {
   ok    = { 0.25, 0.95, 0.3, 1 },
   warn  = { 1, 0.75, 0.2, 1 },
   bad   = { 0.95, 0.3, 0.25, 1 },
+  idle  = { 0.6, 0.6, 0.6, 1 },
   panel = { 0, 0, 0, 0.45 },
 }
 UI.COLORS = C
@@ -414,6 +415,23 @@ function UI:Build()
   round(main, dot)
   local channel = main:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   channel:SetPoint("LEFT", dot, "RIGHT", 6, 0)
+  channel:SetPoint("RIGHT", main, "TOPRIGHT", -14, -38)
+  channel:SetJustifyH("LEFT")
+  if channel.SetWordWrap then channel:SetWordWrap(false) end
+  -- Hovering the line explains the app's status (and what to do about it).
+  local channelHover = CreateFrame("Frame", nil, main)
+  channelHover:SetPoint("TOPLEFT", dot, "TOPLEFT", -4, 1) -- below the title and Delete
+  channelHover:SetPoint("BOTTOMRIGHT", main, "TOPRIGHT", -14, -48)
+  channelHover:EnableMouse(true)
+  channelHover:SetScript("OnEnter", function(self)
+    local title, text = UI:AppStatusHelp()
+    if not GameTooltip or not title then return end
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine(title)
+    if text then GameTooltip:AddLine(text, 1, 1, 1, true) end
+    GameTooltip:Show()
+  end)
+  channelHover:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
 
   local deleteChat = panelButton(main, L.DELETE_CHAT, 96, 22)
   deleteChat:SetPoint("TOPRIGHT", -10, -10)
@@ -483,6 +501,7 @@ function UI:Build()
     local current = ns.Chats:Get(ns.db.currentChat)
     if current then current.unread = nil end
     if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN or 839) end
+    if ns.Live.CheckApp then pcall(ns.Live.CheckApp, ns.Live) end
     UI:Refresh()
     if ns.Button then ns.Button:Update() end
   end)
@@ -746,12 +765,33 @@ function UI:PlaceBubble(i, y, kind, textValue, metaValue, onAction, actionLabel)
   b.text:ClearAllPoints()
   b.text:SetPoint("TOPLEFT", 10, -8)
   b.text:SetWidth(maxText)
-  b.text:SetText(textValue)
+  -- The "thinking" bubble cycles through phrases of different lengths (see the
+  -- OnUpdate animation): size it for the longest one, with all three dots, so
+  -- none of them spills out of the box.
+  local texts = { textValue }
+  if kind == "pending" then
+    texts = {}
+    for _, phrase in ipairs(p.thinking or {}) do texts[#texts + 1] = phrase .. "..." end
+    if #texts == 0 then texts[1] = textValue end
+  end
+  local function naturalWidth()
+    return (b.text.GetUnboundedStringWidth and b.text:GetUnboundedStringWidth()) or b.text:GetStringWidth() or maxText
+  end
   -- Short messages get a snug box.
-  local natural = (b.text.GetUnboundedStringWidth and b.text:GetUnboundedStringWidth()) or b.text:GetStringWidth() or maxText
+  local natural = 0
+  for _, s in ipairs(texts) do
+    b.text:SetText(s)
+    natural = max(natural, naturalWidth())
+  end
   local textW = min(maxText, max(30, floor(natural + 2)))
   b.text:SetWidth(textW)
-  local boxH = (b.text:GetStringHeight() or 14) + 16
+  local textH = 0
+  for _, s in ipairs(texts) do
+    b.text:SetText(s)
+    textH = max(textH, b.text:GetStringHeight() or 14)
+  end
+  b.text:SetText(textValue)
+  local boxH = textH + 16
   local boxW = textW + 20
 
   -- Avatar and name line.
@@ -1044,8 +1084,30 @@ function UI:Retry(entry, chatData)
   ns.Core:Ask(entry.question, nil, chatData.id)
 end
 
--- Connection line under the chat title: how questions travel and whether the
--- app is answering.
+-- What the line under the chat title shows for each state of the app (see
+-- Live:CheckApp). Red: questions won't be answered until the player fixes it.
+local APP_LINE = {
+  closed       = { "bad",  "APP_CLOSED",       "APP_CLOSED_TIP" },
+  stuck        = { "bad",  "APP_STUCK",        "APP_STUCK_TIP" },
+  ["need-ai"]    = { "bad",  "APP_NEED_AI",      "APP_NEED_AI_TIP" },
+  ["need-login"] = { "bad",  "APP_NEED_LOGIN",   "APP_NEED_LOGIN_TIP" },
+  problem      = { "bad",  "APP_PROBLEM",      "APP_PROBLEM_TIP" },
+  restart      = { "warn", "APP_RESTART_GAME", "APP_RESTART_GAME_TIP" },
+  checking     = { "idle", "APP_CHECKING",     nil },
+  nosound      = { "idle", "APP_NO_SOUND",     "APP_NO_SOUND_TIP" },
+}
+
+-- Tooltip of the line: title and explanation of the app's current status.
+function UI:AppStatusHelp()
+  local state = ns.Live:AppState()
+  local line = APP_LINE[state]
+  if line then return L[line[2]], line[3] and L[line[3]] end
+  if state == "ready" then return L.APP_READY, L.APP_READY_TIP end
+  return L.APP_UNKNOWN, L.APP_UNKNOWN_TIP
+end
+
+-- Connection line under the chat title: whether the app is open and ready,
+-- how questions travel, and whether the app is answering.
 function UI:RefreshStatusBar()
   if not self.dot then return end
   local waitingLong = false
@@ -1053,7 +1115,12 @@ function UI:RefreshStatusBar()
     if e.status == "pending" and time() - (e.t or time()) > 30 then waitingLong = true end
   end)
   local p = persona()
-  if waitingLong then
+  local line = APP_LINE[ns.Live:AppState()]
+  if line then
+    fill(self.dot, C[line[1]])
+    local color = line[1] == "bad" and "|cffff6060" or line[1] == "warn" and "|cffffc040" or "|cffaaaaaa"
+    self.channel:SetText(color .. L[line[2]] .. "|r")
+  elseif waitingLong then
     fill(self.dot, C.warn)
     self.channel:SetText(L.NO_SIGNAL)
   elseif ns.Voice and ns.Voice:Find() and not ns.Voice.broken then
