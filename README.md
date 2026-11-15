@@ -15,6 +15,8 @@
 
 <p align="center"><sub>English and Spanish · Inglés y español</sub></p>
 
+<p align="center"><sub>Unofficial fan project, not affiliated with Blizzard. Use it at your own risk: <a href="#blizzards-rules-and-your-own-risk">read the risks</a>.</sub></p>
+
 <p align="center">
   <img src="docs/in-game-item-links.webp" width="900" alt="The Forever AI Companion window in WoW Forever: the player links the Naga Heartpiercer and asks if their equipped weapon is better; Fizzi answers with clickable item links, compares weapon DPS and stats, and suggests the Shrapnel Blaster quest reward">
   <br>
@@ -33,6 +35,7 @@
 - [How it works](#how-it-works)
 - [The WoW Forever guide and its updates](#the-wow-forever-guide-and-its-updates)
 - [Privacy and safety](#privacy-and-safety)
+- [Blizzard's rules and your own risk](#blizzards-rules-and-your-own-risk)
 - [FAQ and troubleshooting](#faq-and-troubleshooting)
 - [Uninstalling](#uninstalling)
 - [For developers](#for-developers)
@@ -265,7 +268,48 @@ Each player can also add their own knowledge from the app's dashboard (**Server 
 - API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`.
 - The app window is a local page (`127.0.0.1`) that doesn't accept connections from other computers or other web pages.
 - **The game is not modified**: its memory and files are not touched, and the addon doesn't play for you. It only uses normal addon and Windows features.
-- This is not a Blizzard product. Use it at your own risk.
+- This is not a Blizzard product. Use it at your own risk (see the next section).
+
+---
+
+## Blizzard's rules and your own risk
+
+> **Forever AI Companion is an unofficial fan project. It is not made, endorsed or approved by Blizzard Entertainment. You use it at your own risk, and the project is provided as is, with no warranty of any kind.**
+
+Blizzard doesn't review or pre-approve addons or the apps that go with them, so nobody can promise you that using this one will never have consequences for your account. This section explains how the project compares with Blizzard's rules as we read them, and where the risks are, so you can decide for yourself. It is not legal advice and it is not Blizzard's opinion.
+
+### Blizzard's addon policy
+
+Blizzard's [UI Add-On Development Policy](https://us.forums.blizzard.com/en/wow/t/ui-add-on-development-policy/24534) sets the basic rules for addons:
+
+| Rule | This project |
+|---|---|
+| Addons must be free | ✅ Free, with nothing paid or locked |
+| The code must be fully visible | ✅ Readable, unobfuscated Lua. The app's code is in this repository too |
+| No harm to realms or other players | ✅ It sends nothing to the realm or to other players during normal use (the optional `/ia probe` test whispers one message to yourself) |
+| No ads and no donation requests in the game | ✅ None |
+| No offensive content | ✅ None |
+| Blizzard may disable any addon feature | Applies, see the risks below |
+
+### Blizzard's Terms of Use
+
+Blizzard's Terms of Use and EULA forbid bots, cheats and unauthorized third-party software that plays for you or collects information from the game. This is what the project does and doesn't do:
+
+| | |
+|---|---|
+| Plays for you, presses keys or clicks | **No.** You type every question, and every answer is just text you read, like looking something up on a website. |
+| Reads or changes the game's memory | **No.** It doesn't read, inject into or modify the game process. |
+| Changes the game's files | **No.** The app only writes inside its own addon folders in `Interface\AddOns`. |
+| Works during combat | **No.** The addon refuses questions while you are in combat, in line with Blizzard's goal that addons shouldn't give an advantage in combat. |
+| Can be inspected | **Yes.** All of the code is public in this repository. |
+
+### Where the risks are
+
+1. **The way data leaves the game is unusual.** Addons can't use the internet or write files, so the question leaves the game through the silent Windows voice or a line of squares read from the screen, and the answer comes back through addon files and silent sounds (see [How it works](#how-it-works)). These are all normal addon and Windows features, but Blizzard didn't design them for this. Apps that write data for an addon to read have been common and tolerated for years (the TradeSkillMaster desktop app, the WeakAuras Companion, Raider.IO). Reading data off the screen, though, is also a technique cheating bots have used. Those bots are banned for playing automatically, which this app never does, but someone reviewing it could still lump them together.
+2. **Blizzard can break it at any time.** If Blizzard doesn't like this kind of tool, the most likely result is a game patch that closes one of these paths, for example by limiting the text-to-speech or sound functions, rather than action against accounts. Blizzard already restricted combat addons heavily in Midnight, the engine WoW Forever runs on. If that happens, the assistant stops working until another way is found, if one exists.
+3. **Action against your account is possible.** Because it doesn't automate anything or touch the game's memory, we consider the risk low, but Blizzard has the final word on what its Terms of Use allow, and its rules and how it enforces them can change. If your account matters more to you than the convenience, don't use it.
+4. **The AI can be wrong.** Answers can be inaccurate or out of date, especially about things that change with patches. Double-check before spending a lot of gold or time on an answer.
+5. **Your AI provider's terms apply too.** Using Claude, Codex or an API key through this app is subject to that provider's own terms and limits.
 
 ---
 
@@ -377,4 +421,4 @@ Installed apps (1.7.0 and later) pick up every new release by themselves (`src/u
 ### To do
 
 - **Code signing** for the `.exe` to remove the SmartScreen warning (a code signing certificate or Azure Trusted Signing).
-- Review Blizzard's policies for Forever before a wide release.
+- Ask Blizzard (a support ticket or the official UI & Macro forum) whether this kind of companion app is allowed, and update [Blizzard's rules and your own risk](#blizzards-rules-and-your-own-risk) with the answer.
