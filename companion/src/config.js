@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { revealSecrets, sealSecrets, secretsProtected } from './secrets.js';
 
 // Folder of the companion source (dev mode). In the packaged app this is unused.
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -134,18 +135,33 @@ export function applyPreset(cfg) {
   return cfg;
 }
 
+function writeConfig(file, data) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n');
+  fs.renameSync(tmp, file);
+}
+
+// API keys are stored encrypted (Windows DPAPI, see secrets.js) and decrypted here.
 export function loadConfig(file = configFile()) {
-  const cfg = applyPreset(merge(DEFAULTS, readUserConfig(file)));
+  const saved = readUserConfig(file);
+  const { cfg: user, plainFound } = revealSecrets(saved);
+  // Keys saved as plain text (earlier versions, or typed into config.json): encrypt them now.
+  if (plainFound && secretsProtected()) {
+    try { writeConfig(file, sealSecrets(saved)); } catch { /* left as is; retried on the next start */ }
+  }
+  const cfg = applyPreset(merge(DEFAULTS, user));
   if (envVar('WOW_DIR')) cfg.wowDir = envVar('WOW_DIR');
   if (envVar('PROVIDER')) cfg.provider = envVar('PROVIDER');
   return cfg;
 }
 
-// Merges `patch` into the saved user config (only what the user changed is stored).
+// Merges `patch` into the saved user config (only what the user changed is
+// stored). New keys are encrypted before they reach the disk; if that fails
+// nothing is saved.
 export function saveConfig(patch, file = configFile()) {
   const next = merge(readUserConfig(file), patch);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(next, null, 2) + '\n');
+  writeConfig(file, sealSecrets(next));
   return loadConfig(file);
 }
 

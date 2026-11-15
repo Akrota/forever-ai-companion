@@ -247,6 +247,7 @@ build: 70938           ← the game's build number
 **How it stays current:**
 
 - The app ships with a copy, and also **downloads the one in this repository** at startup, every 6 hours and as soon as it notices the game was updated. It only uses it if it's valid and its `date` is newer; offline it uses the last one it downloaded.
+- The guide reaches the AI fenced off as reference data: it can supply facts, but text inside it cannot change the AI's rules or role.
 - The AI knows today's date and how old the guide is. If the guide is more than 21 days old, or the game is newer than the guide, it checks on the internet whatever changes with patches before stating it.
 
 **To update the guide for every player** (without releasing a new version of the app):
@@ -265,7 +266,10 @@ Each player can also add their own knowledge from the app's dashboard (**Server 
 
 - **Your data only goes to the AI you chose.** This project has no servers: it never receives your questions, your data or your keys.
 - The app's only connection of its own is downloading the WoW Forever guide from this repository (a read, nothing is sent).
-- API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`.
+- API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`, **encrypted with Windows DPAPI** for your Windows account: a copy of that file on another PC or account doesn't reveal them. Keys saved in plain text by earlier versions are encrypted the next time the app starts.
+- **Invisible sending:** the silent voice's file used by elevated programs lives in `%ProgramFiles%\ForeverAICompanion`, which only administrators can change (installs from before this change are offered **Update invisible sending** to move it). The voice keeps only this app's own messages: anything else any program speaks with it is dropped without being written or logged.
+- **Codex:** when the app searches the PC for Codex, or installs it, it only runs a `codex.exe` that Windows confirms is signed by OpenAI. If a future Codex stops accepting one of the safety switches the app relies on (no commands, no file or browser access), the app refuses to use it rather than dropping the switch.
+- The `/ia probe` channel test only watches the game's files while a test is running (and for 15 minutes after, for files the game writes at logout).
 - The app window is a local page (`127.0.0.1`) that doesn't accept connections from other computers or other web pages.
 - **The game is not modified**: its memory and files are not touched, and the addon doesn't play for you. It only uses normal addon and Windows features.
 - This is not a Blizzard product. Use it at your own risk (see the next section).
@@ -372,6 +376,7 @@ companion/
   src/inbox.js              Inboxes and bell
   src/beacon.js             Tells the game whether the app is open and ready
   src/updater.js            Updates the app from GitHub releases
+  src/secrets.js            Encrypts API keys in config.json (Windows DPAPI)
   src/prompt.js             Instructions for the AI
   src/guide.js              WoW Forever guide: date, version and downloads
   src/providers.js          Claude, OpenAI/Gemini/Ollama, Claude Code, Codex, test
