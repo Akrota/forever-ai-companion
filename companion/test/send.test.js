@@ -822,6 +822,42 @@ test('links in the question bubble keep their color and open the item like in th
   assert.equal(refs, 'item:9999::::/LeftButton', 'clicking opens it like a chat link');
 });
 
+test('each answer shows the tokens it used, and the chat total sits under the text box', () => {
+  const tip = `
+    TIP = {}
+    GameTooltip = { SetOwner = function() TIP = {} end, AddLine = function(_, s) TIP[#TIP + 1] = s end, Show = function() end, Hide = function() end }
+  `;
+  for (const [locale, meta, total, read] of [
+    ['enUS', '  ·  18.2k tokens', 'This chat: 18.2k tokens', 'Read: 18,000 (from the cache: 12,000)'],
+    ['esMX', '  ·  18,2k tokens', 'Este chat: 18,2k tokens', 'Leídos: 18.000 (de la caché: 12.000)'],
+  ]) {
+    const out = runLua(`
+      START()
+      ns.Personas:Set("fizzi")
+      ns.UI:Show()
+      ns.Core:Ask("primera")
+      RUN_FRAMES(200)
+      local chat = ns.Chats:Current()
+      ns.Core:ApplyInbox({ answers = { { id = chat.messages[1].id, ok = true, answer = "uno", tokens = { i = 18000, c = 12000, o = 234 } } } })
+      ns.Core:Ask("segunda")
+      RUN_FRAMES(200)
+      ns.Core:ApplyInbox({ answers = { { id = chat.messages[2].id, ok = true, answer = "dos" } } })
+      ns.UI:Refresh()
+      local b = ns.UI.bubbles[2]
+      b.metaHover.scripts.OnEnter(b.metaHover)
+      local tip1 = table.concat(TIP, "|")
+      -- (the fake UI answers unknown fields with a function: "no table" means unset)
+      local older = type(rawget(ns.UI.bubbles[4].metaHover, "tokens")) ~= "table" and not ns.UI.bubbles[4].meta.textValue:find("tokens")
+      RESULT = table.concat({ b.meta.textValue:gsub("^%d+:%d+", ""), ns.UI.usage.textValue, tip1, tostring(older) }, "#")
+    `, { locale }, ALL_FILES, `LOCALE = ${JSON.stringify(locale)}\n` + tip + RECORD_TEXT + PRELUDE_DRIVE);
+    const [m, t, tipText, older] = out.split('#');
+    assert.equal(m, meta, `${locale}: time · tokens under the answer`);
+    assert.equal(t, total, `${locale}: the whole chat under the text box`);
+    assert.match(tipText, new RegExp(read.replace(/[().]/g, '\\$&')));
+    assert.equal(older, 'true', 'answers from apps that send no tokens show no count');
+  }
+});
+
 test('items in the AI answer become links only when the id really is that item', () => {
   const items = `
     C_Item = {

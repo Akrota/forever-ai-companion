@@ -15,10 +15,19 @@ import path from 'node:path';
 import { foreverGuide } from './assets.js';
 
 export const GUIDE_FILE = 'wow-forever.md';
+// Detailed topics (dungeons, zones, classes, professions...): too long to send
+// whole, so each question gets only its relevant sections (selectTopics).
+export const TOPICS_FILE = 'wow-forever-topics.md';
 const MAX_BYTES = 200 * 1024;
+export const TOPICS_MAX_BYTES = 600 * 1024;
 const MIN_BODY = 1000;
 // Older than this, the AI must double-check facts that may have changed.
 export const STALE_DAYS = 21;
+// Characters of topic sections per question (~6k tokens).
+export const TOPICS_BUDGET = 24000;
+
+// The topics file is published next to the base guide.
+export const topicsUrl = (guideUrl) => (guideUrl ? guideUrl.replace(/[^/]+$/, TOPICS_FILE) : null);
 
 // { meta: { date, gameVersion, build }, body } or null if it isn't a guide.
 export function parseGuide(text) {
@@ -38,21 +47,22 @@ export function parseGuide(text) {
 
 // Rejects anything that isn't clearly an updated Forever guide: the text goes
 // straight to the AI, so a wrong page or an error page must never replace it.
-export function validGuide(text) {
-  if (Buffer.byteLength(String(text || '')) > MAX_BYTES) return null;
+export function validGuide(text, { maxBytes = MAX_BYTES } = {}) {
+  if (Buffer.byteLength(String(text || '')) > maxBytes) return null;
   const g = parseGuide(text);
   if (!g || g.body.length < MIN_BODY || !/World of Warcraft: Forever/.test(g.body)) return null;
   return g;
 }
 
 const newer = (a, b) => (!b || a.meta.date > b.meta.date ? a : b);
+const maxBytesOf = (file) => (file === TOPICS_FILE ? TOPICS_MAX_BYTES : MAX_BYTES);
 
 // The newest of: the downloaded guide, the one inside this app.
-export function currentGuide(dir) {
-  const builtin = parseGuide(foreverGuide());
+export function currentGuide(dir, file = GUIDE_FILE) {
+  const builtin = parseGuide(foreverGuide(file));
   let downloaded = null;
   try {
-    downloaded = validGuide(fs.readFileSync(path.join(dir, GUIDE_FILE), 'utf8'));
+    downloaded = validGuide(fs.readFileSync(path.join(dir, file), 'utf8'), { maxBytes: maxBytesOf(file) });
   } catch { /* none yet */ }
   if (downloaded) downloaded.source = 'descargada';
   if (builtin) builtin.source = 'incluida';
@@ -102,9 +112,9 @@ export function freshnessSection(guide, opts = {}) {
 
 // Downloads the published guide now and then. Keeps it only if it is valid and
 // newer than what the app already has. Returns { check(reason), stop() }.
-export function startGuideUpdates({ url, dir, log = () => {}, intervalMs = 6 * 3600000, fetchImpl = fetch, onUpdate = () => {} }) {
+export function startGuideUpdates({ url, dir, file = GUIDE_FILE, log = () => {}, intervalMs = 6 * 3600000, fetchImpl = fetch, onUpdate = () => {} }) {
   if (!url) return { check: async () => false, stop() {} };
-  const etagFile = path.join(dir, `${GUIDE_FILE}.etag`);
+  const etagFile = path.join(dir, `${file}.etag`);
   let busy = null;
   let lastAt = 0;
 
@@ -115,17 +125,17 @@ export function startGuideUpdates({ url, dir, log = () => {}, intervalMs = 6 * 3
     if (res.status === 304) return false;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
-    const guide = validGuide(text);
+    const guide = validGuide(text, { maxBytes: maxBytesOf(file) });
     if (!guide) throw new Error('the downloaded file is not a valid guide');
-    const have = currentGuide(dir);
+    const have = currentGuide(dir, file);
     if (have && guide.meta.date <= have.meta.date) return false;
     fs.mkdirSync(dir, { recursive: true });
-    const tmp = path.join(dir, `${GUIDE_FILE}.tmp`);
+    const tmp = path.join(dir, `${file}.tmp`);
     fs.writeFileSync(tmp, text);
-    fs.renameSync(tmp, path.join(dir, GUIDE_FILE));
+    fs.renameSync(tmp, path.join(dir, file));
     const etag = res.headers.get('etag');
     if (etag) fs.writeFileSync(etagFile, etag);
-    log(`WoW Forever guide updated (${guide.meta.date}).`);
+    log(`WoW Forever ${file === TOPICS_FILE ? 'topics' : 'guide'} updated (${guide.meta.date}).`);
     onUpdate(guide);
     return true;
   }
@@ -136,14 +146,86 @@ export function startGuideUpdates({ url, dir, log = () => {}, intervalMs = 6 * 3
     if (reason === 'patch' && Date.now() - lastAt < 30 * 60000) return Promise.resolve(false);
     lastAt = Date.now();
     busy = download()
-      .catch((e) => { log(`Could not update the WoW Forever guide: ${e.message}`); return false; })
+      .catch((e) => { log(`Could not update the WoW Forever ${file === TOPICS_FILE ? 'topics' : 'guide'}: ${e.message}`); return false; })
       .finally(() => { busy = null; });
     return busy;
   }
 
-  const first = setTimeout(() => check('start'), 5000);
+  const first = setTimeout(() => check('start'), file === GUIDE_FILE ? 5000 : 15000);
   const timer = setInterval(() => check('timer'), intervalMs);
   timer.unref?.();
   first.unref?.();
   return { check, stop() { clearTimeout(first); clearInterval(timer); } };
+}
+
+// --- Picking the topic sections for a question --------------------------------
+
+// "¿Dónde está La Ciudad Anegada?" -> " donde esta la ciudad anegada "
+export function normalizeText(s) {
+  return ` ${String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').trim()} `;
+}
+
+// Sections of a topics guide: "### Title" + optional "keywords: a, b, c" line.
+export function topicSections(body) {
+  const sections = [];
+  for (const chunk of String(body || '').split(/^(?=### )/m)) {
+    const m = /^### (.+)\r?\n(?:keywords:\s*(.*)\r?\n)?/i.exec(chunk);
+    if (!m) continue;
+    const keywords = (m[2] || '').split(',').map((k) => normalizeText(k)).filter((k) => k.trim().length >= 2); // "xp", "bg"
+    sections.push({
+      title: m[1].trim(), keywords, always: /(^|,)\s*always\s*(,|$)/i.test(m[2] || ''), text: chunk.trim(), plain: normalizeText(chunk),
+    });
+  }
+  return sections;
+}
+
+const STOP = new Set(['the', 'and', 'for', 'with', 'from', 'what', 'where', 'que', 'como', 'donde', 'para', 'por', 'los', 'las', 'del', 'una', 'uno', 'con', 'wow', 'forever']);
+
+// The sections that match the question best (and the player's zone, race and
+// class a little), within `budget` characters.
+export function selectTopics(guide, { question = '', context = null, budget = TOPICS_BUDGET } = {}) {
+  const sections = topicSections(guide?.body);
+  if (!sections.length) return '';
+  const q = normalizeText(question);
+  const ch = context?.character || {};
+  const pos = context?.position || {};
+  const around = normalizeText([pos.zone, pos.subzone, ch.race, ch.raceToken, ch.class].filter(Boolean).join(' | '));
+  const words = q.trim().split(' ').filter(Boolean);
+  const qWords = new Set(words.filter((w) => w.length > 3 && !STOP.has(w)));
+  // Names in the question (an item, an NPC, a quest: "felbough arm", "hemet
+  // nesingwary") found anywhere in a section's text, not just its keywords.
+  const names = new Set();
+  for (let n = 2; n <= 4; n++) {
+    for (let i = 0; i + n <= words.length; i++) {
+      const gram = words.slice(i, i + n);
+      if (STOP.has(gram[0]) || STOP.has(gram[n - 1]) || gram.some((w) => w.length < 3)) continue;
+      if (gram.join(' ').length >= 8) names.add(` ${gram.join(' ')} `);
+    }
+  }
+  const scored = sections.map((s, i) => {
+    let score = 0;
+    for (const k of s.keywords) {
+      if (q.includes(k)) score += k.trim().includes(' ') ? 4 : 3;
+      else if (around.includes(k)) score += 1;
+    }
+    for (const w of normalizeText(s.title).trim().split(' ')) if (qWords.has(w)) score += 1;
+    let named = 0;
+    for (const name of names) if (s.plain.includes(name)) named++;
+    score += Math.min(named, 3) * 3;
+    return { s, i, score };
+  });
+  const picked = [];
+  let used = 0;
+  const take = (s) => {
+    if (used + s.text.length > budget) return;
+    picked.push(s);
+    used += s.text.length;
+  };
+  scored.filter((x) => x.s.always).forEach((x) => take(x.s));
+  scored.filter((x) => !x.s.always && x.score > 0)
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .forEach((x) => take(x.s));
+  // Keep the guide's order so related sections read together.
+  return picked.sort((a, b) => sections.indexOf(a) - sections.indexOf(b)).map((s) => s.text).join('\n\n');
 }

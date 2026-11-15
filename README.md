@@ -119,6 +119,7 @@ Coming from version 1.5.0 or earlier, the app and the addon move to new folder n
 - **Ask about what's open**: with a quest, vendor, trainer or loot window open, the AI sees it. Try *"Should I accept this quest?"*, *"Which reward should I pick?"*, *"What should I buy here?"* or *"What should I train first?"*.
 - **Professions**: open each profession window once and the addon remembers your recipes, so you can ask *"What can I craft with what I have?"* or *"Which recipe should I make to level up?"*.
 - **Is the app ready?** The line under the chat title tells you. Green: the app is open and ready. Red: questions won't be answered yet, and it says why (the app is closed or not responding, no AI is chosen, or your AI needs you to sign in). Hover it for what to do.
+- **Tokens used**: next to each answer's time you see how many tokens it used (*"18.2k tokens"*), and under the text box, below **Send**, the whole chat's total. Hover them for the detail: tokens read (your data, the guide and what it looked up; the part from the cache counts much less) and written. It's what your plan or API key is measured in. The dashboard's recent questions show it too.
 - **See what is sent**: in the window click **See the data I send**.
 - **In combat** you can't ask (on purpose): wait until combat ends.
 
@@ -222,9 +223,9 @@ That's why you need to **restart WoW** after installing: the game only sees file
 
 - **The assistant's instructions**: Fizzi's or Rizzik's personality, how to read the data and how to answer (short, with coordinates, no web links because the game can't open them). Items it saw in your data come back marked with their id (`{{item:ID|Name}}`) and the addon turns them into item links, only if that id really is the item with that name in your game.
 - **Today's date and the game version**, to reason about the calendar and patches.
-- **The WoW Forever guide** (see below).
+- **The WoW Forever guide** (see below): the base guide, plus the detailed sections that match the question (a dungeon, a zone, a class...).
 - **Your data and the question**, plus the earlier questions of the same chat.
-- If the AI can, it **searches the internet** when it needs a Forever-specific fact (a few seconds more). It can be turned off in the dashboard.
+- If the AI can, it **searches the internet** for whatever the guide doesn't cover (a few seconds more), with its own search tools: it's told to prefer WoW Forever guides (Wowhead, Warcraft Tavern, Method, Maxroll, the Fextralife wiki) and to search before saying it doesn't know something. It can be turned off in the dashboard.
 
 With the subscriptions, Claude Code and Codex run as a plain chat: our instructions replace their coding ones, with no access to your files or commands, without your settings and without saving sessions.
 
@@ -257,6 +258,8 @@ build: 70938           ← the game's build number
 
 Tips: write full dates ("opened on December 9, 2026", not "opening soon"), mark with "per guides" whatever Blizzard hasn't confirmed, and keep it under 200 KB.
 
+**Detailed topics.** Next to it, [`companion/knowledge-builtin/wow-forever-topics.md`](companion/knowledge-builtin/wow-forever-topics.md) holds the details: every dungeon and raid (location, how to get in, bosses, loot, quests), zones and leveling, classes and races, professions and systems. It's too long to send whole, so with each question the AI gets only the sections that match it. Each section starts with a `### Title` and a `keywords:` line with the English and Spanish names a player might type (the section is picked when the question contains one of them or names something written in the section, like an item or an NPC, and a little when it's the player's zone, race or class); `keywords: always` sends a section with every question. It has the same header and is updated the same way (set its `date` to today), and it's downloaded by app version 1.10.0 or later; older versions only use the base guide.
+
 Each player can also add their own knowledge from the app's dashboard (**Server knowledge…**): `.md` or `.txt` files in that folder are included with every question and take priority over the guide.
 
 ---
@@ -264,7 +267,7 @@ Each player can also add their own knowledge from the app's dashboard (**Server 
 ## Privacy and safety
 
 - **Your data only goes to the AI you chose.** This project has no servers: it never receives your questions, your data or your keys.
-- The app's only connection of its own is downloading the WoW Forever guide from this repository (a read, nothing is sent).
+- The app's only connection of its own is downloading the WoW Forever guide from this repository (a read, nothing is sent). Internet searches are made by the AI you chose, with its own tools.
 - API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`.
 - The app window is a local page (`127.0.0.1`) that doesn't accept connections from other computers or other web pages.
 - **The game is not modified**: its memory and files are not touched, and the addon doesn't play for you. It only uses normal addon and Windows features.
@@ -373,7 +376,7 @@ companion/
   src/beacon.js             Tells the game whether the app is open and ready
   src/updater.js            Updates the app from GitHub releases
   src/prompt.js             Instructions for the AI
-  src/guide.js              WoW Forever guide: date, version and downloads
+  src/guide.js              WoW Forever guide: date, version, downloads and picking topic sections
   src/providers.js          Claude, OpenAI/Gemini/Ollama, Claude Code, Codex, test
   src/codex.js              Codex: install, sign-in and running it
   src/claude-code.js        Claude Code: install and sign-in
@@ -381,7 +384,7 @@ companion/
   src/migrate.js            Moves installs from the project's previous name
   tts/ForeverAICompanionTts.cs  Silent voice engine (C#)
   tray/Tray.cs              Icon next to the clock (C#)
-  knowledge-builtin/        WoW Forever guide
+  knowledge-builtin/        WoW Forever guide (base) and detailed topics
   scripts/build.js          Packages ForeverAICompanion.exe
   test/                     Tests (they run the addon's real Lua)
 ```

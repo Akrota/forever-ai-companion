@@ -303,6 +303,46 @@ local function stamp(t)
   return date("%H:%M", t)
 end
 
+-- Tokens ---------------------------------------------------------------------
+-- What each answer cost (sent by the app: i = read, c = of which from the
+-- cache, o = written), as Claude Code and Codex show it.
+
+-- 950 -> "950", 18234 -> "18.2k" ("18,2k" in Spanish), 250000 -> "250k".
+local function shortNumber(n)
+  n = tonumber(n) or 0
+  if n < 1000 then return tostring(floor(n)) end
+  local s
+  if n < 100000 then s = string.format("%.1fk", n / 1000)
+  elseif n < 1000000 then s = string.format("%dk", floor(n / 1000 + 0.5))
+  else s = string.format("%.1fM", n / 1000000) end
+  s = s:gsub("%.0([kM])", "%1")
+  return (s:gsub("%.", L.DECIMAL))
+end
+UI.ShortNumber = shortNumber
+
+-- 18234 -> "18,234" ("18.234" in Spanish).
+local function longNumber(n)
+  local s = tostring(floor(tonumber(n) or 0))
+  local sep = L.DECIMAL == "," and "." or ","
+  local k
+  repeat s, k = s:gsub("^(%d+)(%d%d%d)", "%1" .. sep .. "%2") until k == 0
+  return s
+end
+
+local function tokenTotal(t)
+  return t and ((t.i or 0) + (t.o or 0)) or 0
+end
+
+function UI:ShowTokensTip(owner, t, title)
+  if not GameTooltip or not t then return end
+  GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+  GameTooltip:AddLine(title)
+  GameTooltip:AddLine(string.format(L.TOKENS_READ, longNumber(t.i), longNumber(t.c)), 1, 1, 1)
+  GameTooltip:AddLine(string.format(L.TOKENS_WRITTEN, longNumber(t.o)), 1, 1, 1)
+  GameTooltip:AddLine(L.TOKENS_TIP, 0.8, 0.8, 0.8, true)
+  GameTooltip:Show()
+end
+
 local function dayGroup(t)
   t = t or 0
   local today = date("%Y-%m-%d")
@@ -576,9 +616,22 @@ function UI:Build()
   composer:EnableMouse(true)
   composer:SetScript("OnMouseDown", function() input:SetFocus() end)
 
+  -- Under the text box and Send, on the right: the tokens this chat has used
+  -- (as Claude shows it). Hover for what was read, cached and written.
+  local usage = main:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  usage:SetPoint("BOTTOMRIGHT", -26, 10)
+  usage:SetJustifyH("RIGHT")
+  if usage.SetWordWrap then usage:SetWordWrap(false) end
+  local usageHover = CreateFrame("Frame", nil, main)
+  usageHover:SetAllPoints(usage)
+  usageHover:EnableMouse(false)
+  usageHover:SetScript("OnEnter", function(self) UI:ShowTokensTip(self, self.tokens, L.TOKENS_CHAT_TIP_TITLE) end)
+  usageHover:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+  self.usage, self.usageHover = usage, usageHover
+
   local status = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   status:SetPoint("BOTTOMLEFT", 14, 10)
-  status:SetPoint("BOTTOMRIGHT", -24, 10)
+  status:SetPoint("RIGHT", usage, "LEFT", -12, 0)
   status:SetJustifyH("LEFT")
 
   -- Resize grip.
@@ -835,6 +888,13 @@ function UI:Bubble(i)
   b.who = who
   local meta = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   b.meta = meta
+  -- Hovering "time · N tokens" of an answer shows what it read and wrote.
+  local metaHover = CreateFrame("Frame", nil, b)
+  metaHover:SetAllPoints(meta)
+  metaHover:EnableMouse(false)
+  metaHover:SetScript("OnEnter", function(self) UI:ShowTokensTip(self, self.tokens, L.TOKENS_TIP_TITLE) end)
+  metaHover:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+  b.metaHover = metaHover
   local box = newFrame("Frame", nil, b)
   b.box = box
   -- Links in the player's questions work as in the chat: hover shows the
@@ -864,7 +924,7 @@ function UI:Bubble(i)
 end
 
 -- Lays out one message at height y. kind: "user", "ai", "pending", "error".
-function UI:PlaceBubble(i, y, kind, textValue, metaValue, onAction, actionLabel)
+function UI:PlaceBubble(i, y, kind, textValue, metaValue, onAction, actionLabel, tokens)
   local b = self:Bubble(i)
   local p = persona()
   local width = self.content:GetWidth()
@@ -933,6 +993,8 @@ function UI:PlaceBubble(i, y, kind, textValue, metaValue, onAction, actionLabel)
   if kind == "pending" then b.text:SetTextColor(0.75, 0.75, 0.75) end
   b.pending = kind == "pending"
   b.meta:SetText(metaValue or "")
+  b.metaHover.tokens = tokens
+  b.metaHover:EnableMouse(tokens ~= nil)
   b.action:SetShown(onAction ~= nil)
   if onAction then
     b.action.label:SetText(actionLabel)
@@ -1154,6 +1216,7 @@ function UI:RefreshConversation()
   local messages = current and current.messages or {}
   local p = persona()
   local y, n = 8, 0
+  local spent = { i = 0, c = 0, o = 0 }
   if #messages == 0 then
     y = y + self:ShowWelcome()
   elseif self.welcome then
@@ -1167,8 +1230,13 @@ function UI:RefreshConversation()
       y = y + self:PlaceBubble(n, y, "pending", ns.Personas:ThinkingText(0), nil) + 12
     elseif e.status == "done" then
       local answer = e.answer
-      y = y + self:PlaceBubble(n, y, "ai", renderAnswer(answer), stamp(e.t),
-        function() UI:ShowCopy(UI.PlainAnswer(answer)) end, L.COPY) + 12
+      local meta = stamp(e.t)
+      if e.tokens then
+        meta = meta .. "  ·  " .. string.format(L.TOKENS, shortNumber(tokenTotal(e.tokens)))
+        spent.i, spent.c, spent.o = spent.i + (e.tokens.i or 0), spent.c + (e.tokens.c or 0), spent.o + (e.tokens.o or 0)
+      end
+      y = y + self:PlaceBubble(n, y, "ai", renderAnswer(answer), meta,
+        function() UI:ShowCopy(UI.PlainAnswer(answer)) end, L.COPY, e.tokens) + 12
     else
       y = y + self:PlaceBubble(n, y, "error",
         p.errorIntro .. "\n|cffffb0b0" .. escape(e.answer or L.SOMETHING_WRONG) .. "|r", stamp(e.t),
@@ -1176,6 +1244,13 @@ function UI:RefreshConversation()
     end
   end
   for i = n + 1, #self.bubbles do self.bubbles[i]:Hide() end
+  -- The whole chat's tokens, on the right of the line under the title.
+  if self.usage then
+    local total = tokenTotal(spent)
+    self.usage:SetText(total > 0 and string.format(L.TOKENS_CHAT, shortNumber(total)) or "")
+    self.usageHover.tokens = total > 0 and spent or nil
+    self.usageHover:EnableMouse(total > 0)
+  end
   self.content:SetHeight(max(10, y))
   C_Timer.After(0, function()
     UI.scroll:SetVerticalScroll(UI.scroll:GetVerticalScrollRange())

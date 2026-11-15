@@ -400,6 +400,10 @@ function Core:ApplyInbox(inbox)
     if entry and entry.status == "pending" then
       entry.status = a.ok and "done" or "error"
       entry.answer = a.answer
+      -- Tokens the answer used (read, of which cached, written), if the AI said.
+      if type(a.tokens) == "table" then
+        entry.tokens = { i = tonumber(a.tokens.i) or 0, c = tonumber(a.tokens.c) or 0, o = tonumber(a.tokens.o) or 0 }
+      end
       arrived = arrived + 1
       -- Chats with news the player is not looking at: mark and notify.
       owner.updated = time()

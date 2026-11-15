@@ -19,7 +19,11 @@ test('the built-in guide has a date and the game build it describes', () => {
   assert.equal(builtin.meta.build, 70938);
   assert.ok(!builtin.body.startsWith('---'), 'the header is not sent to the AI');
   assert.match(builtin.body, /December 9, 2026/);
-  assert.match(builtin.body, /es: "La Ciudad Anegada"/, 'Spanish client names for Spanish players');
+  assert.match(builtin.body, /esMX: La Ciudad Anegada/, 'Spanish client names for Spanish players');
+  // The detailed topics ship too, split in sections with keywords.
+  const topics = validGuide(foreverGuide('wow-forever-topics.md'), { maxBytes: 600 * 1024 });
+  assert.ok(topics, 'the topics file is a valid guide');
+  assert.match(topics.body, /^### .+\nkeywords: .+/m);
   // The first published guides used Spanish keys.
   const legacy = parseGuide('---\nfecha: 2026-11-13\nversionJuego: 1.60.1\nbuild: 70938\n---\nbody');
   assert.equal(legacy.meta.date, '2026-11-13');
@@ -34,7 +38,7 @@ test('the AI knows today\'s date, the guide\'s age and when the game is newer', 
 
   const system = buildSystem('', 'fizzi', { now, client: { build: 71500, version: '1.61.0' } });
   assert.match(system, /Today is December 20, 2026/);
-  assert.match(system, /The WoW Forever base guide was last reviewed on November 13, 2026/);
+  assert.match(system, /The WoW Forever base guide was last reviewed on November \d+, 2026/);
   assert.match(system, /version 1\.61\.0 \(build 71500\)/);
   assert.match(system, /Blizzard updated the game after the guide/);
   assert.match(system, /the most recent information wins/);
