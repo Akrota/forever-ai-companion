@@ -471,7 +471,7 @@ Test variables: `FAIC_DATA_DIR` (data folder), `FAIC_WOW_DIR`, `FAIC_PROVIDER`, 
 Installed apps (1.7.0 and later) pick up every new release by themselves (`src/updater.js`), so:
 
 1. Bump the number in `companion/src/app/controller.js` (`VERSION`) and, if the addon changed, in `addon/ForeverAICompanion/ForeverAICompanion.toc`. If Blizzard raised the game's interface number, update `## Interface:` in the toc too, or WoW will treat the addon as out of date.
-2. `npm test` and `npm run build`.
+2. `npm test` and `npm run build`. The Windows `.exe` can also be built on GitHub's Windows machines: **Actions › Windows build › Run workflow** with the release's tag runs every test on Windows, builds the exe and attaches it to that release (a draft works).
 3. On GitHub, **Releases → Draft a new release**, create the tag **`v` + the exact `VERSION`** (for example `v1.7.0`) and attach `dist/ForeverAICompanion.exe` with that exact name, and `dist/ForeverAICompanion-mac.zip` (built on a Mac) with that exact name too: Mac apps update from it. Don't mark it as a pre-release (pre-releases are not offered to players). The README's download link and the in-app updater always use the latest release.
 
 ### Contributing
