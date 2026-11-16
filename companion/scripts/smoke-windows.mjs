@@ -67,23 +67,46 @@ async function until(what, fn, ms = 60000, every = 500) {
   return fail(`${what} (waited ${ms / 1000} s)`);
 }
 
+// Requests to the app on a fresh connection each time. (fetch reuses idle
+// connections, and the app's server closes them after 5 s: a POST sent on one
+// that just closed fails with ECONNRESET and is not retried. Browsers retry.)
+function request(method, url, body = null, timeout = 300000) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const data = body === null ? null : Buffer.from(JSON.stringify(body));
+    const req = http.request({
+      host: u.hostname, port: u.port, path: u.pathname, method, agent: false, timeout,
+      headers: { ...HEADER, ...(data ? { 'content-length': data.length } : {}) },
+    }, (res) => {
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => { text += c; });
+      res.on('end', () => {
+        try { resolve({ ok: res.statusCode < 400, status: res.statusCode, json: JSON.parse(text) }); } catch (e) { reject(e); }
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('timed out')));
+    req.on('error', reject);
+    req.end(data);
+  });
+}
+
 async function findApp() {
   for (let port = 47365; port < 47375; port++) {
     try {
-      const r = await fetch(`http://127.0.0.1:${port}/api/ping`, { signal: AbortSignal.timeout(800) });
-      if ((await r.json()).app === 'ForeverAICompanion') return `http://127.0.0.1:${port}/`;
+      const r = await request('GET', `http://127.0.0.1:${port}/api/ping`, null, 800);
+      if (r.json.app === 'ForeverAICompanion') return `http://127.0.0.1:${port}/`;
     } catch { /* not here */ }
   }
   return null;
 }
 
 const api = async (base, name, body = {}, timeout = 300000) => {
-  const r = await fetch(`${base}api/${name}`, { method: 'POST', headers: HEADER, body: JSON.stringify(body), signal: AbortSignal.timeout(timeout) });
-  const j = await r.json();
-  if (!r.ok) throw new Error(`${name}: ${j.error || r.status}`);
-  return j;
+  const r = await request('POST', `${base}api/${name}`, body, timeout);
+  if (!r.ok) throw new Error(`${name}: ${r.json.error || r.status}`);
+  return r.json;
 };
-const status = async (base) => (await fetch(`${base}api/status`)).json();
+const status = async (base) => (await request('GET', `${base}api/status`)).json;
 const log = () => { try { return fs.readFileSync(logFile, 'utf8'); } catch { return ''; } };
 
 // A stand-in for GitHub's "latest release" answer, offering this same exe as 9.9.9.
