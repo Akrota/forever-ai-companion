@@ -44,8 +44,15 @@ function fail(msg) {
   console.error(`  FAIL ${msg}`);
   try { console.error(`\n--- app log ---\n${fs.readFileSync(logFile, 'utf8')}`); } catch { /* no log yet */ }
   try { fs.copyFileSync(logFile, path.join(out, 'app.log')); } catch { /* none */ }
+  for (const dir of [installDir, path.join(dataDir, 'updates')]) {
+    try { console.error(`--- ${dir}: ${fs.readdirSync(dir).join(', ')}`); } catch { /* none */ }
+  }
   process.exit(1);
 }
+
+// Any unexpected error: report it with the app's log, like a failed step.
+process.on('uncaughtException', (e) => fail(`unexpected error: ${e.stack || e}`));
+process.on('unhandledRejection', (e) => fail(`unexpected error: ${e?.stack || e}`));
 
 async function until(what, fn, ms = 60000, every = 500) {
   const end = Date.now() + ms;
@@ -203,6 +210,7 @@ const base2 = await findApp();
 s = await status(base2);
 if (!s.wow.addonInstalled) fail('after updating, the addon is no longer seen');
 ok(`running again at ${base2}, settings kept`);
+fs.writeFileSync(path.join(out, 'app.log'), log());
 
 // 6. Uninstalling ---------------------------------------------------------------
 step('6. Uninstalling');
