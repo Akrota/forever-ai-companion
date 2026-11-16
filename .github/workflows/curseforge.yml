@@ -1,0 +1,69 @@
+# Uploads the addon to CurseForge when a release is published on GitHub
+# (https://www.curseforge.com/wow/addons/forever-ai-companion), with the
+# release notes as its changelog. See companion/scripts/curseforge.mjs.
+#
+# Needs the repository secret CURSEFORGE_TOKEN: an API token of the project's
+# author (CurseForge › Authors › My API Tokens). It can also be run by hand
+# from Actions › "CurseForge upload" › Run workflow, with a release's tag.
+name: CurseForge upload
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of the published release to upload the addon of (for example v1.11.1)
+        required: true
+      dry_run:
+        description: Only check the token and the game version, upload nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: companion
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      # The released code (a dry run checks with the workflow's own code, so
+      # it also works for releases made before this workflow existed).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.dry_run && github.sha || env.TAG }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Changelog from the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$RUNNER_TEMP/changelog.md"
+
+      - name: Build the addon zip
+        run: node scripts/curseforge.mjs zip dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: curseforge-zip
+          path: companion/dist/ForeverAICompanion-*.zip
+
+      - name: Upload to CurseForge
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          CHANGELOG_FILE: ${{ runner.temp }}/changelog.md
+          CURSEFORGE_DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: |
+          if [ -z "$CURSEFORGE_TOKEN" ]; then
+            echo "::error::Add the repository secret CURSEFORGE_TOKEN (a CurseForge API token) to upload the addon."
+            exit 1
+          fi
+          node scripts/curseforge.mjs upload dist/ForeverAICompanion-*.zip

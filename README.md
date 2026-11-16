@@ -474,6 +474,8 @@ Installed apps (1.7.0 and later) pick up every new release by themselves (`src/u
 2. `npm test` and `npm run build`. The Windows `.exe` can also be built on GitHub's Windows machines: **Actions › Windows build › Run workflow** with the release's tag runs every test on Windows, builds the exe and attaches it to that release (a draft works).
 3. On GitHub, **Releases → Draft a new release**, create the tag **`v` + the exact `VERSION`** (for example `v1.7.0`) and attach `dist/ForeverAICompanion.exe` with that exact name, and `dist/ForeverAICompanion-mac.zip` (built on a Mac) with that exact name too: Mac apps update from it. Don't mark it as a pre-release (pre-releases are not offered to players). The README's download link and the in-app updater always use the latest release.
 
+**CurseForge.** Publishing the release on GitHub also uploads the addon to [CurseForge](https://www.curseforge.com/wow/addons/forever-ai-companion) (`.github/workflows/curseforge.yml`): the zip is made by the app's installer (`npm run curseforge -- zip` builds it locally), tagged with the WoW Forever version in the guide's header, with the release notes as its changelog. It needs the repository secret `CURSEFORGE_TOKEN` (CurseForge › Authors › My API Tokens). **Actions › CurseForge upload › Run workflow** with *dry run* checks the token without uploading.
+
 ### Contributing
 
 Pull requests are welcome: bug fixes, more game data for the AI, translations, safety improvements. Thanks to [@Zemnexx](https://github.com/Zemnexx) for the security hardening merged in 1.10.1 (protected silent voice, encrypted API keys, signed Codex only, fenced guide).
