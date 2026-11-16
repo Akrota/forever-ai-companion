@@ -11,7 +11,11 @@
 
 <p align="center">
   <a href="https://github.com/lucasmenares/forever-ai-companion/releases/latest/download/ForeverAICompanion.exe"><b>⬇ Download for Windows</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/lucasmenares/forever-ai-companion/releases/latest/download/ForeverAICompanion-mac.zip"><b>⬇ Download for Mac</b></a>
 </p>
+
+<p align="center"><sub>The addon is also on <a href="https://www.curseforge.com/wow/addons/forever-ai-companion">CurseForge</a>, but you still need the app: it's the one that talks to the AI.</sub></p>
 
 <p align="center"><sub>English and Spanish · Inglés y español</sub></p>
 
@@ -48,8 +52,8 @@ Forever AI Companion has two parts that work together:
 
 | Part | Where it lives | What it does |
 |---|---|---|
-| **The addon** | Inside WoW Forever | The floating button, the chat window and your assistant. It reads your character's data and shows the answers. |
-| **The app** (`ForeverAICompanion.exe`) | On your Windows PC | Receives your question, asks the AI you chose and sends the answer back to the game. |
+| **The addon** | Inside WoW Forever | The floating button, the chat window and your assistant. It reads your character's data and shows the answers. Also on [CurseForge](https://www.curseforge.com/wow/addons/forever-ai-companion). |
+| **The app** (`ForeverAICompanion.exe` / `Forever AI Companion.app`) | On your Windows PC or your Mac | Receives your question, asks the AI you chose and sends the answer back to the game. |
 
 With every question the AI receives, without you having to explain anything:
 
@@ -71,7 +75,7 @@ You get an assistant with personality: **Fizzi**, a gnome inventor, for the Alli
 
 ## Installation (3 minutes)
 
-**Requirements:** Windows 10 or 11, WoW Forever installed, and an AI (see [Which AI to choose](#which-ai-to-choose): with Claude Pro/Max or ChatGPT Plus/Pro you pay nothing extra).
+**Requirements:** Windows 10 or 11, or a Mac with macOS 13 Ventura or later ([Mac steps](#on-a-mac)), WoW Forever installed, and an AI (see [Which AI to choose](#which-ai-to-choose): with Claude Pro/Max or ChatGPT Plus/Pro you pay nothing extra).
 
 ### 1. Download and open the app
 
@@ -94,9 +98,29 @@ The window guides you step by step:
 | **Invisible sending** (optional, recommended) | Choose how your question travels from the game to the app ([explained below](#how-your-question-travels-invisible-or-on-screen-line)). |
 | **Done** | Leave **Open when Windows starts** on so you never have to remember to open the app. |
 
+> **Got the addon from CurseForge?** You still need the app: addons can't use the internet, so without the app nobody answers your questions. Install the app as above and click **Install the addon** in it anyway: it creates the inboxes the answers arrive through (the app makes them on your PC). The app keeps the addon up to date by itself.
+
 ### 3. Restart WoW
 
 If the game was open, **close it completely and open it again** (`/reload` is not enough the first time).
+
+### On a Mac
+
+The Mac app works exactly like the Windows one, invisible sending included. Requirements: macOS 13 Ventura or later, on Apple silicon or Intel.
+
+1. Download [**ForeverAICompanion-mac.zip**](https://github.com/lucasmenares/forever-ai-companion/releases/latest/download/ForeverAICompanion-mac.zip) and double-click it: you get **Forever AI Companion**.
+2. Open it. The first time macOS says it can't check it for malware (the app isn't notarized by Apple yet): click **Done**, then go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway** next to *Forever AI Companion*. You only do this once.
+3. The app moves itself to the **Applications** folder of your user (no password needed) and opens its window. Follow the same setup as on Windows.
+
+Differences from Windows:
+
+| | Mac |
+|---|---|
+| Where the app lives | In your Applications folder, and **in the menu bar** (top right) while it runs, instead of next to the clock |
+| Invisible sending | Already on: the silent voice comes inside the app and needs **no permission**. You can turn it off in the setup or the dashboard |
+| On-screen line | Needs the **Screen Recording** permission (macOS asks once). WoW must not be minimized when you ask |
+| Open when you log in | The **Open when you log in to your Mac** switch (it shows up in *System Settings › General › Login Items*) |
+| Signing in to Claude Code / Codex | Happens in a **Terminal** window the app opens |
 
 ### Updating
 
@@ -214,7 +238,9 @@ sequenceDiagram
 | Requirements | Administrator permission once (Windows only allows adding voices that way) | WoW visible when asking (not minimized or covered) |
 | What gets installed | A silent voice in Windows' voice list | Nothing |
 
-Technically, the voice is a small SAPI engine that the app compiles on your PC with the C# compiler included in Windows. When the game asks it to speak, it saves the text in `%APPDATA%\ForeverAICompanion\tts-inbox\` instead of producing audio. Messages travel in chunks of up to 24,000 characters (a normal question is a single one) (`FAIC:<id>:<part>/<total>:<data>`) and the app joins them back.
+**On a Mac** the game reads text aloud with macOS's speech system, which lets apps bring their own voices: the silent voice is a speech synthesis extension inside the app (`Forever AI Companion.app/Contents/PlugIns`), so nothing is installed elsewhere and no permission is needed. It runs in macOS's sandbox, which only lets it write into `~/Library/Application Support/ForeverAICompanion/tts-inbox/`. The on-screen line is read from the game window with ScreenCaptureKit.
+
+Technically, on Windows the voice is a small SAPI engine that the app compiles on your PC with the C# compiler included in Windows. When the game asks it to speak, it saves the text in `%APPDATA%\ForeverAICompanion\tts-inbox\` instead of producing audio. Messages travel in chunks of up to 24,000 characters (a normal question is a single one) (`FAIC:<id>:<part>/<total>:<data>`) and the app joins them back.
 
 ### Coming back: from the app to the game
 
@@ -275,7 +301,7 @@ Each player can also add their own knowledge from the app's dashboard (**Server 
 
 - **Your data only goes to the AI you chose.** This project has no servers: it never receives your questions, your data or your keys.
 - The app's only connection of its own is downloading the WoW Forever guide from this repository (a read, nothing is sent). Internet searches are made by the AI you chose, with its own tools.
-- API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`, **encrypted with Windows DPAPI** for your Windows account: a copy of that file on another PC or account doesn't reveal them. Keys saved in plain text by earlier versions are encrypted the next time the app starts.
+- API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`, **encrypted with Windows DPAPI** for your Windows account: a copy of that file on another PC or account doesn't reveal them. Keys saved in plain text by earlier versions are encrypted the next time the app starts. On a Mac they are in `~/Library/Application Support/ForeverAICompanion/config.json`, encrypted (AES-256-GCM) with a key kept in your **login Keychain** (*Forever AI Companion (API keys)*), with the same protection.
 - **Invisible sending:** the silent voice's file used by elevated programs lives in `%ProgramFiles%\ForeverAICompanion`, which only administrators can change (installs from before this change are offered **Update invisible sending** to move it). The voice keeps only this app's own messages: anything else any program speaks with it is dropped without being written or logged.
 - **Codex:** when the app searches the PC for Codex, or installs it, it only runs a `codex.exe` that Windows confirms is signed by OpenAI. If a future Codex stops accepting one of the safety switches the app relies on (no commands, no file or browser access), the app refuses to use it rather than dropping the switch.
 - The `/ia probe` channel test only watches the game's files while a test is running (and for 15 minutes after, for files the game writes at logout).
@@ -348,13 +374,19 @@ Check the steps in *Your AI*: the program must be installed and signed in, or th
 Yes, while you play. When you close its window it can keep running next to the Windows clock (click the icon to open it again; right-click to close it). With **Open when Windows starts** you don't have to remember.
 
 **Does it work on Mac?**
-Not for now: Windows 10 and 11 only.
+Yes, from version 1.11.0: macOS 13 Ventura or later, Apple silicon or Intel. See [On a Mac](#on-a-mac).
+
+**Mac: "Forever AI Companion" can't be opened / Apple can't check it.**
+That's macOS protecting you from apps that aren't notarized yet. Go to **System Settings › Privacy & Security** and click **Open Anyway** (once). Updates installed from inside the app don't ask again.
+
+**Mac: the game doesn't see the invisible voice.**
+Close WoW completely and open it again. Then type `/ia test-voice` in the game: *ForeverAICompanion* must be in the list. If it isn't, open the app (it registers the voice every time it starts) and check that invisible sending is on in the dashboard.
 
 ---
 
 ## Uninstalling
 
-Open the app and, under **More options**, click **Uninstall**. It removes the addon, the inboxes, the invisible voice, your settings, the shortcuts and the program.
+Open the app and, under **More options**, click **Uninstall**. It removes the addon, the inboxes, the invisible voice, your settings, the shortcuts and the program. On a Mac it also removes the app from the Applications folder, its login item and its Keychain item.
 
 ---
 
@@ -376,7 +408,7 @@ addon/ForeverAICompanion/   Addon (Lua 5.1, modern client, interface 16001)
   Core.lua                  Events and /ia commands
 companion/
   src/app/                  App: main (self-install, tray), controller,
-                            server (local window), system (Windows), ui.html
+                            server (local window), system (Windows, macOS), ui.html
   src/i18n.js               English and Spanish messages (app, tray, in-game errors)
   src/watcher.js            Receives questions and publishes answers
   src/voice-inbox.js        Reads what the silent voice delivers
@@ -385,7 +417,7 @@ companion/
   src/inbox.js              Inboxes and bell
   src/beacon.js             Tells the game whether the app is open and ready
   src/updater.js            Updates the app from GitHub releases
-  src/secrets.js            Encrypts API keys in config.json (Windows DPAPI)
+  src/secrets.js            Encrypts API keys in config.json (Windows DPAPI, macOS Keychain)
   src/prompt.js             Instructions for the AI
   src/guide.js              WoW Forever guide: date, version, downloads and picking topic sections
   src/providers.js          Claude, OpenAI/Gemini/Ollama, Claude Code, Codex, test
@@ -395,14 +427,22 @@ companion/
   src/migrate.js            Moves installs from the project's previous name
   tts/ForeverAICompanionTts.cs  Silent voice engine (C#)
   tray/Tray.cs              Icon next to the clock (C#)
+  src/mac-shell.js          macOS: talks to the app's native part (menu bar, window, dialogs)
+  src/mac-voice.js          macOS: the silent voice extension (on, off, status)
+  src/mac-update.js         macOS: installs a downloaded update
+  src/mac-path.js           macOS: finds programs installed from the terminal
+  macos/App.swift           macOS native part: menu bar icon, window, dialogs,
+                            reading the on-screen line (ScreenCaptureKit), login item
+  macos/Voice.swift         macOS silent voice (speech synthesis provider extension)
   knowledge-builtin/        WoW Forever guide (base) and detailed topics
   scripts/build.js          Packages ForeverAICompanion.exe
+  scripts/build-mac.js      Packages Forever AI Companion.app and its zip
   test/                     Tests (they run the addon's real Lua)
 ```
 
 ### Build and test
 
-Requirements: Windows and Node.js 25.5 or later (for `--build-sea`; Node 22 is enough for development).
+Requirements: Windows and Node.js 25.5 or later (for `--build-sea`; Node 22 is enough for development). For the Mac app: a Mac with Xcode's command line tools (`xcode-select --install`) and Node.js 22 or later; `npm run build` on a Mac builds the Mac app.
 
 ```bash
 cd companion
@@ -422,6 +462,8 @@ npm start
 npm run ask -- "Which dungeon do you recommend?"
 ```
 
+On a Mac, `npm run build` creates `dist/mac/Forever AI Companion.app` (universal: Apple silicon and Intel; it downloads the Intel copy of Node from nodejs.org once, checked against its SHA-256) and `dist/ForeverAICompanion-mac.zip`. The bundle holds the native part (`Contents/MacOS/ForeverAICompanion`, Swift), the service (`Contents/MacOS/ForeverAICompanionService`, the same Node code as the `.exe`) and the silent voice (`Contents/PlugIns/ForeverAICompanionVoice.appex`). It is ad-hoc signed by default; set `FAIC_SIGN_IDENTITY` to a *Developer ID Application* identity, and `FAIC_NOTARY_PROFILE` to a `notarytool` keychain profile, to sign and notarize it so players don't see the Gatekeeper warning. `FAIC_MAC_ARCHS=arm64` builds for Apple silicon only.
+
 Test variables: `FAIC_DATA_DIR` (data folder), `FAIC_WOW_DIR`, `FAIC_PROVIDER`, `FAIC_NO_SHORTCUTS`, `FAIC_LANG` (`en` / `es`), `FAIC_INSTALL_DIR` (install into a test folder; nothing machine-wide is touched) and `FAIC_UPDATE_API` (a local stand-in for GitHub's latest-release API, for testing updates). `.exe` arguments: `--no-install`, `--no-window`, `--background`.
 
 ### Releasing a new version
@@ -430,7 +472,7 @@ Installed apps (1.7.0 and later) pick up every new release by themselves (`src/u
 
 1. Bump the number in `companion/src/app/controller.js` (`VERSION`) and, if the addon changed, in `addon/ForeverAICompanion/ForeverAICompanion.toc`. If Blizzard raised the game's interface number, update `## Interface:` in the toc too, or WoW will treat the addon as out of date.
 2. `npm test` and `npm run build`.
-3. On GitHub, **Releases → Draft a new release**, create the tag **`v` + the exact `VERSION`** (for example `v1.7.0`) and attach `dist/ForeverAICompanion.exe` with that exact name. Don't mark it as a pre-release (pre-releases are not offered to players). The README's download link and the in-app updater always use the latest release.
+3. On GitHub, **Releases → Draft a new release**, create the tag **`v` + the exact `VERSION`** (for example `v1.7.0`) and attach `dist/ForeverAICompanion.exe` with that exact name, and `dist/ForeverAICompanion-mac.zip` (built on a Mac) with that exact name too: Mac apps update from it. Don't mark it as a pre-release (pre-releases are not offered to players). The README's download link and the in-app updater always use the latest release.
 
 ### Contributing
 
@@ -439,4 +481,5 @@ Pull requests are welcome: bug fixes, more game data for the AI, translations, s
 ### To do
 
 - **Code signing** for the `.exe` to remove the SmartScreen warning (a code signing certificate or Azure Trusted Signing).
+- **Notarizing** the Mac app (an Apple Developer account: `FAIC_SIGN_IDENTITY` + `FAIC_NOTARY_PROFILE`) to remove the "Open Anyway" step.
 - Ask Blizzard (a support ticket or the official UI & Macro forum) whether this kind of companion app is allowed, and update [Blizzard's rules and your own risk](#blizzards-rules-and-your-own-risk) with the answer.

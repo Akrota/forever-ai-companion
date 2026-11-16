@@ -6,12 +6,13 @@ import { execFile, execFileSync } from 'node:child_process';
 
 const FOREVER = '_forever_';
 
-// A WoW "flavor" folder (like _retail_ or _forever_) has Interface/WTF/an exe.
+// A WoW "flavor" folder (like _retail_ or _forever_) has Interface/WTF/an exe
+// (macOS: the "World of Warcraft.app").
 export function looksLikeFlavorDir(dir) {
   try {
     if (!fs.statSync(dir).isDirectory()) return false;
     const names = fs.readdirSync(dir);
-    return names.some((n) => /^(Interface|WTF|Data)$/i.test(n) || /^wow.*\.exe$/i.test(n));
+    return names.some((n) => /^(Interface|WTF|Data)$/i.test(n) || /^wow.*\.exe$/i.test(n) || /^World of Warcraft.*\.app$/i.test(n));
   } catch {
     return false;
   }
@@ -53,7 +54,9 @@ function registryInstallDirs() {
 
 function battleNetDefaultDir() {
   try {
-    const file = path.join(process.env.APPDATA || '', 'Battle.net', 'Battle.net.config');
+    const file = process.platform === 'darwin'
+      ? path.join(os.homedir(), 'Library', 'Application Support', 'Battle.net', 'Battle.net.config')
+      : path.join(process.env.APPDATA || '', 'Battle.net', 'Battle.net.config');
     const cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
     const base = cfg?.Client?.Install?.DefaultInstallPath;
     return base ? [path.join(base, 'World of Warcraft')] : [];
@@ -63,7 +66,10 @@ function battleNetDefaultDir() {
 }
 
 function commonDirs() {
-  if (process.platform === 'darwin') return ['/Applications/World of Warcraft'];
+  if (process.platform === 'darwin') {
+    return ['/Applications/World of Warcraft', path.join(os.homedir(), 'Applications', 'World of Warcraft'),
+      path.join(os.homedir(), 'Games', 'World of Warcraft')];
+  }
   const out = [];
   for (let c = 67; c <= 90; c++) { // C..Z
     const drive = `${String.fromCharCode(c)}:\\`;
@@ -88,9 +94,21 @@ export function findWowDirs() {
 }
 
 const WOW_PROCESS = /^"wow[^"]*\.exe"/im;
+// macOS: the game's executable inside its app bundle.
+export const MAC_WOW_PROCESS = /World of Warcraft[^/\n]*\.app\/Contents\/MacOS\//i;
+
+function isWowRunningMac(unknown) {
+  try {
+    const out = execFileSync('/bin/ps', ['-axo', 'comm='], { encoding: 'utf8', timeout: 10000, maxBuffer: 8 * 1024 * 1024 });
+    return MAC_WOW_PROCESS.test(out);
+  } catch {
+    return unknown;
+  }
+}
 
 // unknown: the answer when tasklist fails.
 export function isWowRunning({ unknown = false } = {}) {
+  if (process.platform === 'darwin') return isWowRunningMac(unknown);
   if (process.platform !== 'win32') return false;
   try {
     const out = execFileSync('tasklist', ['/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true, timeout: 10000 });
@@ -103,6 +121,12 @@ export function isWowRunning({ unknown = false } = {}) {
 // Same without blocking. When the answer is unknown, says "running" (the safe
 // side for callers that must not touch files the game may be using).
 export function isWowRunningAsync() {
+  if (process.platform === 'darwin') {
+    return new Promise((resolve) => {
+      execFile('/bin/ps', ['-axo', 'comm='], { encoding: 'utf8', timeout: 10000, maxBuffer: 8 * 1024 * 1024 },
+        (err, out) => resolve(err ? true : MAC_WOW_PROCESS.test(out)));
+    });
+  }
   if (process.platform !== 'win32') return Promise.resolve(false);
   return new Promise((resolve) => {
     execFile('tasklist', ['/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true, timeout: 10000 },

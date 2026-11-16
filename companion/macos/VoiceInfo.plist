@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key><string>en</string>
+	<key>CFBundleDisplayName</key><string>ForeverAICompanion Voice</string>
+	<key>CFBundleExecutable</key><string>ForeverAICompanionVoice</string>
+	<key>CFBundleIdentifier</key><string>io.github.lucasmenares.ForeverAICompanion.Voice</string>
+	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+	<key>CFBundleName</key><string>ForeverAICompanionVoice</string>
+	<key>CFBundlePackageType</key><string>XPC!</string>
+	<key>CFBundleShortVersionString</key><string>__VERSION__</string>
+	<key>CFBundleVersion</key><string>__VERSION__</string>
+	<key>LSMinimumSystemVersion</key><string>13.0</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>AudioComponents</key>
+			<array>
+				<dict>
+					<key>description</key><string>Forever AI Companion silent voice</string>
+					<key>factoryFunction</key><string>ForeverAICompanionVoiceFactory</string>
+					<key>manufacturer</key><string>FAIC</string>
+					<key>name</key><string>Forever AI Companion: ForeverAICompanion</string>
+					<key>sandboxSafe</key><true/>
+					<key>subtype</key><string>faic</string>
+					<key>tags</key><array><string>Speech Synthesizer</string></array>
+					<key>type</key><string>ausp</string>
+					<key>version</key><integer>__AUVERSION__</integer>
+				</dict>
+			</array>
+		</dict>
+		<key>NSExtensionPointIdentifier</key><string>com.apple.AudioUnit</string>
+		<key>NSExtensionPrincipalClass</key><string>ForeverAICompanionVoiceFactory</string>
+	</dict>
+</dict>
+</plist>

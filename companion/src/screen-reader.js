@@ -6,8 +6,15 @@
 // of the window and prints it as one line:
 //   FRAME <seq> <attempt> <width> <height> <base64 RGB>
 // `seq` counts strip appearances; each appearance is grabbed up to 3 times.
+//
+// macOS: the app's native part does the same with ScreenCaptureKit
+// (macos/App.swift, --capture), which also reads the game window when other
+// windows cover it. It needs the Screen Recording permission: without it the
+// helper exits ("NOPERM") instead of asking, and is tried again now and then
+// (the player is asked when they choose the on-screen line, see mac-voice.js).
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
+import { nativeHelper } from './app/system.js';
 
 export const CAPTURE_HEIGHT = 160; // px from the top of the window
 
@@ -153,20 +160,35 @@ ${CSHARP}
 
 // Starts the helper and restarts it if it dies. onFrame({ seq, attempt, width, height, channels, data }).
 // wholeScreen: watch the top of the primary screen instead of the WoW window (tests).
-export function startScreenReader({ onFrame, log = () => {}, captureHeight = CAPTURE_HEIGHT, wholeScreen = false }) {
-  if (process.platform !== 'win32') return { stop() {} };
+export function startScreenReader({ onFrame, log = () => {}, captureHeight = CAPTURE_HEIGHT, wholeScreen = false, helper = nativeHelper }) {
+  const mac = process.platform === 'darwin';
+  if (process.platform !== 'win32' && !mac) return { stop() {} };
+  const macExe = mac ? helper() : null;
+  if (mac && !macExe) return { stop() {} };
   let child = null;
   let stopped = false;
   let restartTimer = null;
-  const encoded = Buffer.from(helperScript(captureHeight, wholeScreen), 'utf16le').toString('base64');
+  let noPermission = false;
+  const encoded = mac ? null : Buffer.from(helperScript(captureHeight, wholeScreen), 'utf16le').toString('base64');
 
   const launch = () => {
-    child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
-      windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    child = mac
+      // stdin stays open: the helper stops when this program does.
+      ? spawn(macExe, ['--capture', String(captureHeight), '--no-prompt', ...(wholeScreen ? ['--whole-screen'] : [])], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+      : spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
+        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    child.stdin?.on('error', () => {});
     const lines = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
     lines.on('line', (line) => {
-      if (line === 'READY') { log('Screen reader active.'); return; }
+      if (line === 'READY') { noPermission = false; log('Screen reader active.'); return; }
+      if (line === 'NOPERM') {
+        if (!noPermission) log('Screen reader: no Screen Recording permission (only needed for the on-screen line).');
+        noPermission = true;
+        return;
+      }
       if (!line.startsWith('FRAME ')) return;
       const [, seq, attempt, w, h, b64] = line.split(' ');
       try {
@@ -185,6 +207,8 @@ export function startScreenReader({ onFrame, log = () => {}, captureHeight = CAP
     child.on('exit', (code) => {
       child = null;
       if (stopped) return;
+      // No permission yet (macOS): checked again every half a minute, quietly.
+      if (mac && code === 3) { restartTimer = setTimeout(launch, 30000); return; }
       log(`The screen reader exited (code ${code}); restarting in 3 s.`);
       restartTimer = setTimeout(launch, 3000);
     });

@@ -116,6 +116,13 @@ export function startProbeMonitor({ wowDir, log = () => {}, intervalMs = 500, ac
   };
 }
 
+// macOS: the voices AVSpeechSynthesizer lists (the ones the game sees), in
+// the same shape as windowsVoices (all of them under "sapi").
+async function macSystemVoices() {
+  const { macVoices } = await import('./mac-voice.js');
+  return { sapi: (await macVoices()).map((v) => v.name), onecore: [] };
+}
+
 // Voices Windows offers: classic SAPI (third parties can add voices) and
 // OneCore (Narrator voices, closed). Tells which family the game uses.
 export function windowsVoices() {
@@ -167,7 +174,7 @@ export async function probeReport(probe, monitor) {
     };
   }
 
-  const voices = await windowsVoices();
+  const voices = process.platform === 'darwin' ? await macSystemVoices() : await windowsVoices();
   const gameVoices = (probe.ttsVoices || []).map((v) => v.name).filter(Boolean);
   // The game appends the language: "Microsoft Sabina Desktop - Spanish (Mexico)".
   const base = (n) => n.replace(/\s+-\s+.*$/, '').trim().toLowerCase();
@@ -180,7 +187,8 @@ export async function probeReport(probe, monitor) {
     gameVoices,
     windowsSapi: voices.sapi,
     windowsOneCore: voices.onecore,
-    family: inSapi.length ? 'sapi' : inOneCore.length ? 'onecore' : 'unknown',
+    family: process.platform === 'darwin' ? (inSapi.length ? 'mac' : 'unknown')
+      : inSapi.length ? 'sapi' : inOneCore.length ? 'onecore' : 'unknown',
   };
 
   const report = { at: new Date().toISOString(), token: probe.token, channels, tts, flashClientIcon: probe.flashClientIcon };
@@ -199,6 +207,7 @@ export async function probeReport(probe, monitor) {
   const fam = {
     sapi: 'classic Windows voices (a ForeverAICompanion voice can be added)',
     onecore: 'modern Windows voices (custom voices cannot be added)',
+    mac: 'macOS voices (the ForeverAICompanion voice ships with the app)',
     unknown: 'could not be determined',
   }[tts.family];
   lines.push(`- Text to speech: ${gameVoices.length ? `${gameVoices.length} voices in the game, ${fam}` : 'the game offers no voices'}` +

@@ -168,6 +168,9 @@ local EN = {
   -- Mailboxes and /ia status
   MAILBOX_MISSING = "The addon's mailboxes are missing. Run 'npm run install-addon' and restart WoW.",
   MAILBOX_OUT = "Out of mailboxes for this session. Type /reload to get more answers.",
+  MAILBOX_OUT_POPUP = "Forever AI Companion: out of mailboxes for this session, so new answers can't reach the game.\n\nReload the interface to get them all back (your chats are kept).",
+  RELOAD = "Reload",
+  CANCEL = "Cancel",
   YES = "yes",
   NO = "no",
   STATUS_BASE = "version %s · sound=%s, next signal=%d/%d, mailboxes used=%d/%d",
@@ -416,6 +419,9 @@ local ES = {
   -- Buzones y /ia estado
   MAILBOX_MISSING = "Faltan los buzones del addon. Ejecuta 'npm run install-addon' y reinicia WoW.",
   MAILBOX_OUT = "Se acabaron los buzones de esta sesión. Escribe /reload para recibir más respuestas.",
+  MAILBOX_OUT_POPUP = "Forever AI Companion: se acabaron los buzones de esta sesión, así que las respuestas nuevas no pueden llegar al juego.\n\nRecarga la interfaz para recuperarlos todos (tus chats se mantienen).",
+  RELOAD = "Recargar",
+  CANCEL = "Cancelar",
   YES = "sí",
   NO = "no",
   STATUS_BASE = "versión %s · sonido=%s, señal siguiente=%d/%d, buzones usados=%d/%d",
@@ -506,6 +512,17 @@ local ES = {
 
 EN.code = "en"
 ES.code = "es"
+
+-- On a Mac the app lives in the menu bar and the Applications folder, not
+-- next to the Windows clock or in the Start menu.
+if IsMacClient and IsMacClient() then
+  EN.APP_CLOSED_TIP = "The app on your Mac isn't running, so nobody will answer your questions. Open Forever AI Companion from your Applications folder (or download it from its GitHub page if you don't have it yet)."
+  EN.APP_STUCK_TIP = "The app stopped giving signs of life (it may have crashed or frozen). Quit it from its icon in the menu bar, or with Force Quit (Option+Command+Esc), and open it again."
+  EN.APP_READY_TIP = "The app on your Mac is running and has an AI set up: ask away."
+  ES.APP_CLOSED_TIP = "La app de tu Mac no está funcionando, así que nadie responderá tus preguntas. Abre Forever AI Companion desde tu carpeta Aplicaciones (o descárgala de su página de GitHub si aún no la tienes)."
+  ES.APP_STUCK_TIP = "La app dejó de dar señales de vida (puede que se haya cerrado de golpe o congelado). Ciérrala desde su ícono en la barra de menús, o con Forzar salida (Opción+Comando+Esc), y vuelve a abrirla."
+  ES.APP_READY_TIP = "La app de tu Mac está funcionando y tiene una IA configurada: pregunta lo que quieras."
+end
 
 -- Unknown keys show their own name instead of nil.
 setmetatable(EN, { __index = function(_, key) return tostring(key) end })

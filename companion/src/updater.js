@@ -1,15 +1,19 @@
 // Updates from inside the app: checks the project's latest GitHub release,
-// downloads ForeverAICompanion.exe and checks it (size, SHA-256 published by
-// GitHub, Windows executable). Installing it is just running it: the new exe
-// closes this one, replaces it in the install folder and starts (see
-// app/main.js selfInstall), keeping all data.
+// downloads ForeverAICompanion.exe (macOS: ForeverAICompanion-mac.zip) and
+// checks it (size, SHA-256 published by GitHub, Windows executable / zip).
+// Installing it on Windows is just running it: the new exe closes this one,
+// replaces it in the install folder and starts (see app/main.js selfInstall),
+// keeping all data. On macOS see mac-update.js.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const REPO = 'lucasmenares/forever-ai-companion';
 export const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
-export const ASSET_NAME = 'ForeverAICompanion.exe';
+export const WINDOWS_ASSET = 'ForeverAICompanion.exe';
+export const MAC_ASSET = 'ForeverAICompanion-mac.zip';
+export const assetName = (platform = process.platform) => (platform === 'darwin' ? MAC_ASSET : WINDOWS_ASSET);
+export const ASSET_NAME = assetName();
 const DOWNLOAD_PREFIX = `https://github.com/${REPO}/releases/download/`;
 const MAX_BYTES = 400 * 1024 * 1024;
 
@@ -27,9 +31,9 @@ export function compareVersions(a, b) {
 
 // What the app needs from GitHub's "latest release" answer, or null.
 // `allowUrl` decides which download addresses are trusted.
-export function parseRelease(json, { allowUrl = (u) => u.startsWith(DOWNLOAD_PREFIX) } = {}) {
+export function parseRelease(json, { allowUrl = (u) => u.startsWith(DOWNLOAD_PREFIX), platform = process.platform } = {}) {
   if (!json || json.draft || json.prerelease || !json.tag_name) return null;
-  const asset = (json.assets || []).find((a) => a.name === ASSET_NAME);
+  const asset = (json.assets || []).find((a) => a.name === assetName(platform));
   if (!asset || !allowUrl(String(asset.browser_download_url || ''))) return null;
   const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest || '');
   return {
@@ -45,8 +49,9 @@ export function parseRelease(json, { allowUrl = (u) => u.startsWith(DOWNLOAD_PRE
 // is called once per new version (tray notice).
 export function createUpdater({
   currentVersion, dir, log = () => {}, fetchImpl = fetch, apiUrl = RELEASES_API,
-  allowUrl, intervalMs = 6 * 3600000, onAvailable = () => {},
+  allowUrl, intervalMs = 6 * 3600000, onAvailable = () => {}, platform = process.platform,
 }) {
+  const mac = platform === 'darwin';
   const state = { status: 'idle', current: currentVersion, latest: null, notesUrl: null, progress: 0, error: null, checkedAt: null };
   let release = null;
   let ready = null; // path of a verified download
@@ -72,7 +77,7 @@ export function createUpdater({
         });
         if (res.status === 404) throw new Error('no releases published');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const found = parseRelease(await res.json(), allowUrl ? { allowUrl } : undefined);
+        const found = parseRelease(await res.json(), allowUrl ? { allowUrl, platform } : { platform });
         state.checkedAt = new Date().toISOString();
         if (!found || compareVersions(found.version, currentVersion) <= 0) {
           release = null;
@@ -111,7 +116,7 @@ export function createUpdater({
       state.progress = 0;
       state.error = null;
       fs.mkdirSync(dir, { recursive: true });
-      const target = path.join(dir, `ForeverAICompanion-${rel.version}.exe`);
+      const target = path.join(dir, `ForeverAICompanion-${rel.version}${mac ? '-mac.zip' : '.exe'}`);
       const tmp = `${target}.part`;
       try {
         const res = await fetchImpl(rel.url, { headers: { 'user-agent': 'ForeverAICompanion' }, signal: AbortSignal.timeout(15 * 60000) });
@@ -135,7 +140,9 @@ export function createUpdater({
           fs.closeSync(out);
         }
         if (rel.size && got !== rel.size) throw new Error(`incomplete download (${got} of ${rel.size} bytes)`);
-        if (!head || head.toString('latin1') !== 'MZ') throw new Error('the download is not a Windows program');
+        if (mac) {
+          if (!head || head.toString('latin1') !== 'PK') throw new Error('the download is not a zip file');
+        } else if (!head || head.toString('latin1') !== 'MZ') throw new Error('the download is not a Windows program');
         const sha = hash.digest('hex');
         if (rel.sha256 && sha !== rel.sha256) throw new Error('the download does not match the published file (SHA-256)');
         fs.renameSync(tmp, target);

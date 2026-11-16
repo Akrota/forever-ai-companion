@@ -1,7 +1,7 @@
 // Builds dist/ForeverAICompanion.exe: one self-contained Windows program with
 // the companion, the setup window and the addon files embedded.
 //
-//   npm run build
+//   npm run build        (on a Mac it builds the Mac app instead: build-mac.js)
 //
 // Steps: bundle with esbuild (embedding the assets) -> give a copy of Node the
 // app's icon and name (rcedit) -> Node single executable application built
@@ -10,9 +10,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { build } from 'esbuild';
 import { ROOT } from '../src/config.js';
-import { GUIDE_FILES, addonFiles, appIconIco, appIconPng, foreverGuide, knowledgeReadme, sampleContext, trayCsSource, ttsEngineSource, uiHtml } from '../src/assets.js';
+import { bundleApp } from './bundle.js';
+
+if (process.platform === 'darwin') {
+  await import('./build-mac.js');
+  process.exit(0);
+}
 
 const DIST = path.join(ROOT, 'dist');
 const BUNDLE = path.join(DIST, 'forever-ai-companion.cjs');
@@ -20,50 +24,8 @@ const EXE = path.join(DIST, 'ForeverAICompanion.exe');
 
 fs.mkdirSync(DIST, { recursive: true });
 
-// Replace src/assets.js with a module that has every file embedded.
-const embedded = `
-const ADDON = ${JSON.stringify(addonFiles())};
-const UI = ${JSON.stringify(uiHtml())};
-const SAMPLE = ${JSON.stringify(sampleContext())};
-const KNOWLEDGE = ${JSON.stringify(knowledgeReadme())};
-const TTS = ${JSON.stringify(ttsEngineSource())};
-const ICON = ${JSON.stringify(appIconPng().toString('base64'))};
-export const appIconPng = () => Buffer.from(ICON, 'base64');
-const ICO = ${JSON.stringify(appIconIco().toString('base64'))};
-export const appIconIco = () => Buffer.from(ICO, 'base64');
-const TRAY = ${JSON.stringify(trayCsSource())};
-export const trayCsSource = () => TRAY;
-export const GUIDE_FILES = ${JSON.stringify(GUIDE_FILES)};
-const GUIDES = ${JSON.stringify(Object.fromEntries(GUIDE_FILES.map((f) => [f, foreverGuide(f)])))};
-export const foreverGuide = (file = 'wow-forever.md') => GUIDES[file] || '';
-export const ttsEngineSource = () => TTS;
-export const addonFiles = () => ({ ...ADDON });
-export const uiHtml = () => UI;
-export const sampleContext = () => structuredClone(SAMPLE);
-export const knowledgeReadme = () => KNOWLEDGE;
-`;
-const assetsPath = path.join(ROOT, 'src', 'assets.js');
-const embedAssets = {
-  name: 'embed-assets',
-  setup(b) {
-    b.onLoad({ filter: /[\\/]src[\\/]assets\.js$/ }, (args) =>
-      (path.resolve(args.path) === assetsPath ? { contents: embedded, loader: 'js' } : undefined));
-  },
-};
-
 console.log('1/4 Bundling the code…');
-await build({
-  entryPoints: [path.join(ROOT, 'src', 'app', 'main.js')],
-  outfile: BUNDLE,
-  bundle: true,
-  platform: 'node',
-  format: 'cjs',
-  target: 'node22',
-  plugins: [embedAssets],
-  define: { 'import.meta.url': '__faic_import_meta_url' },
-  banner: { js: 'const __faic_import_meta_url = require("url").pathToFileURL(__filename).href;' },
-  logLevel: 'warning',
-});
+await bundleApp(BUNDLE);
 
 console.log('2/4 Setting the icon and name…');
 // --build-sea copies the Node executable that runs it, resources included:

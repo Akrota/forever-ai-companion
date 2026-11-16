@@ -1,10 +1,11 @@
 // English (default) and Spanish messages for everything the player reads:
 // the app window's errors, the tray icon and errors shown in the game.
 //
-// Language: the player's Windows language (or FAIC_LANG / config "language").
+// Language: the player's system language (or FAIC_LANG / config "language").
 // Requests from the game carry the game's language (req.lang), and everything
 // said while answering one uses it: see runInLang().
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { execFileSync } from 'node:child_process';
 
 export const LANGS = ['en', 'es'];
 
@@ -15,10 +16,25 @@ export function normalizeLang(value) {
   return null;
 }
 
-// Windows' user locale as Node sees it (es-CL, en-US...).
+// macOS: apps opened from Finder get no LANG, so Node would always say
+// "en-US". The player's language list (System Settings › General ›
+// Language & Region) is read instead: "es-CL" from ( "es-CL", "en-US" ).
+export function macPreferredLanguage() {
+  if (process.platform !== 'darwin') return null;
+  try {
+    const out = execFileSync('/usr/bin/defaults', ['read', '-g', 'AppleLanguages'], {
+      encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return /^\s*"?([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]+)*)"?,?\s*$/m.exec(out.replace(/^\(\s*/, ''))?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+// The system's user locale as Node sees it (es-CL, en-US...).
 export function systemLang() {
   // AZIA_LANG: the variable's name before the rename (see config.envVar).
-  const candidates = [process.env.FAIC_LANG, process.env.AZIA_LANG];
+  const candidates = [process.env.FAIC_LANG, process.env.AZIA_LANG, macPreferredLanguage()];
   try { candidates.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch { /* no ICU */ }
   candidates.push(process.env.LANG, process.env.LC_ALL);
   for (const c of candidates) {
@@ -213,9 +229,31 @@ const MESSAGES = {
   },
 };
 
+// macOS wording where Windows' doesn't fit (menu bar instead of the clock,
+// Terminal instead of a console window...).
+const MAC = {
+  en: {
+    pickCodexMac: 'Find codex (the Codex program)',
+    codexPickInvalidMac: 'That file is not Codex. Choose the codex program (for example in /opt/homebrew/bin or ~/.local/bin).',
+    trayClickHint: 'Click its icon in the menu bar to open it again.',
+    trayAskText: 'If it keeps running in the background, you can keep asking from the game. You will find it in the menu bar, at the top of the screen: click its icon to open it again.\n\nIf you close it, the game will not get answers until you open it again.',
+    trayClose: `Quit ${APP}`,
+    voiceUpdateNoticeText: 'Click here and press "Update invisible sending".',
+  },
+  es: {
+    pickCodexMac: 'Busca codex (el programa Codex)',
+    codexPickInvalidMac: 'Ese archivo no es Codex. Elige el programa codex (por ejemplo en /opt/homebrew/bin o ~/.local/bin).',
+    trayClickHint: 'Haz clic en su ícono de la barra de menús para volver a abrirla.',
+    trayAskText: 'Si sigue en segundo plano, podrás seguir preguntando desde el juego. La encontrarás en la barra de menús, arriba en la pantalla: haz clic en su ícono para volver a abrirla.\n\nSi la cierras, el juego no recibirá respuestas hasta que la abras de nuevo.',
+    trayClose: `Salir de ${APP}`,
+    voiceUpdateNoticeText: 'Haz clic aquí y pulsa «Actualizar envío invisible».',
+  },
+};
+const isMac = process.platform === 'darwin';
+
 // t('tooSlow', { bin: 'claude' }) in the current language (English fallback).
 export function t(key, vars = {}, lang = currentLang()) {
-  const text = MESSAGES[lang]?.[key] ?? MESSAGES.en[key] ?? key;
+  const text = (isMac ? MAC[lang]?.[key] ?? MAC.en[key] : undefined) ?? MESSAGES[lang]?.[key] ?? MESSAGES.en[key] ?? key;
   return text.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
 }
 

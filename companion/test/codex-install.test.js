@@ -13,7 +13,11 @@ import {
 
 const touch = (file) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, 'x'); return file; };
 
-test('the disk search finds Codex and skips what is not worth walking', async (t) => {
+const isMac = process.platform === 'darwin';
+// The tests below use Windows file names (codex.exe); macOS has its own further down.
+const winNames = { skip: isMac ? 'Windows file names' : false };
+
+test('the disk search finds Codex and skips what is not worth walking', winNames, async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-walk-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const deep = touch(path.join(root, 'tools', 'ai', 'codex', 'bin', 'codex.exe'));
@@ -28,7 +32,7 @@ test('the disk search finds Codex and skips what is not worth walking', async (t
   assert.deepEqual(shallow.found, [], 'depth is respected');
 });
 
-test('Codex is found inside the open desktop app, which itself is never run', async (t) => {
+test('Codex is found inside the open desktop app, which itself is never run', winNames, async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-app-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const app = touch(path.join(root, 'Codex', 'Codex.exe'));
@@ -87,7 +91,7 @@ function sandboxEnv(t) {
   return home;
 }
 
-test('a file found by the search runs only if Windows says OpenAI signed it', async (t) => {
+test('a file found by the search runs only if Windows says OpenAI signed it', winNames, async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-sign-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const planted = touch(path.join(root, 'Downloads', 'codex.exe'));
@@ -120,11 +124,48 @@ test('a file found by the search runs only if Windows says OpenAI signed it', as
 test('only the official, checkable Codex build is downloaded', () => {
   const asset = (name, over = {}) => ({ name, size: 10, digest: `sha256:${'a'.repeat(64)}`, browser_download_url: `https://github.com/openai/codex/releases/download/rust-v1/${name}`, ...over });
   const rel = { tag_name: 'rust-v1', assets: [asset(codexAssetName('x64')), asset(codexAssetName('arm64'))] };
-  assert.equal(codexAssetName('x64'), 'codex-x86_64-pc-windows-msvc.exe.tar.gz');
+  assert.equal(codexAssetName('x64', 'win32'), 'codex-x86_64-pc-windows-msvc.exe.tar.gz');
+  assert.equal(codexAssetName('arm64', 'darwin'), 'codex-aarch64-apple-darwin.tar.gz');
+  assert.equal(codexAssetName('x64', 'darwin'), 'codex-x86_64-apple-darwin.tar.gz');
   assert.match(pickCodexAsset(rel, 'arm64').url, /aarch64/);
   assert.equal(pickCodexAsset({ ...rel, prerelease: true }, 'x64'), null);
   assert.equal(pickCodexAsset({ assets: [asset(codexAssetName('x64'), { digest: undefined })] }, 'x64'), null, 'no SHA-256, no install');
   assert.equal(pickCodexAsset({ assets: [asset(codexAssetName('x64'), { browser_download_url: 'https://evil.example/codex.tar.gz' })] }, 'x64'), null);
+});
+
+test('macOS: the search finds codex, never runs app bundles, and only runs what OpenAI signed', { skip: !isMac }, async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-mac-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const real = touch(path.join(root, 'tools', 'codex', 'codex'));
+  const release = touch(path.join(root, 'dl', 'codex-aarch64-apple-darwin'));
+  const planted = touch(path.join(root, 'Downloads', 'codex'));
+  touch(path.join(root, 'World of Warcraft', '_forever_', 'codex')); // game folders are skipped
+  touch(path.join(root, 'tools', 'codex.exe')); // Windows files are not Codex here
+  const r = await walkForCodex([[root, 6]]);
+  assert.deepEqual(r.found.sort(), [real, release, planted].sort());
+  const app = touch(path.join(root, 'Codex.app', 'Contents', 'MacOS', 'Codex'));
+  assert.ok(isDesktopApp(app), 'an app bundle is never run');
+  assert.ok(!isDesktopApp(real));
+  const ran = [];
+  const logs = [];
+  const found = await searchCodex({
+    running: async () => [app], roots: [[root, 6]], log: (m) => logs.push(m),
+    verify: async (p) => p === real,
+    check: async (p) => { ran.push(p); return true; },
+  });
+  assert.equal(found, real);
+  assert.deepEqual(ran, [real], 'nothing else was started, not even with --version');
+  assert.ok(logs.some((l) => l.includes(planted) && /not signed by OpenAI/.test(l)));
+});
+
+test('macOS: codesign\'s answer for the real Codex is read as signed by OpenAI', async () => {
+  const { parseCodesign } = await import('../src/codex.js');
+  // codesign -dvv of codex-aarch64-apple-darwin 0.169.0 (GitHub release).
+  const real = 'Identifier=codex\nAuthority=Developer ID Application: OpenAI OpCo, LLC (2DC432GLL2)\nAuthority=Developer ID Certification Authority\nAuthority=Apple Root CA\nTeamIdentifier=2DC432GLL2\n';
+  assert.equal(isOpenAISignature(parseCodesign(real)), true);
+  assert.equal(isOpenAISignature(parseCodesign(real.replace('OpenAI OpCo, LLC', 'Evil Corp'))), false);
+  assert.equal(parseCodesign(real.replace('Authority=Apple Root CA\n', '')), null, 'must lead to Apple');
+  assert.equal(parseCodesign('Signature=adhoc\n'), null, 'ad-hoc signatures are nobody');
 });
 
 test('Codex installed with winget (or by this app) is found', { skip: !canBuildExe }, async (t) => {

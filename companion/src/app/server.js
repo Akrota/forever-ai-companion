@@ -14,7 +14,9 @@ const HEADER = 'x-forever-ai-companion';
 // expect the previous header: still recognized, to close them when updating.
 const LEGACY_HEADER = `x-${LEGACY_NAME.toLowerCase()}`;
 
-export function createServer(controller, { onQuit = () => {}, onWindowClosed = () => {}, closeDelayMs = 1000, log = () => {} } = {}) {
+export function createServer(controller, {
+  onQuit = () => {}, onWindowClosed = () => {}, onShowWindow = () => {}, closeDelayMs = 1000, log = () => {},
+} = {}) {
   // Open windows: each one has an id and asks for the status every 2 s.
   // When one closes, the app is "closed" unless another window was active in
   // the last moments or a new one appears right away (a reload).
@@ -33,6 +35,7 @@ export function createServer(controller, { onQuit = () => {}, onWindowClosed = (
     'voice-status': () => controller.voiceStatus(),
     'voice-install': () => controller.installVoice(),
     'voice-uninstall': () => controller.uninstallVoice(),
+    'screen-settings': () => controller.openScreenSettings(),
     'claude-install': () => controller.claudeInstall(),
     'claude-login': () => controller.claudeLogin(),
     'codex-status': () => controller.codexStatus(),
@@ -59,6 +62,8 @@ export function createServer(controller, { onQuit = () => {}, onWindowClosed = (
       return {};
     },
     quit: () => { setTimeout(onQuit, 200); return {}; },
+    // Another copy was opened (macOS): this one shows its window instead.
+    'show-window': () => { onShowWindow(); return {}; },
     uninstall: async () => { await controller.uninstall(); setTimeout(onQuit, 300); return {}; },
   };
 

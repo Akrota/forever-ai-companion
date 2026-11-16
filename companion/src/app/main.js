@@ -7,6 +7,12 @@
 // Running it again just reopens the window of the instance already running.
 // `--background` (used by "start with Windows") starts without a window.
 //
+// macOS: this program is the service inside "Forever AI Companion.app",
+// started by the bundle's native part (macos/App.swift), which is the app
+// window and the menu bar icon (see mac-shell.js). Opened from anywhere but
+// Applications (the Downloads folder, a zip), the app copies itself to
+// ~/Applications and starts from there.
+//
 // Updating from before the rename (see config.LEGACY_NAME) also moves the data
 // folder, the install folder, shortcuts and "start with Windows" to the
 // current names (see migrateFromPreviousName below and ../migrate.js).
@@ -18,6 +24,8 @@ import { createServer, findRunning, findRunningInstance, listen, quitRunningInst
 import * as sys from './system.js';
 import { appIconIco, trayCsSource } from '../assets.js';
 import { ensureTrayExe, startTray } from '../tray.js';
+import { startShellChannel } from '../mac-shell.js';
+import { fixMacPath } from '../mac-path.js';
 import { err, t } from '../i18n.js';
 import { migrateDataDir, removeLegacyInstallDir, tidyLegacyDataDir } from '../migrate.js';
 import { isLegacyEngineRegistered, isLegacyVoiceVisible } from '../tts-voice.js';
@@ -40,7 +48,26 @@ function makeLogger() {
   };
 }
 
+// macOS: the bundle is copied to ~/Applications and opened from there.
+async function selfInstallMac(log) {
+  const bundle = sys.bundlePath();
+  if (!bundle || sys.isInstalledBundle(bundle)) return false;
+  const target = sys.installedBundle();
+  const running = await findRunningInstance();
+  if (running) await quitRunningInstance(running);
+  fs.mkdirSync(sys.installDir(), { recursive: true });
+  try {
+    await sys.copyBundle(bundle, target);
+  } catch (e) {
+    throw err('installFailed', { target, error: e.message });
+  }
+  log(`Installed in ${target}`);
+  sys.relaunch(target, args);
+  return true;
+}
+
 async function selfInstall(log) {
+  if (sys.isMac) return selfInstallMac(log);
   const target = sys.installedExe();
   if (sys.samePath(process.execPath, target)) return false;
   // Updating: close the version that is running from the install folder.
@@ -101,6 +128,17 @@ async function cleanUpPreviousName(log) {
   return true;
 }
 
+let serverUrl = null;
+
+// Asks a running copy of the app to show its window.
+async function showRunningWindow(url) {
+  try {
+    await fetch(`${url}api/show-window`, {
+      method: 'POST', headers: { 'x-forever-ai-companion': '1' }, signal: AbortSignal.timeout(2000),
+    });
+  } catch { /* an older copy: nothing else to do */ }
+}
+
 async function main() {
   const dataOverride = envVar('DATA_DIR');
   if (sys.isPackaged()) env.dataDir = sys.appDataDir();
@@ -110,8 +148,26 @@ async function main() {
   const log = makeLogger();
   if (dataMigration !== 'none') log(`Data folder of the previous name (${LEGACY_NAME}): ${dataMigration}.`);
 
-  if (sys.isPackaged() && sys.isWindows && !args.includes('--no-install')) {
-    if (await selfInstall(log)) process.exit(0);
+  // macOS: started by the app's native part (the menu bar icon and the window).
+  let shell = null;
+  let onShellQuit = () => process.exit(0);
+  let onShellChoice = () => {};
+  let onShellClosed = () => {};
+  if (sys.isMac && envVar('SHELL')) {
+    shell = startShellChannel({
+      log,
+      onOpen: () => sys.openWindow(serverUrl),
+      onQuit: () => onShellQuit(),
+      onChoice: (choice, remember) => onShellChoice(choice, remember),
+      onClosed: () => onShellClosed(),
+    });
+    sys.setShell(shell);
+  }
+  const exit = (code = 0) => { shell?.stop(); setTimeout(() => process.exit(code), 100); };
+  if (sys.isMac) await fixMacPath(log);
+
+  if (sys.isPackaged() && (sys.isWindows || sys.isMac) && !args.includes('--no-install')) {
+    if (await selfInstall(log)) return exit(0);
   }
 
   const running = await findRunning();
@@ -119,8 +175,12 @@ async function main() {
     // A copy from before the rename (e.g. started by its old shortcut): replace it.
     await quitRunningInstance(running.url);
   } else if (running) {
-    if (!background) sys.openWindow(running.url);
-    process.exit(0);
+    if (!background) {
+      // macOS: the running copy shows its own window.
+      if (sys.isMac) await showRunningWindow(running.url);
+      else sys.openWindow(running.url);
+    }
+    return exit(0);
   }
 
   // Running from the install folder: move shortcuts and "start with Windows"
@@ -144,8 +204,12 @@ async function main() {
   const controller = createController({
     log,
     onUpdateAvailable: (version) => tray?.notify(t('updateNoticeTitle', { version }), t('updateNoticeText')),
+    onQuit: () => quit(),
   });
+  let quitting = false;
   const quit = () => {
+    if (quitting) return;
+    quitting = true;
     controller.stop();
     tray?.stop();
     log('Forever AI Companion closed.');
@@ -164,10 +228,25 @@ async function main() {
     }
     tray.ask();
   };
-  const server = createServer(controller, { onQuit: quit, onWindowClosed, log });
+  const server = createServer(controller, { onQuit: quit, onWindowClosed, onShowWindow: () => sys.openWindow(serverUrl), log });
   const port = await listen(server);
   const url = `http://127.0.0.1:${port}/`;
+  serverUrl = url;
   log(`Forever AI Companion ${background ? 'running in the background' : 'open'}: ${url}`);
+
+  // macOS: the native app is the menu bar icon and the window.
+  if (shell) {
+    tray = shell;
+    shell.send(`url ${url}`);
+    onShellQuit = quit;
+    onShellClosed = onWindowClosed;
+    onShellChoice = (choice, remember) => {
+      if (remember) { try { controller.setCloseAction({ action: choice }); } catch (e) { log(e.message); } }
+      if (choice === 'quit') quit();
+      else remindedTray = true;
+    };
+    controller.setTrayReady(true);
+  }
   if (!background) sys.openWindow(url);
 
   // Icon next to the Windows clock.
@@ -204,8 +283,9 @@ async function main() {
 }
 
 main().catch(async (e) => {
+  if (sys.isMac) sys.getShell()?.send(`alert ${Buffer.from(`${t('startFailed')}\n\n${e.message}`, 'utf8').toString('base64')}`);
   try { fs.appendFileSync(path.join(env.dataDir, LOG_FILE), `[fatal] ${e.stack || e}\n`); } catch { /* ignore */ }
-  if (sys.isPackaged()) await sys.showError(`${t('startFailed')}\n\n${e.message}`);
+  if (sys.isPackaged() && !sys.getShell()) await sys.showError(`${t('startFailed')}\n\n${e.message}`);
   else console.error(e);
   process.exit(1);
 });

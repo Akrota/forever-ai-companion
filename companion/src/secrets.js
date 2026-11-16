@@ -4,8 +4,13 @@
 // not give the keys away. Stored as { "dpapi": "<base64>" } in place of the key.
 //
 // DPAPI is reached through PowerShell and .NET's ProtectedData, which ship
-// with Windows: nothing is added to the app. Elsewhere (development on
-// Linux/macOS) keys stay as plain text, as before.
+// with Windows: nothing is added to the app.
+//
+// macOS: the same protection with the user's login Keychain. A random key is
+// kept there (only this macOS account can read it) and the API keys are
+// encrypted with it (AES-256-GCM), stored as { "keychain": "<base64>" }.
+// Elsewhere (development on Linux) keys stay as plain text, as before.
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 // Extra secret mixed into the encryption, so other programs' DPAPI calls
@@ -52,7 +57,68 @@ export const windowsDpapi = {
   },
 };
 
-let protector = process.platform === 'win32' ? windowsDpapi : null;
+// --- macOS Keychain ----------------------------------------------------------
+const KEYCHAIN_SERVICE = 'Forever AI Companion';
+const KEYCHAIN_ACCOUNT = 'api-keys-v1';
+const SECURITY = '/usr/bin/security';
+
+let macKey = null;
+function keychainKey({ create }) {
+  if (macKey) return macKey;
+  try {
+    const hex = execFileSync(SECURITY, ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-a', KEYCHAIN_ACCOUNT, '-w'], {
+      encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (/^[0-9a-f]{64}$/i.test(hex)) return (macKey = Buffer.from(hex, 'hex'));
+  } catch { /* not there yet */ }
+  if (!create) return null;
+  const hex = crypto.randomBytes(32).toString('hex');
+  execFileSync(SECURITY, ['add-generic-password', '-U', '-s', KEYCHAIN_SERVICE, '-a', KEYCHAIN_ACCOUNT,
+    '-l', `${KEYCHAIN_SERVICE} (API keys)`, '-j', 'Encrypts the API keys saved by Forever AI Companion.', '-w', hex], {
+    timeout: 30000, stdio: 'ignore',
+  });
+  return (macKey = Buffer.from(hex, 'hex'));
+}
+
+// Uninstalling (macOS): the Keychain key goes too.
+export function removeKeychainKey() {
+  macKey = null;
+  try {
+    execFileSync(SECURITY, ['delete-generic-password', '-s', KEYCHAIN_SERVICE, '-a', KEYCHAIN_ACCOUNT], { timeout: 30000, stdio: 'ignore' });
+  } catch { /* there was none */ }
+}
+
+export function aesSeal(key, text) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const body = Buffer.concat([c.update(String(text), 'utf8'), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), body]).toString('base64');
+}
+
+export function aesOpen(key, blob) {
+  try {
+    const raw = Buffer.from(String(blob), 'base64');
+    const d = crypto.createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12));
+    d.setAuthTag(raw.subarray(12, 28));
+    return Buffer.concat([d.update(raw.subarray(28)), d.final()]).toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+export const macKeychain = {
+  field: 'keychain',
+  protect(values) {
+    const key = keychainKey({ create: true });
+    return values.map((v) => aesSeal(key, v));
+  },
+  unprotect(blobs) {
+    const key = keychainKey({ create: false });
+    return blobs.map((b) => (key ? aesOpen(key, b) : null));
+  },
+};
+
+let protector = process.platform === 'win32' ? windowsDpapi : process.platform === 'darwin' ? macKeychain : null;
 // Tests: a stand-in protector (or null for plain text).
 export const setSecretProtector = (p) => { protector = p; cache.clear(); };
 export const secretsProtected = () => Boolean(protector);
@@ -60,7 +126,13 @@ export const secretsProtected = () => Boolean(protector);
 // blob -> plain text, so the keys are decrypted once per run.
 const cache = new Map();
 
-export const isSealed = (v) => Boolean(v && typeof v === 'object' && !Array.isArray(v) && typeof v.dpapi === 'string');
+// Where a protector stores its blob: { dpapi: … } (Windows) or { keychain: … } (macOS).
+const FIELDS = ['dpapi', 'keychain'];
+const fieldOf = (p) => p?.field || 'dpapi';
+export const sealedBlob = (v) => (v && typeof v === 'object' && !Array.isArray(v)
+  ? FIELDS.map((f) => v[f]).find((b) => typeof b === 'string') ?? null
+  : null);
+export const isSealed = (v) => sealedBlob(v) !== null;
 
 // Where keys can be in config.json: the app window's keys per AI, and the
 // apiKey of a hand-written anthropic / openai section.
@@ -84,7 +156,7 @@ export function revealSecrets(saved) {
   const cfg = clone(saved) || {};
   const slots = secretSlots(cfg);
   const sealed = slots.filter(([o, k]) => isSealed(o[k]));
-  const todo = [...new Set(sealed.map(([o, k]) => o[k].dpapi).filter((b) => !cache.has(b)))];
+  const todo = [...new Set(sealed.map(([o, k]) => sealedBlob(o[k])).filter((b) => !cache.has(b)))];
   if (todo.length) {
     let plain = todo.map(() => null);
     try { if (protector) plain = protector.unprotect(todo); } catch { /* unreadable */ }
@@ -92,7 +164,7 @@ export function revealSecrets(saved) {
   }
   let unreadable = 0;
   for (const [o, k] of sealed) {
-    const v = cache.get(o[k].dpapi);
+    const v = cache.get(sealedBlob(o[k]));
     if (v === undefined) unreadable++;
     o[k] = v ?? null;
   }
@@ -110,7 +182,7 @@ export function sealSecrets(cfg) {
   const blobs = protector.protect(plain.map(([o, k]) => o[k]));
   plain.forEach(([o, k], i) => {
     cache.set(blobs[i], o[k]);
-    o[k] = { dpapi: blobs[i] };
+    o[k] = { [fieldOf(protector)]: blobs[i] };
   });
   return out;
 }

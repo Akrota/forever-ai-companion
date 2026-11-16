@@ -8,6 +8,7 @@ import { execFile, execFileSync, spawn } from 'node:child_process';
 import { t } from './i18n.js';
 
 const isWin = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
 
 function compareVersions(a, b) {
   const pa = a.split('.').map(Number);
@@ -21,7 +22,24 @@ function compareVersions(a, b) {
 
 // The Claude desktop app ships its own copy at
 // %LOCALAPPDATA%\Claude-Data\<profile>\claude-code\<version>\<hash>\claude.exe
+// (macOS: ~/Library/Application Support/Claude/claude-code/<version>/<hash>/claude.app).
+function macDesktopAppCopies() {
+  const ccDir = path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude-code');
+  const found = [];
+  try {
+    for (const version of fs.readdirSync(ccDir)) {
+      if (!/^\d+(\.\d+)*$/.test(version)) continue;
+      for (const hash of fs.readdirSync(path.join(ccDir, version))) {
+        const exe = path.join(ccDir, version, hash, 'claude.app', 'Contents', 'MacOS', 'claude');
+        if (fs.existsSync(exe)) found.push({ exe, version });
+      }
+    }
+  } catch { /* not installed */ }
+  return found.sort((a, b) => compareVersions(b.version, a.version)).map((f) => f.exe);
+}
+
 function desktopAppCopies() {
+  if (isMac) return macDesktopAppCopies();
   const base = path.join(process.env.LOCALAPPDATA || '', 'Claude-Data');
   const found = [];
   try {
@@ -58,6 +76,11 @@ export function findClaudeCode(configured) {
   for (const p of onPath()) candidates.push([p, 'path']);
   candidates.push([path.join(home, '.local', 'bin', isWin ? 'claude.exe' : 'claude'), 'native']);
   if (isWin) candidates.push([path.join(process.env.APPDATA || '', 'npm', 'claude.cmd'), 'npm']);
+  if (isMac) {
+    candidates.push([path.join(home, '.claude', 'local', 'claude'), 'native']);
+    candidates.push(['/opt/homebrew/bin/claude', 'homebrew'], ['/usr/local/bin/claude', 'path']);
+    candidates.push([path.join(home, '.npm-global', 'bin', 'claude'), 'npm']);
+  }
   for (const p of desktopAppCopies()) candidates.push([p, 'desktop']);
   const hit = candidates.find(([p]) => p && fs.existsSync(p));
   return hit ? { path: hit[0], source: hit[1] } : null;
@@ -84,6 +107,30 @@ export function authStatus(bin) {
   });
 }
 
+// POSIX shell single-quoted literal.
+export const shQuote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+
+// macOS: a Terminal window running `script` (bash), so the player sees the
+// progress and can answer prompts. A .command file opened with Terminal needs
+// no extra permission (unlike scripting Terminal).
+export function macTerminal(title, script) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-'));
+  const file = path.join(dir, `${title.replace(/[^\w .-]+/g, '').trim() || 'Forever AI Companion'}.command`);
+  fs.writeFileSync(file, [
+    '#!/bin/bash',
+    `printf '\\033]0;%s\\007' ${shQuote(title)}`,
+    'clear',
+    script,
+    'echo',
+    `echo ${shQuote(t('consoleDone'))}`,
+    `rm -rf ${shQuote(dir)}`,
+    '',
+  ].join('\n'), { mode: 0o700 });
+  const child = spawn('/usr/bin/open', ['-a', 'Terminal', file], { detached: true, stdio: 'ignore' });
+  child.on('error', () => {});
+  child.unref();
+}
+
 // Opens a visible console window running `command` so the player sees progress
 // (the sign-in also opens the browser).
 export function visibleConsole(title, commandLine) {
@@ -96,6 +143,10 @@ export function visibleConsole(title, commandLine) {
 }
 
 export function openLogin(bin) {
+  if (isMac) {
+    macTerminal(t('consoleSignInClaude'), `${shQuote(bin)} auth login --claudeai`);
+    return;
+  }
   visibleConsole(t('consoleSignInClaude'), `cmd /k ""${bin}" auth login --claudeai && echo. && echo ${t('consoleDone')}"`);
 }
 
@@ -103,6 +154,13 @@ export function openLogin(bin) {
 // install itself; otherwise use Anthropic's official installer script.
 export function openInstall() {
   const bundled = desktopAppCopies()[0];
+  if (isMac) {
+    // The desktop app's copy can install itself; otherwise Anthropic's official installer.
+    macTerminal(t('consoleInstallClaude'), bundled
+      ? `${shQuote(bundled)} install`
+      : 'curl -fsSL https://claude.ai/install.sh | bash');
+    return;
+  }
   if (bundled) {
     visibleConsole(t('consoleInstallClaude'), `cmd /k ""${bundled}" install && echo. && echo ${t('consoleDone')}"`);
   } else {

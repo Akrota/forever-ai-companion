@@ -6,11 +6,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
-import { spawnArgs, visibleConsole } from './claude-code.js';
+import { macTerminal, shQuote, spawnArgs, visibleConsole } from './claude-code.js';
 import { t } from './i18n.js';
+import { env } from './config.js';
 import { installDir, powershell } from './app/system.js';
 
 const isWin = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
 
 // Models shown in the app window (slug -> name). "default" = the plan's default.
 export const CODEX_MODELS = {
@@ -25,9 +27,10 @@ export const CODEX_MODELS = {
 // started, so the current PATH is also read from the registry: a Codex
 // installed after the app was opened is found without restarting it.
 
-// Where this app installs Codex itself (see installCodex).
-export const ownCodexDir = () => path.join(installDir(), 'codex');
-export const ownCodexExe = () => path.join(ownCodexDir(), 'codex.exe');
+// Where this app installs Codex itself (see installCodex). macOS: the app's
+// data folder (the install folder is Applications).
+export const ownCodexDir = () => (isMac ? path.join(env.dataDir, 'codex') : path.join(installDir(), 'codex'));
+export const ownCodexExe = () => path.join(ownCodexDir(), isMac ? 'codex' : 'codex.exe');
 
 function registryPath() {
   if (!isWin) return [];
@@ -69,15 +72,23 @@ function findExe(dir, depth, names) {
   return out;
 }
 
-const RELEASE_EXE = /^codex-(x86_64|aarch64)-pc-windows-msvc\.exe$/i;
+const RELEASE_EXE = isMac ? /^codex-(x86_64|aarch64)-apple-darwin$/ : /^codex-(x86_64|aarch64)-pc-windows-msvc\.exe$/i;
 
 // Every place a Codex install can be, most reliable first: [path, source].
 export function codexCandidates(configured) {
   const out = [];
   if (configured && path.isAbsolute(configured)) out.push([configured, 'config']);
   if (!isWin) {
+    if (isMac) out.push([ownCodexExe(), 'app']);
     for (const d of pathDirs()) out.push([path.join(d, 'codex'), 'path']);
     out.push([path.join(os.homedir(), '.local', 'bin', 'codex'), 'native']);
+    if (isMac) {
+      out.push(['/opt/homebrew/bin/codex', 'homebrew'], ['/usr/local/bin/codex', 'path']);
+      out.push([path.join(os.homedir(), '.npm-global', 'bin', 'codex'), 'npm']);
+      out.push([path.join(os.homedir(), '.bun', 'bin', 'codex'), 'bun']);
+      out.push([path.join(os.homedir(), 'Library', 'pnpm', 'codex'), 'pnpm']);
+      out.push([path.join(os.homedir(), '.volta', 'bin', 'codex'), 'volta']);
+    }
     return out;
   }
   const local = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
@@ -149,14 +160,15 @@ export function codexVersion(bin, timeout = 20000) {
 export const CODEX_RELEASES_API = 'https://api.github.com/repos/openai/codex/releases/latest';
 const CODEX_DOWNLOAD_PREFIX = 'https://github.com/openai/codex/releases/download/';
 
-export function codexAssetName(arch = process.arch) {
-  return `codex-${arch === 'arm64' ? 'aarch64' : 'x86_64'}-pc-windows-msvc.exe.tar.gz`;
+export function codexAssetName(arch = process.arch, platform = process.platform) {
+  const cpu = arch === 'arm64' ? 'aarch64' : 'x86_64';
+  return platform === 'darwin' ? `codex-${cpu}-apple-darwin.tar.gz` : `codex-${cpu}-pc-windows-msvc.exe.tar.gz`;
 }
 
 // The asset to download from GitHub's "latest release" answer, or null.
-export function pickCodexAsset(json, arch = process.arch) {
+export function pickCodexAsset(json, arch = process.arch, platform = process.platform) {
   if (!json || json.draft || json.prerelease) return null;
-  const asset = (json.assets || []).find((a) => a.name === codexAssetName(arch));
+  const asset = (json.assets || []).find((a) => a.name === codexAssetName(arch, platform));
   if (!asset || !String(asset.browser_download_url || '').startsWith(CODEX_DOWNLOAD_PREFIX)) return null;
   const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest || '');
   if (!digest) return null; // never install something that can't be checked
@@ -170,7 +182,8 @@ let installing = null;
 // Downloads, checks and installs Codex into this app's folder. Returns { path, version }.
 // verify: whether the unpacked program is signed by OpenAI (checked before it is installed or run).
 export function installCodex({
-  log = () => {}, fetchImpl = fetch, apiUrl = CODEX_RELEASES_API, tarExe = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'),
+  log = () => {}, fetchImpl = fetch, apiUrl = CODEX_RELEASES_API,
+  tarExe = isMac ? '/usr/bin/tar' : path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'),
   pickAsset = pickCodexAsset, verify = isSignedByOpenAI,
 } = {}) {
   if (installing) return installing;
@@ -181,7 +194,7 @@ export function installCodex({
       const res = await fetchImpl(apiUrl, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'ForeverAICompanion' }, signal: AbortSignal.timeout(20000) });
       if (!res.ok) throw new Error(`GitHub: HTTP ${res.status}`);
       const asset = pickAsset(await res.json());
-      if (!asset) throw new Error('no verifiable Codex download for Windows was found');
+      if (!asset) throw new Error(`no verifiable Codex download for ${isMac ? 'macOS' : 'Windows'} was found`);
       const archive = path.join(work, 'codex.tar.gz');
       const dl = await fetchImpl(asset.url, { headers: { 'user-agent': 'ForeverAICompanion' }, signal: AbortSignal.timeout(30 * 60000) });
       if (!dl.ok || !dl.body) throw new Error(`download: HTTP ${dl.status}`);
@@ -209,8 +222,8 @@ export function installCodex({
       await new Promise((resolve, reject) => {
         execFile(tarExe, ['-xzf', archive, '-C', out], { windowsHide: true, timeout: 10 * 60000 }, (err, so, se) => (err ? reject(new Error(`tar: ${(se || err.message).trim()}`)) : resolve()));
       });
-      const exe = findExeMatching(out, 2, RELEASE_EXE)[0] || findExe(out, 2, ['codex.exe'])[0];
-      if (!exe) throw new Error('codex.exe was not in the download');
+      const exe = findExeMatching(out, 2, RELEASE_EXE)[0] || findExe(out, 2, [isMac ? 'codex' : 'codex.exe'])[0];
+      if (!exe) throw new Error('codex was not in the download');
       if (!(await verify(exe))) throw new Error('the downloaded Codex is not signed by OpenAI');
 
       fs.mkdirSync(ownCodexDir(), { recursive: true });
@@ -219,6 +232,7 @@ export function installCodex({
         try { fs.rmSync(target); } catch { fs.renameSync(target, `${target}.old-${Date.now()}`); }
       }
       fs.copyFileSync(exe, target);
+      if (isMac) fs.chmodSync(target, 0o755);
       const version = await codexVersion(target);
       if (!version) throw new Error('the installed Codex does not start');
       Object.assign(installState, { status: 'done', progress: 100 });
@@ -242,11 +256,13 @@ export function installCodex({
 // Codex inside its folder), then walk the disks for a while. Nothing found is
 // run except with --version, and desktop apps (Electron) are never run.
 
-const CLI_NAMES = ['codex.exe', 'codex.cmd'];
-const isCliName = (name) => CLI_NAMES.includes(name.toLowerCase()) || RELEASE_EXE.test(name);
+const CLI_NAMES = isMac ? ['codex'] : ['codex.exe', 'codex.cmd'];
+const isCliName = (name) => (isMac ? CLI_NAMES.includes(name) : CLI_NAMES.includes(name.toLowerCase())) || RELEASE_EXE.test(name);
 
 // A desktop (Electron) app next to its runtime files: running it would open a window.
 export function isDesktopApp(exe) {
+  // macOS: the program of an app bundle (…/Codex.app/Contents/MacOS/Codex).
+  if (isMac && /\.app\/Contents\/MacOS\/[^/]+$/.test(exe) && !/\/Resources\//.test(exe)) return true;
   const dir = path.dirname(exe);
   return fs.existsSync(path.join(dir, 'resources'))
     && ['ffmpeg.dll', 'v8_context_snapshot.bin', 'resources.pak', 'icudtl.dat'].some((f) => fs.existsSync(path.join(dir, f)));
@@ -258,6 +274,8 @@ const SKIP_DIRS = new Set([
   '.git', '.cache', 'cache', 'caches', 'temp', 'tmp', 'logs', 'crashdumps', 'packages', 'onedrive',
   'steamapps', 'steamlibrary', 'world of warcraft', 'battle.net', 'riot games', 'epic games', 'ea games', 'xboxgames',
   'windowsapps', 'windows kits', 'microsoft visual studio', 'dotnet', 'nvidia corporation', 'intel', 'amd',
+  // macOS
+  'library', '.trash', 'pictures', 'movies', 'music', 'system', 'volumes', 'private', 'cores', 'dev',
 ]);
 
 // Walks `roots` breadth-first (each [dir, depth]) for Codex files, giving the
@@ -298,6 +316,14 @@ export async function walkForCodex(roots, { budgetMs = 60000, onProgress = () =>
 
 // Executable paths of running programs named like Codex.
 export function runningCodexPaths() {
+  if (isMac) {
+    return new Promise((resolve) => {
+      execFile('/bin/ps', ['-axo', 'comm='], { timeout: 20000, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }, (err, stdout) => {
+        const paths = String(stdout || '').split('\n').map((s) => s.trim()).filter((p) => /\/codex[^/]*$/i.test(p) || /\/Codex\.app\/Contents\/MacOS\//.test(p));
+        resolve([...new Set(paths)]);
+      });
+    });
+  }
   if (!isWin) return Promise.resolve([]);
   return new Promise((resolve) => {
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
@@ -339,7 +365,8 @@ export function searchCodex({
       if (tried.has(k) || !fs.existsSync(file)) return null;
       tried.add(k);
       if (!isCliName(path.basename(file)) || isDesktopApp(file)) return null;
-      if (/\.cmd$/i.test(file)) {
+      // npm's launchers: a .cmd on Windows, a script (#!/usr/bin/env node) on macOS.
+      if (/\.cmd$/i.test(file) || (isMac && await isScript(file))) {
         if (!launchers) return null;
       } else if (!(await verify(file))) {
         log(`Codex search: skipped ${file} (not signed by OpenAI).`);
@@ -363,11 +390,13 @@ export function searchCodex({
       for (const [f] of codexCandidates(null)) { const ok = await tryOne(f, { launchers: true }); if (ok) return finish(ok, 'known place'); }
       // 3. The disks.
       const home = os.homedir();
-      const walkRoots = roots || [
+      const walkRoots = roots || (isMac ? [
+        [home, 7], ['/Applications', 6], ['/opt/homebrew', 5], ['/usr/local', 5],
+      ] : [
         [home, 7],
         [process.env.ProgramFiles, 5], [process.env['ProgramFiles(x86)'], 5], [process.env.ProgramData, 5],
         ...driveRoots().map((d) => [d, 5]),
-      ];
+      ]);
       const walk = await walkForCodex(walkRoots, { budgetMs, onProgress: (n) => { searchState.dirs = n; } });
       // Prefer real executables over npm's .cmd launchers, shallow paths first.
       walk.found.sort((a, b) => (a.endsWith('.cmd') - b.endsWith('.cmd')) || (a.split(/[\\/]/).length - b.split(/[\\/]/).length));
@@ -406,8 +435,41 @@ export function subjectOrganization(subject) {
 
 export const isOpenAISignature = (sig) => Boolean(sig && sig.status === 'Valid' && OPENAI_SIGNERS.includes(subjectOrganization(sig.subject)));
 
+// macOS: the signer of a program, checked by codesign (the signature must be
+// intact and lead to Apple). "Developer ID Application: OpenAI OpCo, LLC (ABCDE12345)"
+// -> { status: 'Valid', subject: 'O="OpenAI OpCo, LLC"', team }.
+export function parseCodesign(text) {
+  const m = /^Authority=Developer ID Application: (.+?) \(([A-Z0-9]{10})\)\s*$/m.exec(String(text || ''));
+  if (!m || !/^Authority=Apple Root CA\s*$/m.test(String(text))) return null;
+  return { status: 'Valid', subject: `O="${m[1].replace(/"/g, '""')}"`, team: m[2] };
+}
+
+async function macSignature(file) {
+  const run = (args) => new Promise((resolve) => {
+    execFile('/usr/bin/codesign', args, { timeout: 60000, encoding: 'utf8' }, (err, stdout, stderr) => resolve({ ok: !err, text: `${stdout || ''}${stderr || ''}` }));
+  });
+  const verify = await run(['--verify', '--strict', file]);
+  if (!verify.ok) return null;
+  return parseCodesign((await run(['-dvv', file])).text);
+}
+
+// A text file starting with "#!" (npm's launchers on macOS).
+async function isScript(file) {
+  try {
+    const fd = fs.openSync(file, 'r');
+    const b = Buffer.alloc(2);
+    fs.readSync(fd, b, 0, 2, 0);
+    fs.closeSync(fd);
+    return b.toString('latin1') === '#!';
+  } catch {
+    return false;
+  }
+}
+
 // Windows' verdict on a file's Authenticode signature: { status, subject } or null.
+// macOS: codesign's (see parseCodesign).
 export async function authenticodeSignature(file) {
+  if (isMac) return macSignature(file);
   if (!isWin) return null;
   try {
     const out = await powershell(`$s = Get-AuthenticodeSignature -LiteralPath $env:FAIC_FILE
@@ -443,6 +505,10 @@ export function codexAuthStatus(bin) {
 }
 
 export function openCodexLogin(bin) {
+  if (isMac) {
+    macTerminal(t('consoleSignInChatGPT'), `${shQuote(bin)} login`);
+    return;
+  }
   visibleConsole(t('consoleSignInChatGPT'), `cmd /k ""${bin}" login && echo. && echo ${t('consoleDone')}"`);
 }
 

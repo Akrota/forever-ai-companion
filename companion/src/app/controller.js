@@ -24,12 +24,15 @@ import {
   machineEngineState, uninstallVoiceMachineWide,
 } from '../tts-voice.js';
 import { removeLegacyInstallDir } from '../migrate.js';
+import { disableMacVoice, enableMacVoice, macVoiceStatus, removeMacVoice, requestScreenAccess } from '../mac-voice.js';
+import { installMacUpdate } from '../mac-update.js';
+import { removeKeychainKey } from '../secrets.js';
 import * as sys from './system.js';
 import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { TOPICS_FILE, currentGuide, guideFreshness, startGuideUpdates, topicsUrl } from '../guide.js';
 import { createUpdater } from '../updater.js';
 
-export const VERSION = '1.10.1';
+export const VERSION = '1.11.0';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
 // Only programs running as the player load this copy (per-user registration);
@@ -43,7 +46,7 @@ const LEGACY_ADDON_CHECK_MS = 10000;
 const LOGIN_CHECK_MS = 5 * 60 * 1000;
 
 // onUpdateAvailable(version): a newer release was found (tray notice).
-export function createController({ log = () => {}, onUpdateAvailable = () => {} } = {}) {
+export function createController({ log = () => {}, onUpdateAvailable = () => {}, onQuit = () => process.exit(0) } = {}) {
   let cfg = loadConfig();
   setAppLang(cfg.language && cfg.language !== 'auto' ? cfg.language : null);
   let watcher = null;
@@ -236,6 +239,12 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
       .then(([active, legacy]) => (active || legacy ? refreshVoiceDll() : null))
       .catch((e) => log(`Could not update the invisible voice: ${e.message}`));
   }
+  // macOS: the silent voice ships inside the app and is on unless the player
+  // turned it off. Registering it again on every start keeps it pointing at
+  // this copy of the app (after updates or moving the app).
+  if (sys.isMac && cfg.macVoice !== false && !envVar('NO_MAC_VOICE')) {
+    enableMacVoice({ log }).catch((e) => log(`Could not enable the invisible voice: ${e.message}`));
+  }
 
   // First run: find the game on our own.
   if (!wowDirValid()) {
@@ -264,6 +273,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
       const preset = cfg.preset || (cfg.provider === 'echo' ? 'echo' : null);
       return {
         version: VERSION,
+        platform: process.platform,
         lang: getAppLang(),
         packaged: sys.isPackaged(),
         wow: {
@@ -280,6 +290,9 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
           models: cfg.models || {},
           defaults: Object.fromEntries(Object.entries(PRESETS).map(([k, v]) => [k, v.model || null])),
           webSearch: cfg.webSearch !== false,
+          // Why the chosen AI can't answer yet: "need-ai" (no AI or no key),
+          // "need-login" (Claude Code / Codex signed out), or null.
+          issue: ['need-ai', 'need-login'].includes(notReadyReason()) ? notReadyReason() : null,
         },
         running: Boolean(watcher),
         problem: watcherError,
@@ -309,6 +322,12 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
       if (!updater) throw err('updateUnsupported');
       const exe = await updater.download();
       log(`Installing update from ${exe}`);
+      if (sys.isMac) {
+        // The new app replaces this one once it has quit, and starts again.
+        await installMacUpdate(exe, { log });
+        setTimeout(() => onQuit(), 300);
+        return { restarting: true };
+      }
       sys.relaunch(exe, ['--background']);
       return { restarting: true };
     },
@@ -373,6 +392,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
     },
 
     async voiceStatus() {
+      if (sys.isMac) return macVoiceStatus();
       if (!sys.isWindows) return { supported: false };
       const active = await isVoiceVisible();
       // Set up by a version from before the rename (the voice's previous name,
@@ -391,6 +411,11 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
 
     // Compiles the silent voice and registers it (one administrator prompt).
     async installVoice() {
+      if (sys.isMac) {
+        if (cfg.macVoice === false) save({ macVoice: true });
+        const active = await enableMacVoice({ log });
+        return { active, wowRunning: isWowRunning() };
+      }
       const dll = await refreshVoiceDll(true);
       await installVoiceMachineWide(dll, env.dataDir, { sourceHash: engineSourceHash() });
       log('Invisible voice enabled.');
@@ -399,7 +424,25 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
       return { active: await isVoiceVisible(), wowRunning: isWowRunning() };
     },
 
+    // macOS: the on-screen line needs the Screen Recording permission. Asks for
+    // it (the first time) and opens its page in System Settings.
+    async openScreenSettings() {
+      if (!sys.isMac) return {};
+      const screen = await requestScreenAccess();
+      if (screen !== 'granted') {
+        sys.openUrl('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+      }
+      return { screen };
+    },
+
     async uninstallVoice() {
+      if (sys.isMac) {
+        save({ macVoice: false });
+        await disableMacVoice({ log });
+        // The on-screen line reads the game window: macOS asks for permission.
+        const screen = await requestScreenAccess();
+        return { active: false, screen };
+      }
       await uninstallVoiceMachineWide(env.dataDir);
       log('Invisible voice disabled.');
       return { active: await isVoiceVisible() };
@@ -457,9 +500,9 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
 
     // The player points at a codex.exe Codex installed some other way.
     async codexPick() {
-      const file = await sys.pickFile({ title: t('pickCodex'), filter: 'Codex (codex*.exe;codex.cmd)|codex*.exe;codex.cmd' });
+      const file = await sys.pickFile({ title: t(sys.isMac ? 'pickCodexMac' : 'pickCodex'), filter: 'Codex (codex*.exe;codex.cmd)|codex*.exe;codex.cmd' });
       if (!file) return { cancelled: true };
-      if (!(await codexVersion(file))) throw err('codexPickInvalid');
+      if (!(await codexVersion(file))) throw err(sys.isMac ? 'codexPickInvalidMac' : 'codexPickInvalid');
       save({ codex: { bin: file } });
       return { path: file };
     },
@@ -499,6 +542,10 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {} 
       this.stop();
       if (wowDirValid()) uninstallAddon(cfg, cfg.wowDir);
       if (sys.isWindows) await uninstallVoiceMachineWide(env.dataDir).catch((e) => log(e.message));
+      if (sys.isMac) {
+        await removeMacVoice().catch((e) => log(e.message));
+        if (sys.isPackaged()) removeKeychainKey();
+      }
       if (sys.isPackaged()) {
         await sys.setAutostart(false).catch(() => {});
         await sys.removeShortcuts().catch(() => {});

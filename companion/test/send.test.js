@@ -787,6 +787,90 @@ test('chat header shows whether the app is open, ready, and why not', () => {
   assert.equal(tip, 'App status unknown');
 });
 
+// --- macOS: sound files are checked a moment later ------------------------------
+// WoW for Mac says PlaySoundFile will play any file that exists, empty or not;
+// only C_Sound.IsPlaying a moment later tells them apart. Trusting the first
+// answer took every signal as rung and used up the 50 mailboxes in ~5 questions.
+const MAC_SOUND = RECORD_TEXT + PRELUDE_DRIVE + `
+  IsMacClient = function() return true end
+  REAL = { ok = true, st = true }   -- sound files with real content
+  HANDLES = {}
+  PlaySoundFile = function(path)
+    HANDLES[#HANDLES + 1] = path:match("sig\\\\([%w%-]+)%.wav$") or ""
+    return true, #HANDLES          -- "will play", like the Mac client says for every file
+  end
+  StopSound = function() end
+  C_Sound = { IsPlaying = function(h) return REAL[HANDLES[h]] == true end }
+  TIMERS = {}
+  C_Timer.After = function(_, fn) TIMERS[#TIMERS + 1] = fn end
+  function FLUSH() local list = TIMERS; TIMERS = {}; for _, fn in ipairs(list) do fn() end end
+  LOADS, LOADED = 0, {}
+  C_AddOns = {
+    IsAddOnLoaded = function(n) return LOADED[n] end,
+    LoadAddOn = function(n) LOADED[n] = true; LOADS = LOADS + 1; return true end,
+    EnableAddOn = function() end,
+  }
+`;
+
+test('Mac: a mailbox is opened only when the app really rings, not on every check', () => {
+  const out = runLua(`
+    START()
+    FLUSH()                                   -- the start-up scan finds nothing rung
+    ns.Core.HasPending = function() return true end
+    local first = ns.db.nextSig
+    for i = 1, 15 do ns.Live:Tick(); FLUSH() end   -- 30 s waiting for an answer
+    local idle = LOADS .. "/" .. ns.db.nextSig
+    REAL[string.format("%03d", ns.db.nextSig)] = true   -- the app rings
+    ns.Live:Tick(); FLUSH()
+    local rung = LOADS .. "/" .. ns.db.nextSig
+    for i = 1, 5 do ns.Live:Tick(); FLUSH() end    -- the next signal is still empty
+    RESULT = first .. "#" .. idle .. "#" .. rung .. "#" .. LOADS .. "#" .. tostring(ns.Live.deferred)
+  `, {}, ALL_FILES, MAC_SOUND);
+  const [first, idle, rung, after, deferred] = out.split('#');
+  assert.equal(deferred, 'true');
+  assert.equal(idle, `0/${first}`, 'no mailbox used and no signal skipped while nothing rang');
+  assert.equal(rung, `1/${Number(first) + 1}`, 'one ring, one mailbox');
+  assert.equal(after, '1');
+});
+
+test('Mac: signals rung while the game was closed are skipped at start, one check at a time', () => {
+  const out = runLua(`
+    REAL["001"], REAL["002"], REAL["003"] = true, true, true
+    START()
+    local during = tostring(ns.Live.scanning)
+    for i = 1, 5 do FLUSH() end
+    RESULT = during .. "#" .. ns.db.nextSig .. "#" .. tostring(ns.Live.scanning)
+  `, {}, ALL_FILES, MAC_SOUND);
+  assert.equal(out, 'true#4#false');
+});
+
+test('Mac: the chat header tells closed from ready (not "unknown")', () => {
+  const out = runLua(`
+    START()
+    ns.Personas:Set("fizzi")
+    ns.UI:Show()
+    FLUSH()
+    local states = {}
+    local function check() NOW = NOW + 2; ns.Live:CheckApp(); FLUSH(); states[#states + 1] = ns.Live:AppState() end
+    check(); check()                                   -- nothing beats: closed
+    REAL.beat1 = true; check()
+    REAL.beat1, REAL.beat2 = nil, true; check()        -- it switches: ready
+    REAL["need-ai"] = true; REAL.beat1, REAL.beat2 = true, nil; check()
+    RESULT = table.concat(states, ",")
+  `, {}, ALL_FILES, MAC_SOUND);
+  assert.equal(out.split(',').slice(-4).join(','), 'closed,closed,ready,need-ai');
+});
+
+test('Mac without C_Sound.IsPlaying: signals are not trusted, mailboxes go by the timer', () => {
+  const out = runLua(`
+    START()
+    ns.Core.HasPending = function() return true end
+    for i = 1, 10 do ns.Live:Tick() end
+    RESULT = LOADS .. "#" .. tostring(ns.Live.soundOK) .. "#" .. ns.Live:CheckApp()
+  `, {}, ALL_FILES, MAC_SOUND + 'C_Sound = nil\n');
+  assert.equal(out, '0#false#unknown');
+});
+
 test('the "thinking" bubble is big enough for every phrase it cycles through', () => {
   const out = runLua(`
     START()

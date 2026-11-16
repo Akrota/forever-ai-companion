@@ -780,10 +780,14 @@ function UI:Row(i)
   name:SetJustifyH("LEFT")
   if name.SetWordWrap then name:SetWordWrap(false) end
   row.name = name
+  -- One line under the title: a long status ("Fizzi is typing...") is cut
+  -- with "..." instead of wrapping up over the title.
   local info = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  info:SetPoint("BOTTOMLEFT", face, "BOTTOMRIGHT", 8, 0)
+  info:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -3)
   info:SetPoint("RIGHT", -22, 0)
   info:SetJustifyH("LEFT")
+  if info.SetWordWrap then info:SetWordWrap(false) end
+  if info.SetMaxLines then info:SetMaxLines(1) end
   row.info = info
   -- Unread: a green light on the avatar, like an online friend.
   local dot = row:CreateTexture(nil, "OVERLAY")

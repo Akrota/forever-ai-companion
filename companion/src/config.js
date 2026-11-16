@@ -16,11 +16,15 @@ export const ADDON_SRC = path.resolve(ROOT, '..', 'addon', ADDON_NAME);
 export const LEGACY_NAME = 'AzerothIA';
 
 // Where config.json, state.json, knowledge/ and logs live.
-// Dev: the companion folder. Packaged app: %APPDATA%\ForeverAICompanion (see app/main.js).
+// Dev: the companion folder. Packaged app: %APPDATA%\ForeverAICompanion on
+// Windows, ~/Library/Application Support/ForeverAICompanion on macOS (see app/main.js).
 export const env = { dataDir: ROOT };
 
-// %APPDATA%: the packaged app's data folder and the silent voice's inbox live there.
-export const roamingDir = () => process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+// %APPDATA% (Windows) or ~/Library/Application Support (macOS): the packaged
+// app's data folder and the silent voice's inbox live there.
+export const roamingDir = () => (process.platform === 'darwin'
+  ? path.join(os.homedir(), 'Library', 'Application Support')
+  : process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'));
 
 // Settings from environment variables (FAIC_*). The AZIA_* spelling from
 // before the rename still works.
@@ -76,11 +80,16 @@ export const DEFAULTS = {
   // The app downloads it every few hours; null = only the guide inside the app.
   guideUrl: GUIDE_URL,
 
-  // Language of the app and its messages: "auto" (Windows' language), "en" or "es".
+  // Language of the app and its messages: "auto" (the system's language), "en" or "es".
   language: 'auto',
 
-  // Closing the app window: "ask" | "tray" (keep running next to the clock) | "quit".
+  // Closing the app window: "ask" | "tray" (keep running next to the clock /
+  // in the menu bar) | "quit".
   closeAction: 'ask',
+
+  // macOS: false when the player turned invisible sending off (the silent
+  // voice ships inside the app and is on by default; see mac-voice.js).
+  macVoice: true,
 };
 
 function merge(base, over) {
@@ -175,6 +184,7 @@ function candidateDirs() {
     }
   } else if (process.platform === 'darwin') {
     out.push('/Applications/World of Warcraft/_forever_');
+    out.push(path.join(os.homedir(), 'Applications', 'World of Warcraft', '_forever_'));
   }
   return out;
 }

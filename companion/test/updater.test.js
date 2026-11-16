@@ -5,7 +5,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ASSET_NAME, REPO, compareVersions, createUpdater, parseRelease } from '../src/updater.js';
+import { MAC_ASSET, REPO, WINDOWS_ASSET, compareVersions, createUpdater, parseRelease as parseAny } from '../src/updater.js';
+
+// These tests are about the Windows exe; the macOS zip has its own test below.
+const ASSET_NAME = WINDOWS_ASSET;
+const parseRelease = (json, opts = {}) => parseAny(json, { platform: 'win32', ...opts });
 
 const exeBytes = Buffer.concat([Buffer.from('MZ'), crypto.randomBytes(5000)]);
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
@@ -61,7 +65,7 @@ test('a newer version is offered once, downloaded and verified', async (t) => {
   let latest = release('1.6.0');
   const gh = fakeGitHub({ latest: () => latest });
   const announced = [];
-  const u = createUpdater({ currentVersion: '1.6.0', dir, fetchImpl: gh.fetchImpl, intervalMs: 1e9, onAvailable: (v) => announced.push(v) });
+  const u = createUpdater({ platform: 'win32', currentVersion: '1.6.0', dir, fetchImpl: gh.fetchImpl, intervalMs: 1e9, onAvailable: (v) => announced.push(v) });
   t.after(() => u.stop());
   assert.deepEqual(fs.readdirSync(dir), [], 'old downloads removed');
 
@@ -88,7 +92,7 @@ test('a download that does not match what GitHub published is thrown away', asyn
     [exeBytes.subarray(0, 100), /incomplete/],
   ]) {
     const gh = fakeGitHub({ latest: () => release('1.7.0'), file });
-    const u = createUpdater({ currentVersion: '1.6.0', dir, fetchImpl: gh.fetchImpl, intervalMs: 1e9 });
+    const u = createUpdater({ platform: 'win32', currentVersion: '1.6.0', dir, fetchImpl: gh.fetchImpl, intervalMs: 1e9 });
     await u.check();
     await assert.rejects(u.download(), why);
     assert.equal(u.state().status, 'available', 'can try again');
@@ -100,7 +104,7 @@ test('a download that does not match what GitHub published is thrown away', asyn
   const noDigest = release('1.7.0');
   delete noDigest.assets[0].digest;
   const gh = fakeGitHub({ latest: () => noDigest, file: notExe });
-  const u = createUpdater({ currentVersion: '1.6.0', dir, fetchImpl: gh.fetchImpl, intervalMs: 1e9 });
+  const u = createUpdater({ platform: 'win32', currentVersion: '1.6.0', dir, fetchImpl: gh.fetchImpl, intervalMs: 1e9 });
   await u.check();
   await assert.rejects(u.download(), /not a Windows program/);
   u.stop();
@@ -109,9 +113,37 @@ test('a download that does not match what GitHub published is thrown away', asyn
 test('no internet: it says so and keeps working', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-upd-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const u = createUpdater({ currentVersion: '1.6.0', dir, intervalMs: 1e9, fetchImpl: async () => { throw new Error('offline'); } });
+  const u = createUpdater({ platform: 'win32', currentVersion: '1.6.0', dir, intervalMs: 1e9, fetchImpl: async () => { throw new Error('offline'); } });
   const s = await u.check();
   assert.equal(s.status, 'error');
   assert.match(s.error, /offline/);
   u.stop();
+});
+
+test('macOS: the app updates from the zip of the same release, checked the same way', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-upd-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const zip = Buffer.concat([Buffer.from('PK\x03\x04'), crypto.randomBytes(5000)]);
+  const both = (version) => ({
+    ...release(version),
+    assets: [
+      release(version).assets[0],
+      { name: MAC_ASSET, size: zip.length, digest: `sha256:${sha(zip)}`, browser_download_url: `https://github.com/${REPO}/releases/download/v${version}/${MAC_ASSET}` },
+    ],
+  });
+  assert.equal(parseAny(both('1.7.0'), { platform: 'darwin' }).sha256, sha(zip));
+  assert.equal(parseAny(release('1.7.0'), { platform: 'darwin' }), null, 'a release without the Mac zip is not offered on a Mac');
+  const gh = fakeGitHub({ latest: () => both('1.7.0'), file: zip });
+  const u = createUpdater({ platform: 'darwin', currentVersion: '1.6.0', dir, fetchImpl: gh.fetchImpl, intervalMs: 1e9 });
+  t.after(() => u.stop());
+  await u.check();
+  const file = await u.download();
+  assert.match(file, /-mac\.zip$/);
+  assert.equal(sha(fs.readFileSync(file)), sha(zip));
+  // The Windows exe is never accepted as the Mac update.
+  const wrong = fakeGitHub({ latest: () => ({ ...both('1.8.0'), assets: [{ ...both('1.8.0').assets[1], size: exeBytes.length, digest: undefined }] }), file: exeBytes });
+  const u2 = createUpdater({ platform: 'darwin', currentVersion: '1.6.0', dir, fetchImpl: wrong.fetchImpl, intervalMs: 1e9 });
+  t.after(() => u2.stop());
+  await u2.check();
+  await assert.rejects(u2.download(), /not a zip/);
 });
