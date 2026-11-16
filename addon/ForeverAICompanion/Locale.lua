@@ -144,7 +144,6 @@ local EN = {
   PREVIOUS_CONVERSATION = "Previous conversation",
 
   -- Asking
-  VOICE_LOST = "The invisible link didn't reach the app; I resent it with the on-screen strip.",
   NO_ANSWER = "No answer arrived. Is the companion app open on your PC?",
   FRAME_TOO_BIG = "%d bytes (JSON %d) even after trimming everything",
   IN_COMBAT = "Can't ask during combat.",
@@ -395,7 +394,6 @@ local ES = {
   PREVIOUS_CONVERSATION = "Conversación anterior",
 
   -- Preguntas
-  VOICE_LOST = "El envío invisible no llegó a la app; lo reenvié con la línea en pantalla.",
   NO_ANSWER = "No llegó respuesta. ¿Está abierta la app compañera en tu PC?",
   FRAME_TOO_BIG = "%d bytes (JSON %d) incluso recortando todo",
   IN_COMBAT = "No puedo preguntar durante el combate.",

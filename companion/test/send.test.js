@@ -871,6 +871,65 @@ test('Mac without C_Sound.IsPlaying: signals are not trusted, mailboxes go by th
   assert.equal(out, '0#false#unknown');
 });
 
+// --- A slow answer through the invisible voice ------------------------------------
+const VOICE_ON = RECORD_TEXT + PRELUDE_DRIVE + `
+  SPOKEN = {}
+  C_VoiceChat = {
+    GetTtsVoices = function() return { { voiceID = 7, name = "ForeverAICompanion" } } end,
+    SpeakText = function(_, text) SPOKEN[#SPOKEN + 1] = text; return true end,
+  }
+  C_Timer.After = function(_, fn) fn() end
+  function UNTIL_IDLE()
+    for i = 1, 6000 do
+      if not ns.Core.working and not ns.Uplink.busy then return end
+      RUN_FRAMES(1)
+    end
+  end
+`;
+
+test('a slow answer through the voice: sent again as the same question, and the voice stays on', () => {
+  const out = runLua(`
+    START()
+    ns.Personas:Set("fizzi")
+    local id = ns.Core:Ask("¿Qué mazmorra me conviene?")
+    UNTIL_IDLE()
+    local chat = ns.Chats:Current()
+    local entry = chat.messages[#chat.messages]
+    local spoke = #SPOKEN
+    entry.t = time() - 46                       -- no answer after 45 s (a slow first answer)
+    ns.Core:HasPending()
+    UNTIL_IDLE()
+    local again = (ns.Uplink.last and ns.Uplink.last.bytes or 0) > 0
+    local count = #chat.messages
+    local stillPending = entry.status
+    ns.Core:HasPending()                        -- only once
+    UNTIL_IDLE()
+    -- The answer to the first copy arrives (the app answers an id once).
+    ns.Core:ApplyInbox({ answers = { { id = id, ok = true, answer = "Las Minas de la Muerte." } } })
+    RESULT = table.concat({ spoke, tostring(again), count, stillPending, entry.id == id and "same-id" or "new-id",
+      entry.status, tostring(ns.Voice.broken), tostring(ns.Voice:Available()) }, "#")
+  `, {}, ALL_FILES, VOICE_ON);
+  assert.equal(out, '1#true#1#pending#same-id#done#nil#true');
+});
+
+test('no answer at all through the voice: the question fails and the voice is given up, until an answer still arrives', () => {
+  const out = runLua(`
+    START()
+    ns.Personas:Set("fizzi")
+    ns.Core:Ask("¿Hola?")
+    UNTIL_IDLE()
+    local chat = ns.Chats:Current()
+    local entry = chat.messages[#chat.messages]
+    entry.t = time() - 46; ns.Core:HasPending(); UNTIL_IDLE()
+    entry.t = time() - 151; ns.Core:HasPending()
+    local given = entry.status .. "#" .. tostring(ns.Voice.broken)
+    -- The answer still arrives later: it is shown, and the voice is back.
+    ns.Core:ApplyInbox({ answers = { { id = entry.id, ok = true, answer = "Hola, aventurera." } } })
+    RESULT = given .. "#" .. entry.status .. "#" .. tostring(entry.answer) .. "#" .. tostring(ns.Voice.broken)
+  `, {}, ALL_FILES, VOICE_ON);
+  assert.equal(out, 'error#true#done#Hola, aventurera.#nil');
+});
+
 test('the "thinking" bubble is big enough for every phrase it cycles through', () => {
   const out = runLua(`
     START()

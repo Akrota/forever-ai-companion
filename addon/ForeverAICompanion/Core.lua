@@ -17,7 +17,12 @@ function Core:FindEntry(id)
 end
 
 -- A question sent through the invisible voice with no answer after this
--- long is re-sent through the strip, and the voice is skipped this session.
+-- long is also sent through the strip, as the same question (same id): the
+-- app answers it once, whichever copy it got. A slow answer (the AI taking a
+-- while, a first start) is not a lost question: the voice is only given up
+-- for the session when no answer comes back at all (PENDING_TIMEOUT). Giving
+-- it up after these 45 s left a Mac without the Screen Recording permission
+-- (the strip can't be read there) with no answers until /reload.
 local VOICE_TIMEOUT = 45
 
 function Core:HasPending()
@@ -25,25 +30,25 @@ function Core:HasPending()
   local any = false
   local resend
   ns.Chats:EachEntry(function(e, c)
-    if e.status == "pending" and e.viaVoice and now - (e.t or now) > VOICE_TIMEOUT and not self.working then
+    if e.status ~= "pending" then return end
+    if now - (e.t or now) > PENDING_TIMEOUT then
       e.status = "error"
-      e.answer = L.VOICE_LOST
-      ns.Voice.broken = true
-      resend = { question = e.shown or e.question, chatId = c.id }
+      e.answer = L.NO_ANSWER
+      e.timedOut = true -- an answer that still arrives is shown (see ApplyInbox)
+      -- Sent through the voice and nothing came back, not even after the strip:
+      -- the voice isn't working this session.
+      if e.viaVoice then ns.Voice.broken = true end
       ns.UI:Refresh()
-    elseif e.status == "pending" then
-      if now - (e.t or now) > PENDING_TIMEOUT then
-        e.status = "error"
-        e.answer = L.NO_ANSWER
-        ns.UI:Refresh()
-      else
-        any = true
-      end
+      return
+    end
+    any = true
+    if e.viaVoice and not e.resent and not resend and not self.working and now - (e.t or now) > VOICE_TIMEOUT then
+      e.resent = true
+      resend = { entry = e, question = e.shown or e.question, chatId = c.id }
     end
   end)
   if resend then
-    C_Timer.After(0, function() Core:Ask(resend.question, nil, resend.chatId) end)
-    any = true
+    C_Timer.After(0, function() Core:Ask(resend.question, nil, resend.chatId, resend.entry) end)
   end
   return any
 end
@@ -342,7 +347,9 @@ end
 -- `extra`: additional request fields (used by the channel probe).
 -- `chatId`: chat the question belongs to (default: the open one).
 -- Returns the request id, or nil when nothing was sent.
-function Core:Ask(question, extra, chatId)
+-- again: a question already asked (its chat entry), sent once more through
+-- the strip with the same id (see VOICE_TIMEOUT).
+function Core:Ask(question, extra, chatId, again)
   -- Items (and spells, quests...) linked with shift-click go along with their
   -- full description; the question itself keeps just their "[Name]".
   local linked = ns.Collect:Links(question)
@@ -365,7 +372,7 @@ function Core:Ask(question, extra, chatId)
 
   -- The question belongs to the open chat (or to the given one, for resends).
   local chatData = ns.Chats:Get(chatId) or ns.Chats:Current()
-  local id = string.format("%d%04d", time(), math.random(0, 9999))
+  local id = again and again.id or string.format("%d%04d", time(), math.random(0, 9999))
   local sig, resetSignals = ns.Live:RequestFields()
   local req = {
     v = 2,
@@ -380,8 +387,8 @@ function Core:Ask(question, extra, chatId)
   }
   for k, v in pairs(extra or {}) do req[k] = v end
 
-  local entry = { id = id, question = question, shown = shown, status = "pending", t = time() }
-  ns.Chats:AddMessage(chatData, entry)
+  local entry = again or { id = id, question = question, shown = shown, status = "pending", t = time() }
+  if not again then ns.Chats:AddMessage(chatData, entry) end
   req.chat = { id = chatData.id, title = chatData.title }
 
   local function fail(msg)
@@ -400,7 +407,7 @@ function Core:Ask(question, extra, chatId)
   -- Invisible voice channel when available; otherwise the strip on screen.
   local context = linked and { linkedItems = linked } or nil
   local co = coroutine.create(function()
-    if ns.Voice:Available() then
+    if not again and ns.Voice:Available() then
       local frame = Core:BuildFrame(req, Core.step, ns.Voice.MAX_FRAME_BYTES, context)
       if frame and ns.Voice:Send(frame, req.id, Core.step) then
         Core.lastChannel = "voice"
@@ -457,7 +464,11 @@ function Core:ApplyInbox(inbox)
   for _, a in ipairs(inbox.answers) do
     local entry, owner
     if type(a) == "table" then entry, owner = self:FindEntry(a.id) end
-    if entry and entry.status == "pending" then
+    -- Pending, or given up waiting: an answer that arrives late is still shown.
+    if entry and (entry.status == "pending" or entry.timedOut) then
+      entry.timedOut = nil
+      -- It came back: the app got the question, so the voice works after all.
+      if entry.viaVoice then ns.Voice.broken = nil end
       entry.status = a.ok and "done" or "error"
       entry.answer = a.answer
       -- Tokens the answer used (read, of which cached, written), if the AI said.
