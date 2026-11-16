@@ -146,7 +146,9 @@ local EN = {
   -- Asking
   NO_ANSWER = "No answer arrived. Is the companion app open on your PC?",
   FRAME_TOO_BIG = "%d bytes (JSON %d) even after trimming everything",
-  IN_COMBAT = "Can't ask during combat.",
+  COMBAT_ON = "In combat: keep an eye on the game",
+  COMBAT_HIT = "You're being hit! Watch the game",
+  COMBAT_HIT_HEALTH = "You're being hit! Watch the game · health %d%%",
   WAIT_PREVIOUS = "Wait a moment: I'm still sending the previous question.",
   PREPARING = "Preparing...",
   PREP_ERROR = "Error preparing the question: %s",
@@ -396,7 +398,9 @@ local ES = {
   -- Preguntas
   NO_ANSWER = "No llegó respuesta. ¿Está abierta la app compañera en tu PC?",
   FRAME_TOO_BIG = "%d bytes (JSON %d) incluso recortando todo",
-  IN_COMBAT = "No puedo preguntar durante el combate.",
+  COMBAT_ON = "En combate: atento al juego",
+  COMBAT_HIT = "¡Te están golpeando! Mira el juego",
+  COMBAT_HIT_HEALTH = "¡Te están golpeando! Mira el juego · vida %d%%",
   WAIT_PREVIOUS = "Espera un momento: todavía estoy enviando la pregunta anterior.",
   PREPARING = "Preparando...",
   PREP_ERROR = "Error preparando la pregunta: %s",

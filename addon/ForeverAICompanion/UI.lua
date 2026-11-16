@@ -650,6 +650,7 @@ function UI:Build()
     if current then current.unread = nil end
     if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN or 839) end
     if ns.Live.CheckApp then pcall(ns.Live.CheckApp, ns.Live) end
+    if ns.Combat then pcall(ns.Combat.Update, ns.Combat) end -- the "in combat" bar
     UI:Refresh()
     if ns.Button then ns.Button:Update() end
   end)

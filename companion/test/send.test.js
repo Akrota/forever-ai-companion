@@ -621,7 +621,7 @@ test('portraits: race icon atlas when the game has it, icon files or the gadget 
 
 // --- Languages ---------------------------------------------------------------
 // GetLocale() picks the texts: esES / esMX -> Spanish, anything else -> English.
-const ALL_FILES = ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'];
+const ALL_FILES = ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Combat.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'];
 const RECORD_TEXT = FAKE_UI.replace('GetStringHeight" then return function() return 10 end end',
   'GetStringHeight" then return function() return 10 end end\n      if k == "SetText" then return function(self, v) self.textValue = v end end');
 const inLocale = (locale) => `LOCALE = ${JSON.stringify(locale)}\n` + RECORD_TEXT + PRELUDE_DRIVE;
@@ -928,6 +928,69 @@ test('no answer at all through the voice: the question fails and the voice is gi
     RESULT = given .. "#" .. entry.status .. "#" .. tostring(entry.answer) .. "#" .. tostring(ns.Voice.broken)
   `, {}, ALL_FILES, VOICE_ON);
   assert.equal(out, 'error#true#done#Hola, aventurera.#nil');
+});
+
+// --- Asking in combat ----------------------------------------------------------------
+const IN_COMBAT = RECORD_TEXT + PRELUDE_DRIVE + `
+  INCOMBAT = false
+  UnitAffectingCombat = function() return INCOMBAT end
+  InCombatLockdown = function() return INCOMBAT end
+  HEALTH, MAXH = 800, 1000
+  UnitHealth = function() return HEALTH end
+  UnitHealthMax = function() return MAXH end
+  function FIRE(event, ...)
+    for _, f in ipairs(FRAMES) do
+      if f.scripts.OnEvent then pcall(f.scripts.OnEvent, f, event, ...) end
+    end
+  end
+`;
+
+test('in combat you can ask, and the window warns you to watch the game (and flashes when you get hit)', () => {
+  const out = runLua(`
+    START()
+    ns.Personas:Set("fizzi")
+    ns.UI:Show()
+    INCOMBAT = true
+    FIRE("PLAYER_REGEN_DISABLED")
+    local id = ns.Core:Ask("¿Qué hago con este mob?")
+    local chat = ns.Chats:Current()
+    local asked = id and chat.messages[#chat.messages].status or "blocked"
+    local C = ns.Combat
+    local bar = tostring(C.bar.shown) .. ":" .. tostring(C.text.textValue)
+    FIRE("UNIT_COMBAT", "target", "WOUND", "", 50)       -- someone else hit: nothing
+    local other = tostring(C.hitAt)
+    FIRE("UNIT_COMBAT", "player", "WOUND", "", 200)      -- the player is hit
+    C:Fade(0.1)
+    local hit = string.format("%.2f", C.glow.alpha) .. ":" .. tostring(C.text.textValue)
+    NOW = NOW + 5; C:Fade(0.1)                            -- a few seconds later
+    local calm = tostring(C.text.textValue)
+    INCOMBAT = false
+    FIRE("PLAYER_REGEN_ENABLED")
+    RESULT = table.concat({ asked, bar, other, hit, calm, tostring(C.bar.shown) }, "#")
+  `, {}, ALL_FILES, IN_COMBAT);
+  const [asked, bar, other, hit, calm, after] = out.split('#');
+  assert.equal(asked, 'pending', 'the question is sent in combat');
+  assert.equal(bar, 'true:In combat: keep an eye on the game');
+  assert.equal(other, 'nil', 'only hits on the player count');
+  assert.match(hit, /^0\.80:.*You're being hit! Watch the game · health 80%/);
+  assert.equal(calm, 'In combat: keep an eye on the game');
+  assert.equal(after, 'false', 'the bar goes away after combat');
+});
+
+test('in combat, with the game hiding health from addons: the warning still works, without errors', () => {
+  const out = runLua(`
+    issecretvalue = function(v) return type(v) == "number" end   -- like the game in combat
+    START()
+    ns.UI:Show()
+    INCOMBAT = true
+    FIRE("PLAYER_REGEN_DISABLED")
+    FIRE("UNIT_HEALTH", "player")
+    FIRE("UNIT_COMBAT", "player", "WOUND", "", 120)
+    RESULT = tostring(ns.Combat.bar.shown) .. "#" .. tostring(ns.Combat.text.textValue)
+  `, {}, ALL_FILES, 'LOCALE = "esES"\n' + IN_COMBAT);
+  const [shown, text] = out.split('#');
+  assert.equal(shown, 'true');
+  assert.match(text, /¡Te están golpeando! Mira el juego\|r$/, 'no health when the game hides it');
 });
 
 test('the "thinking" bubble is big enough for every phrase it cycles through', () => {

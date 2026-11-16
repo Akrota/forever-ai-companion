@@ -356,11 +356,9 @@ function Core:Ask(question, extra, chatId, again)
   local shown = linked and strtrim(question) or nil -- with the links, for the chat bubble
   question = strtrim(ns.Collect.Clean(question or "") or "")
   if question == "" then return end
+  -- Asking in combat is allowed: the window then warns the player to keep an
+  -- eye on the game (see Combat.lua).
   ns.UI:Show()
-  if InCombatLockdown() or UnitAffectingCombat("player") then
-    ns.UI:SetStatus("|cffff6060" .. L.IN_COMBAT .. "|r")
-    return
-  end
   if self.working or ns.Uplink.busy then
     ns.UI:SetStatus(L.WAIT_PREVIOUS)
     return

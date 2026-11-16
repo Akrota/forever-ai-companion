@@ -151,7 +151,7 @@ Coming from version 1.5.0 or earlier, the app and the addon move to new folder n
 - **Is the app ready?** The line under the chat title tells you. Green: the app is open and ready. Red: questions won't be answered yet, and it says why (the app is closed or not responding, no AI is chosen, or your AI needs you to sign in). Hover it for what to do.
 - **Tokens used**: next to each answer's time you see how many tokens it used (*"18.2k tokens"*), and under the text box, below **Send**, the whole chat's total. Hover them for the detail: tokens read (your data, the guide and what it looked up; the part from the cache counts much less) and written. It's what your plan or API key is measured in. The dashboard's recent questions show it too.
 - **See what is sent**: in the window click **See the data I send**.
-- **In combat** you can't ask (on purpose): wait until combat ends.
+- **In combat** you can still ask, but keep your eyes on the game: while you're in combat a red bar in the window reminds you, and the window's edge flashes red each time you get hit.
 
 ### Chat commands (optional)
 
@@ -339,7 +339,7 @@ Blizzard's Terms of Use and EULA forbid bots, cheats and unauthorized third-part
 | Plays for you, presses keys or clicks | **No.** You type every question, and every answer is just text you read, like looking something up on a website. |
 | Reads or changes the game's memory | **No.** It doesn't read, inject into or modify the game process. |
 | Changes the game's files | **No.** The app only writes inside its own addon folders in `Interface\AddOns`. |
-| Works during combat | **No.** The addon refuses questions while you are in combat, in line with Blizzard's goal that addons shouldn't give an advantage in combat. |
+| Works during combat | **You can ask, but it only shows text.** It never acts in the game for you. While you're in combat the window shows a red "In combat" bar and flashes when you get hit, so your attention goes back to the game. Versions before 1.11.1 refused questions in combat: asking for advice in the middle of a fight is the closest this project gets to what Blizzard doesn't want addons to give, so keep that in mind. |
 | Can be inspected | **Yes.** All of the code is public in this repository. |
 
 ### Where the risks are
