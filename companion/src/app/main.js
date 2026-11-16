@@ -282,6 +282,16 @@ async function main() {
   }
 }
 
+// An error nobody caught would close the app without a trace: it goes to the
+// log first (the app keeps running for rejected promises).
+process.on('uncaughtException', (e) => {
+  try { fs.appendFileSync(path.join(env.dataDir, LOG_FILE), `[${new Date().toLocaleString()}] [fatal] ${e?.stack || e}\n`); } catch { /* ignore */ }
+  process.exit(1);
+});
+process.on('unhandledRejection', (e) => {
+  try { fs.appendFileSync(path.join(env.dataDir, LOG_FILE), `[${new Date().toLocaleString()}] [error] ${e?.stack || e}\n`); } catch { /* ignore */ }
+});
+
 main().catch(async (e) => {
   if (sys.isMac) sys.getShell()?.send(`alert ${Buffer.from(`${t('startFailed')}\n\n${e.message}`, 'utf8').toString('base64')}`);
   try { fs.appendFileSync(path.join(env.dataDir, LOG_FILE), `[fatal] ${e.stack || e}\n`); } catch { /* ignore */ }

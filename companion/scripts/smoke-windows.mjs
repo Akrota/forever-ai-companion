@@ -5,9 +5,10 @@
 //   3. invisible sending: the silent voice is registered (administrator, like
 //      on a PC) and a question is "spoken" with Windows' speech system, as WoW
 //      does; the answer must reach the addon's inboxes;
-//   4. a screenshot of the app window in Edge;
-//   5. updating: a stand-in GitHub offers a newer version; the app downloads,
+//   4. updating: a stand-in GitHub offers a newer version; the app downloads,
 //      checks and installs it, and starts again;
+//   5. a screenshot of the app window in Edge (and the app keeps running
+//      when that window closes);
 //   6. uninstalling removes the addon and the voice.
 //
 //   node scripts/smoke-windows.mjs dist/ForeverAICompanion.exe <out folder>
@@ -44,6 +45,9 @@ function fail(msg) {
   console.error(`  FAIL ${msg}`);
   try { console.error(`\n--- app log ---\n${fs.readFileSync(logFile, 'utf8')}`); } catch { /* no log yet */ }
   try { fs.copyFileSync(logFile, path.join(out, 'app.log')); } catch { /* none */ }
+  try {
+    console.error(`--- running: ${execFileSync('tasklist', ['/FI', 'IMAGENAME eq ForeverAICompanion.exe', '/FO', 'CSV', '/NH'], { encoding: 'utf8' }).trim()}`);
+  } catch { /* no tasklist */ }
   for (const dir of [installDir, path.join(dataDir, 'updates')]) {
     try { console.error(`--- ${dir}: ${fs.readdirSync(dir).join(', ')}`); } catch { /* none */ }
   }
@@ -176,25 +180,8 @@ const answered = await until('the answer reached the addon inboxes', () => {
 if (answered) ok('question received through the silent voice and answered into the inboxes');
 if (!log().includes('Hola desde la prueba de Windows')) fail('the question is not in the app log');
 
-// 4. The app window --------------------------------------------------------------
-step('4. Screenshot of the app window (Edge)');
-const edge = ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].find((p) => fs.existsSync(p));
-if (edge) {
-  for (const [name, w, h] of [['window.png', 1000, 860], ['window-tall.png', 1000, 2200]]) {
-    try {
-      execFileSync(edge, ['--headless=new', '--disable-gpu', `--window-size=${w},${h}`, '--virtual-time-budget=8000',
-        `--user-data-dir=${path.join(root, 'edge')}`, `--screenshot=${path.join(out, name)}`, base], { timeout: 120000, stdio: 'ignore' });
-      ok(`${name} saved`);
-    } catch (e) {
-      console.log(`  (screenshot failed: ${e.message})`);
-    }
-  }
-} else {
-  console.log('  (Edge not found: no screenshot)');
-}
-
-// 5. Updating -------------------------------------------------------------------
-step('5. Updating from GitHub (stand-in): download, check, replace, start again');
+// 4. Updating -------------------------------------------------------------------
+step('4. Updating from GitHub (stand-in): download, check, replace, start again');
 const u = await api(base, 'update-check');
 if (u.status !== 'available' || u.latest !== '9.9.9') fail(`update not offered: ${JSON.stringify(u)}`);
 ok('update 9.9.9 offered');
@@ -211,6 +198,27 @@ s = await status(base2);
 if (!s.wow.addonInstalled) fail('after updating, the addon is no longer seen');
 ok(`running again at ${base2}, settings kept`);
 fs.writeFileSync(path.join(out, 'app.log'), log());
+
+// 5. The app window --------------------------------------------------------------
+step('5. Screenshot of the app window (Edge)');
+const edge = ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].find((p) => fs.existsSync(p));
+if (edge) {
+  for (const [name, w, h] of [['window.png', 1000, 860], ['window-tall.png', 1000, 2200]]) {
+    try {
+      execFileSync(edge, ['--headless=new', '--disable-gpu', `--window-size=${w},${h}`, '--virtual-time-budget=8000',
+        `--user-data-dir=${path.join(root, 'edge')}`, `--screenshot=${path.join(out, name)}`, base2], { timeout: 120000, stdio: 'ignore' });
+      ok(`${name} saved`);
+    } catch (e) {
+      console.log(`  (screenshot failed: ${e.message})`);
+    }
+  }
+} else {
+  console.log('  (Edge not found: no screenshot)');
+}
+
+await sleep(3000); // the app hears that the page closed
+if (!(await findApp())) fail('the app closed after the Edge window closed');
+ok('the app keeps running after its window closed');
 
 // 6. Uninstalling ---------------------------------------------------------------
 step('6. Uninstalling');
