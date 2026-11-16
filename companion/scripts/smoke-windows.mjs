@@ -111,6 +111,22 @@ const env = {
   FAIC_PROVIDER: 'echo', FAIC_LANG: 'es', FAIC_UPDATE_API: `http://127.0.0.1:${gh.address().port}/release`,
 };
 
+// Screenshots of the app window with Edge (headless); each one opens and
+// closes the page, like a player opening and closing the window.
+async function screenshots(url, prefix) {
+  const edge = ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].find((p) => fs.existsSync(p));
+  if (!edge) { console.log('  (Edge not found: no screenshot)'); return; }
+  for (const [name, w, h] of [['window.png', 1000, 860], ['window-tall.png', 1000, 2200]]) {
+    try {
+      execFileSync(edge, ['--headless=new', '--disable-gpu', `--window-size=${w},${h}`, '--virtual-time-budget=8000',
+        `--user-data-dir=${path.join(root, 'edge')}`, `--screenshot=${path.join(out, prefix + name)}`, url], { timeout: 120000, stdio: 'ignore' });
+      ok(`${prefix}${name} saved`);
+    } catch (e) {
+      console.log(`  (screenshot failed: ${e.message})`);
+    }
+  }
+}
+
 // 1. Opening the downloaded exe ----------------------------------------------
 step('1. Opening the exe: it installs itself and starts');
 if (await findApp()) fail('another copy of the app is already running');
@@ -180,6 +196,13 @@ const answered = await until('the answer reached the addon inboxes', () => {
 if (answered) ok('question received through the silent voice and answered into the inboxes');
 if (!log().includes('Hola desde la prueba de Windows')) fail('the question is not in the app log');
 
+// The window opened and closed right after the first start.
+step('3b. The app window opens and closes (Edge) after the first start');
+await screenshots(base, 'first-');
+await sleep(3000);
+if (!(await findApp())) fail('the app closed after the Edge window closed (first start)');
+ok('the app keeps running after its window closed');
+
 // 4. Updating -------------------------------------------------------------------
 step('4. Updating from GitHub (stand-in): download, check, replace, start again');
 const u = await api(base, 'update-check');
@@ -200,25 +223,12 @@ ok(`running again at ${base2}, settings kept`);
 fs.writeFileSync(path.join(out, 'app.log'), log());
 
 // 5. The app window --------------------------------------------------------------
-step('5. Screenshot of the app window (Edge)');
-const edge = ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].find((p) => fs.existsSync(p));
-if (edge) {
-  for (const [name, w, h] of [['window.png', 1000, 860], ['window-tall.png', 1000, 2200]]) {
-    try {
-      execFileSync(edge, ['--headless=new', '--disable-gpu', `--window-size=${w},${h}`, '--virtual-time-budget=8000',
-        `--user-data-dir=${path.join(root, 'edge')}`, `--screenshot=${path.join(out, name)}`, base2], { timeout: 120000, stdio: 'ignore' });
-      ok(`${name} saved`);
-    } catch (e) {
-      console.log(`  (screenshot failed: ${e.message})`);
-    }
-  }
-} else {
-  console.log('  (Edge not found: no screenshot)');
-}
-
+step('5. Screenshot of the app window (Edge), again after updating');
+await screenshots(base2, '');
 await sleep(3000); // the app hears that the page closed
 if (!(await findApp())) fail('the app closed after the Edge window closed');
 ok('the app keeps running after its window closed');
+fs.writeFileSync(path.join(out, 'app.log'), log());
 
 // 6. Uninstalling ---------------------------------------------------------------
 step('6. Uninstalling');
