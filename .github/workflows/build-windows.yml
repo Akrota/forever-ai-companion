@@ -24,6 +24,9 @@ jobs:
       run:
         working-directory: companion
     steps:
+      # The files as they are in the repository (no Windows line endings), like a local build.
+      - run: git config --global core.autocrlf false
+        working-directory: .
       - uses: actions/checkout@v4
 
       # --build-sea (scripts/build.js) needs Node.js 25.5 or later.
