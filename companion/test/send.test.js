@@ -621,7 +621,7 @@ test('portraits: race icon atlas when the game has it, icon files or the gadget 
 
 // --- Languages ---------------------------------------------------------------
 // GetLocale() picks the texts: esES / esMX -> Spanish, anything else -> English.
-const ALL_FILES = ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Combat.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'];
+const ALL_FILES = ['Locale.lua', 'Json.lua', 'Collect.lua', 'Uplink.lua', 'Voice.lua', 'Live.lua', 'Chats.lua', 'Personas.lua', 'UI.lua', 'Button.lua', 'Notify.lua', 'Probe.lua', 'Core.lua'];
 const RECORD_TEXT = FAKE_UI.replace('GetStringHeight" then return function() return 10 end end',
   'GetStringHeight" then return function() return 10 end end\n      if k == "SetText" then return function(self, v) self.textValue = v end end');
 const inLocale = (locale) => `LOCALE = ${JSON.stringify(locale)}\n` + RECORD_TEXT + PRELUDE_DRIVE;
