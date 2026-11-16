@@ -53,12 +53,15 @@ Forever AI Companion has two parts that work together:
 
 With every question the AI receives, without you having to explain anything:
 
-- your **character**: race, class, level, experience, talents and stats;
-- your **gear** slot by slot, what's in your **bags** and your bank;
-- **where you are**: zone and coordinates;
+- your **character**: race, class, level, experience (rested XP in points and as a share of the level), talents and stats;
+- your **gear** slot by slot with its effects ("Equip:", "Use:", set bonuses), what's in your **bags** and your bank;
+- your **pet**: its abilities with rank and autocast, stance, loyalty, training points, diet and stats, plus what **Beast Training** can teach it;
+- your **spells**, which ones are not on your **action bars** yet, and your weapon skills;
+- **where you are**: zone and coordinates, and the flight paths you know;
 - your **quests** with progress, rewards and the real coordinates of where to do them;
-- **professions**, reputations, dungeon lockouts, group and target;
-- the **items you link** in the question, the **window you have open** (a quest, a vendor, a trainer, loot) and your **recipes**.
+- your **target** (family, whether it counts for a quest, its tooltip), recent error messages and deaths;
+- **professions**, reputations, dungeon lockouts and group;
+- the **items you link** in the question, the **window you have open** (a quest, a vendor, a trainer, Beast Training, the flight map, the auction house, loot), your **recipes** and the **auction prices** you have seen for the items you own.
 
 So you can ask things like *"What should I do now?"*, *"Is this ring better?"* or *"Which dungeon should I run?"* and get an answer for **your** character.
 
@@ -101,6 +104,8 @@ If the game was open, **close it completely and open it again** (`/reload` is no
 
 For older versions, download the new `.exe` and open it: it replaces the old version in the same way.
 
+**Updating to 1.10.1 with invisible sending on:** it keeps working, but this version moves the silent voice to a protected Windows folder. You get a notice next to the clock and at the top of the dashboard: click **Update invisible sending**, accept the Windows prompt, and restart WoW.
+
 The WoW Forever guide the AI uses updates by itself from the internet, with nothing to download.
 
 Coming from version 1.5.0 or earlier, the app and the addon move to new folder names on their own: your chats, settings and API keys come along. Restart WoW once afterwards. If you use invisible sending, the app window will offer **Update invisible sending** (Windows asks for permission once); until then it keeps working as before.
@@ -116,7 +121,8 @@ Coming from version 1.5.0 or earlier, the app and the addon move to new folder n
 - **Chats by topic**: each chat remembers its conversation (gear, quests, dungeons…). Right-click the floating button to start a new chat.
 - **Ask about a specific item**: while typing, shift-click an item (in your bags, a vendor, a quest reward…) to put it in the question, like in the chat box: *"Is [this ring] better than mine?"*. The AI gets its full stats, and the link stays clickable in your message.
 - **Clickable items in the answers**: when the assistant names an item from your gear, bags, bank, quest rewards or an open vendor, it shows up as a real item link. Hover it for the tooltip, click to open it, shift-click to paste it in the chat or ctrl-click to try it on. Items that aren't in your data (for example, dungeon loot) are written as plain text.
-- **Ask about what's open**: with a quest, vendor, trainer or loot window open, the AI sees it. Try *"Should I accept this quest?"*, *"Which reward should I pick?"*, *"What should I buy here?"* or *"What should I train first?"*.
+- **Ask about what's open**: with a quest, vendor, trainer, Beast Training, flight map, auction house or loot window open, the AI sees it, and a new chat suggests questions about that window. Try *"Should I accept this quest?"*, *"Which reward should I pick?"*, *"What should I buy here?"*, *"What should I teach my pet?"* or *"What from my bags should I sell here?"*.
+- **Auction prices**: every price you see at the auction house is remembered (per realm and faction), so later the AI can tell you what your items are worth even with the auction house closed.
 - **Professions**: open each profession window once and the addon remembers your recipes, so you can ask *"What can I craft with what I have?"* or *"Which recipe should I make to level up?"*.
 - **Is the app ready?** The line under the chat title tells you. Green: the app is open and ready. Red: questions won't be answered yet, and it says why (the app is closed or not responding, no AI is chosen, or your AI needs you to sign in). Hover it for what to do.
 - **Tokens used**: next to each answer's time you see how many tokens it used (*"18.2k tokens"*), and under the text box, below **Send**, the whole chat's total. Hover them for the detail: tokens read (your data, the guide and what it looked up; the part from the cache counts much less) and written. It's what your plan or API key is measured in. The dashboard's recent questions show it too.
@@ -248,6 +254,7 @@ build: 70938           ← the game's build number
 **How it stays current:**
 
 - The app ships with a copy, and also **downloads the one in this repository** at startup, every 6 hours and as soon as it notices the game was updated. It only uses it if it's valid and its `date` is newer; offline it uses the last one it downloaded.
+- The guide and its topics reach the AI fenced off as reference data: they can supply facts, but text inside them cannot change the AI's rules or role.
 - The AI knows today's date and how old the guide is. If the guide is more than 21 days old, or the game is newer than the guide, it checks on the internet whatever changes with patches before stating it.
 
 **To update the guide for every player** (without releasing a new version of the app):
@@ -268,7 +275,10 @@ Each player can also add their own knowledge from the app's dashboard (**Server 
 
 - **Your data only goes to the AI you chose.** This project has no servers: it never receives your questions, your data or your keys.
 - The app's only connection of its own is downloading the WoW Forever guide from this repository (a read, nothing is sent). Internet searches are made by the AI you chose, with its own tools.
-- API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`.
+- API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`, **encrypted with Windows DPAPI** for your Windows account: a copy of that file on another PC or account doesn't reveal them. Keys saved in plain text by earlier versions are encrypted the next time the app starts.
+- **Invisible sending:** the silent voice's file used by elevated programs lives in `%ProgramFiles%\ForeverAICompanion`, which only administrators can change (installs from before this change are offered **Update invisible sending** to move it). The voice keeps only this app's own messages: anything else any program speaks with it is dropped without being written or logged.
+- **Codex:** when the app searches the PC for Codex, or installs it, it only runs a `codex.exe` that Windows confirms is signed by OpenAI. If a future Codex stops accepting one of the safety switches the app relies on (no commands, no file or browser access), the app refuses to use it rather than dropping the switch.
+- The `/ia probe` channel test only watches the game's files while a test is running (and for 15 minutes after, for files the game writes at logout).
 - The app window is a local page (`127.0.0.1`) that doesn't accept connections from other computers or other web pages.
 - **The game is not modified**: its memory and files are not touched, and the addon doesn't play for you. It only uses normal addon and Windows features.
 - This is not a Blizzard product. Use it at your own risk (see the next section).
@@ -375,6 +385,7 @@ companion/
   src/inbox.js              Inboxes and bell
   src/beacon.js             Tells the game whether the app is open and ready
   src/updater.js            Updates the app from GitHub releases
+  src/secrets.js            Encrypts API keys in config.json (Windows DPAPI)
   src/prompt.js             Instructions for the AI
   src/guide.js              WoW Forever guide: date, version, downloads and picking topic sections
   src/providers.js          Claude, OpenAI/Gemini/Ollama, Claude Code, Codex, test
@@ -420,6 +431,10 @@ Installed apps (1.7.0 and later) pick up every new release by themselves (`src/u
 1. Bump the number in `companion/src/app/controller.js` (`VERSION`) and, if the addon changed, in `addon/ForeverAICompanion/ForeverAICompanion.toc`. If Blizzard raised the game's interface number, update `## Interface:` in the toc too, or WoW will treat the addon as out of date.
 2. `npm test` and `npm run build`.
 3. On GitHub, **Releases → Draft a new release**, create the tag **`v` + the exact `VERSION`** (for example `v1.7.0`) and attach `dist/ForeverAICompanion.exe` with that exact name. Don't mark it as a pre-release (pre-releases are not offered to players). The README's download link and the in-app updater always use the latest release.
+
+### Contributing
+
+Pull requests are welcome: bug fixes, more game data for the AI, translations, safety improvements. Thanks to [@Zemnexx](https://github.com/Zemnexx) for the security hardening merged in 1.10.1 (protected silent voice, encrypted API keys, signed Codex only, fenced guide).
 
 ### To do
 

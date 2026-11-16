@@ -1009,6 +1009,44 @@ function UI:PlaceBubble(i, y, kind, textValue, metaValue, onAction, actionLabel,
   return h
 end
 
+-- A suggested question, like a quest dialog option.
+local function makeChip(w)
+  local chip = newFrame("Button", nil, w)
+  panel(chip, EDGE_DIM, { 0, 0, 0, 0.55 }, 12)
+  local icon = chip:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(14, 14)
+  icon:SetPoint("LEFT", 10, 0)
+  icon:SetTexture("Interface\\GossipFrame\\GossipGossipIcon")
+  local fs = chip:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  fs:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+  fs:SetPoint("RIGHT", -10, 0)
+  fs:SetJustifyH("LEFT")
+  if fs.SetWordWrap then fs:SetWordWrap(true) end
+  chip.label = fs
+  local hl = chip:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetPoint("TOPLEFT", 3, -3)
+  hl:SetPoint("BOTTOMRIGHT", -3, 3)
+  hl:SetTexture(ART.rowLight)
+  if hl.SetBlendMode then hl:SetBlendMode("ADD") end
+  hl:SetVertexColor(1, 0.82, 0.3, 0.4)
+  chip:SetScript("OnClick", function(self) if self.question then ns.Core:Ask(self.question) end end)
+  return chip
+end
+
+-- The suggested questions for a new chat, and a title when they are about a
+-- game window the player has open (vendor, auction house, trainer...): those
+-- go first, then a couple of the usual ones.
+local GENERAL_AFTER_CONTEXT = 2
+function UI.Suggestions()
+  local ok, window = pcall(function() return ns.Collect and ns.Collect:OpenWindow() end)
+  local list = ok and window and L.CONTEXT_SUGGESTIONS and L.CONTEXT_SUGGESTIONS[window]
+  if not list then return SUGGESTIONS, nil end
+  local out = {}
+  for _, q in ipairs(list) do out[#out + 1] = q end
+  for i = 1, min(GENERAL_AFTER_CONTEXT, #SUGGESTIONS) do out[#out + 1] = SUGGESTIONS[i] end
+  return out, list.title
+end
+
 function UI:ShowWelcome()
   if not self.welcome then
     local w = CreateFrame("Frame", nil, self.content)
@@ -1026,30 +1064,15 @@ function UI:ShowWelcome()
     sub:SetPoint("TOP", hello, "BOTTOM", 0, -10)
     sub:SetJustifyH("CENTER")
     w.sub = sub
-    -- Suggestions look like quest dialog options.
+    -- Suggestions look like quest dialog options. Chips are made as needed
+    -- (the list changes with the window the player has open).
     w.chips = {}
-    for i, text in ipairs(SUGGESTIONS) do
-      local chip = newFrame("Button", nil, w)
-      panel(chip, EDGE_DIM, { 0, 0, 0, 0.55 }, 12)
-      local icon = chip:CreateTexture(nil, "ARTWORK")
-      icon:SetSize(14, 14)
-      icon:SetPoint("LEFT", 10, 0)
-      icon:SetTexture("Interface\\GossipFrame\\GossipGossipIcon")
-      local fs = chip:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-      fs:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-      fs:SetPoint("RIGHT", -10, 0)
-      fs:SetJustifyH("LEFT")
-      if fs.SetWordWrap then fs:SetWordWrap(true) end
-      fs:SetText(text)
-      local hl = chip:CreateTexture(nil, "HIGHLIGHT")
-      hl:SetPoint("TOPLEFT", 3, -3)
-      hl:SetPoint("BOTTOMRIGHT", -3, 3)
-      hl:SetTexture(ART.rowLight)
-      if hl.SetBlendMode then hl:SetBlendMode("ADD") end
-      hl:SetVertexColor(1, 0.82, 0.3, 0.4)
-      chip:SetScript("OnClick", function() ns.Core:Ask(text) end)
-      w.chips[i] = chip
-    end
+    -- "You have a vendor open...": shown above the suggestions about it.
+    local context = w:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    context:SetJustifyH("CENTER")
+    if context.SetWordWrap then context:SetWordWrap(true) end
+    context:SetTextColor(1, 0.82, 0.3)
+    w.context = context
     local hint = w:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetText(L.WELCOME_HINT)
     w.hint = hint
@@ -1065,13 +1088,28 @@ function UI:ShowWelcome()
   local chipW = floor((min(width, 640) - (cols - 1) * 10) / cols)
   local left = floor((width - (chipW * cols + (cols - 1) * 10)) / 2)
   local top = 186
-  for i, chip in ipairs(w.chips) do
+  local questions, title = UI.Suggestions()
+  w.context:SetShown(title ~= nil)
+  if title then
+    w.context:SetText(title)
+    w.context:SetWidth(min(width, 640) - 20)
+    w.context:ClearAllPoints()
+    w.context:SetPoint("TOP", w, "TOP", 0, -top)
+    top = top + max(18, floor(w.context:GetStringHeight() or 18)) + 10
+  end
+  for i, text in ipairs(questions) do
+    local chip = w.chips[i] or makeChip(w)
+    w.chips[i] = chip
+    chip.label:SetText(text)
+    chip.question = text
     local col, rowN = (i - 1) % cols, floor((i - 1) / cols)
     chip:SetSize(chipW, 40)
     chip:ClearAllPoints()
     chip:SetPoint("TOPLEFT", w, "TOPLEFT", left + col * (chipW + 10), -(top + rowN * 46))
+    chip:Show()
   end
-  local rows = math.ceil(#w.chips / cols)
+  for i = #questions + 1, #w.chips do w.chips[i]:Hide() end
+  local rows = math.ceil(#questions / cols)
   w.hint:ClearAllPoints()
   w.hint:SetPoint("TOP", w, "TOP", 0, -(top + 8 + rows * 46))
   w:ClearAllPoints()
@@ -1407,4 +1445,27 @@ function UI:ShowContext()
   local ok, snap = pcall(ns.Collect.Snapshot, ns.Collect)
   local json = ok and ns.Json.Encode(snap) or (L.ERROR .. ": " .. tostring(snap))
   self:ShowCopy(json, string.format(L.CONTEXT_TITLE, persona().name))
+end
+
+-- A game window opened or closed (vendor, auction house, trainer...): a new
+-- chat's suggestions change to questions about it.
+local WINDOW_EVENTS = {
+  "MERCHANT_SHOW", "MERCHANT_CLOSED", "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED",
+  "TRAINER_SHOW", "TRAINER_CLOSED", "QUEST_DETAIL", "QUEST_COMPLETE", "QUEST_FINISHED",
+  "TAXIMAP_OPENED", "TAXIMAP_CLOSED", "LOOT_OPENED", "LOOT_CLOSED",
+}
+function UI:OnGameWindow()
+  if not (self.frame and self.frame:IsShown() and ns.db) then return end
+  local current = ns.Chats:Get(ns.db.currentChat)
+  if current and #current.messages > 0 then return end -- only a new chat shows suggestions
+  self:RefreshConversation()
+end
+
+local windowWatcher = CreateFrame and CreateFrame("Frame")
+if windowWatcher then
+  for _, e in ipairs(WINDOW_EVENTS) do pcall(windowWatcher.RegisterEvent, windowWatcher, e) end
+  -- Next frame: after Collect has noted which window is open.
+  windowWatcher:SetScript("OnEvent", function()
+    C_Timer.After(0, function() pcall(UI.OnGameWindow, UI) end)
+  end)
 end

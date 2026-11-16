@@ -77,8 +77,13 @@ export async function handleRequest(req, {
   const started = Date.now();
   let answer;
   try {
-    // Channel probe: answered by the app itself, not by the AI.
-    const { text, model, usage } = req.probe && probeMonitor
+    // Channel probe: answered by the app itself, not by the AI. The addon
+    // first asks the app to start watching the game's files (probeStart).
+    const { text, model, usage } = req.probeStart && probeMonitor
+      ? (probeMonitor.activate(), {
+        text: runInLang(playerLang({ lang: req.lang, client: req.context?.client }), () => t('probeRecording')), model: 'prueba de canales',
+      })
+      : req.probe && probeMonitor
       ? { ...(await probeReport(req.probe, probeMonitor)), model: 'prueba de canales' }
       : await runInLang(playerLang({ lang: req.lang, client: req.context?.client }), () => ask(cfg, typeof system === 'function' ? system(req) : system, buildMessages(req), req));
     answer = { id: req.id, ok: true, answer: cleanAnswer(text) || t('emptyAnswer'), model };
@@ -123,6 +128,7 @@ export function startWatcher({ cfg, wowDir, log = () => {}, onEvent = () => {}, 
     });
   };
   const contextCache = loadContextCache();
+  // Idle until the addon starts a channel test (see probe.js).
   const probeMonitor = startProbeMonitor({ wowDir, log });
 
   // One request at a time, whatever the source.

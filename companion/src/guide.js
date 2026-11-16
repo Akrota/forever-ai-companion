@@ -190,7 +190,8 @@ export function selectTopics(guide, { question = '', context = null, budget = TO
   const q = normalizeText(question);
   const ch = context?.character || {};
   const pos = context?.position || {};
-  const around = normalizeText([pos.zone, pos.subzone, ch.race, ch.raceToken, ch.class].filter(Boolean).join(' | '));
+  const around = normalizeText([pos.zone, pos.subzone, ch.race, ch.raceToken, ch.class, context?.pet?.family]
+    .filter(Boolean).join(' | '));
   const words = q.trim().split(' ').filter(Boolean);
   const qWords = new Set(words.filter((w) => w.length > 3 && !STOP.has(w)));
   // Names in the question (an item, an NPC, a quest: "felbough arm", "hemet

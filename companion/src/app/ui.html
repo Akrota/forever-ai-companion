@@ -228,7 +228,7 @@
   /* Toasts and dialogs --------------------------------------------------------- */
   #toasts { position: fixed; right: 20px; bottom: 84px; display: flex; flex-direction: column; gap: 8px; z-index: 50; max-width: min(380px, calc(100vw - 40px)); }
   .toast { background: var(--surface-3); border: 1px solid var(--line-2); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.5); animation: rise .2s ease-out; font-size: 14px; }
-  .toast.ok { border-left-color: var(--ok); } .toast.bad { border-left-color: var(--bad); }
+  .toast.ok { border-left-color: var(--ok); } .toast.bad { border-left-color: var(--bad); } .toast.warn { border-left-color: var(--warn); }
   @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
   .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 60; padding: 16px; }
   .modal { width: min(440px, 100%); background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 14px; padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
@@ -494,6 +494,7 @@ const I18N = {
     'voice.fair': 'Both options use normal Windows and game features: they don\'t modify WoW, don\'t read its memory and don\'t play for you.',
     'voice.legacyTitle': 'Update invisible sending',
     'voice.legacyText': 'Your invisible sending was set up under the app’s previous name. It keeps working, but click <b>Update invisible sending</b> to switch it to “ForeverAICompanion”. Windows will ask for permission once; then restart WoW.',
+    'voice.protectText': 'This version keeps the silent voice’s file in a protected Windows folder (Program Files), where other programs can’t replace it. Your invisible sending keeps working, but click <b>Update invisible sending</b> to move it there. Windows will ask for permission once; then restart WoW.',
     'voice.hint': 'Windows will ask for permission: click Yes',
     'voice.onRestart': 'Invisible sending is on. Restart the game',
     'voice.onRestartText': 'Close WoW completely and open it again so it starts using it.',
@@ -570,6 +571,9 @@ const I18N = {
     'dash.voiceOn': 'On: your questions travel without anything being seen or heard',
     'dash.voiceOff': 'Off: when you ask, a line briefly appears at the top of the screen',
     'dash.voiceUpdate': 'Update',
+    'dash.voiceUpdateNow': 'Update invisible sending',
+    'dash.voiceUpdating': 'Updating… accept the Windows prompt',
+    'dash.voiceUpdateFail': 'If you didn\'t accept the Windows permission, try again. Meanwhile your invisible sending keeps working.',
     'dash.voiceActivate': 'Turn on',
     'dash.close': 'When closing this window',
     'dash.closeText': 'The app can keep running next to the Windows clock.',
@@ -807,6 +811,7 @@ const I18N = {
     'voice.fair': 'Los dos caminos usan funciones normales de Windows y del juego: no modifican WoW, no leen su memoria y no juegan por ti.',
     'voice.legacyTitle': 'Actualiza el envío invisible',
     'voice.legacyText': 'Tu envío invisible se configuró con el nombre anterior de la app. Sigue funcionando, pero pulsa <b>Actualizar envío invisible</b> para cambiarlo a «ForeverAICompanion». Windows pedirá permiso una vez; luego reinicia WoW.',
+    'voice.protectText': 'Esta versión guarda el archivo de la voz silenciosa en una carpeta protegida de Windows (Archivos de programa), donde otros programas no pueden reemplazarlo. Tu envío invisible sigue funcionando, pero pulsa <b>Actualizar envío invisible</b> para moverlo ahí. Windows pedirá permiso una vez; luego reinicia WoW.',
     'voice.hint': 'Windows te pedirá permiso: pulsa Sí',
     'voice.onRestart': 'Envío invisible activado. Reinicia el juego',
     'voice.onRestartText': 'Cierra WoW por completo y vuelve a abrirlo para que lo use.',
@@ -881,6 +886,9 @@ const I18N = {
     'dash.voiceOn': 'Activado: tus preguntas viajan sin que se vea ni se oiga nada',
     'dash.voiceOff': 'Desactivado: al preguntar aparece un instante una línea arriba de la pantalla',
     'dash.voiceUpdate': 'Actualizar',
+    'dash.voiceUpdateNow': 'Actualizar envío invisible',
+    'dash.voiceUpdating': 'Actualizando… acepta el permiso de Windows',
+    'dash.voiceUpdateFail': 'Si no aceptaste el permiso de Windows, vuelve a intentarlo. Mientras tanto tu envío invisible sigue funcionando.',
     'dash.voiceActivate': 'Activar',
     'dash.close': 'Al cerrar esta ventana',
     'dash.closeText': 'La app puede seguir funcionando junto al reloj de Windows.',
@@ -1311,7 +1319,7 @@ const VIEWS = {
           ])}
         </div>
         <p class="small faint" style="margin-top:14px">${t('voice.fair')}</p>
-        ${legacy ? `<div style="margin-top:14px">${callout('warn', t('voice.legacyTitle'), t('voice.legacyText'))}</div>` : ''}
+        ${legacy ? `<div style="margin-top:14px">${callout('warn', t('voice.legacyTitle'), voice.legacyReason === 'protect' ? t('voice.protectText') : t('voice.legacyText'))}</div>` : ''}
         ${voiceMsg ? `<div style="margin-top:14px">${voiceMsg}</div>` : ''}`,
       next,
       hint: (choice === 'on' && !on) || legacy ? t('voice.hint') : '',
@@ -1463,6 +1471,9 @@ function renderDash() {
     ${updating ? `<div class="callout info"><span class="ic">${ICON.info}</span><div><b>${t('upd.title', { v: esc(u.latest) })}</b><p>${t('upd.text')}</p>
       <div class="links" style="margin-top:10px"><button class="btn primary small" data-act="update" ${busyAction || u.status === 'downloading' ? 'disabled' : ''}>${u.status === 'downloading' || busyAction === 'update' ? `<span class="spin"></span>${t('upd.downloading', { n: u.progress || 0 })}` : t('upd.now')}</button>
       <a class="btn small" href="${esc(u.notesUrl)}" target="_blank" rel="noopener">${t('upd.notes')}</a></div></div></div>` : ''}
+    ${voice?.legacy ? `<div class="callout warn"><span class="ic">${ICON.alert}</span><div><b>${t('voice.legacyTitle')}</b>
+      <p>${voice.legacyReason === 'protect' ? t('voice.protectText') : t('voice.legacyText')}</p>
+      <div class="links" style="margin-top:10px"><button class="btn primary small" data-act="voiceUpdate" ${busyAction ? 'disabled' : ''}>${spinner('voiceUpdate', t('dash.voiceUpdateNow'), t('dash.voiceUpdating'))}</button></div></div></div>` : ''}
     ${ok
       ? callout('ok', t('dash.ok'), `${t('dash.okText')}${s.ai.preset === 'echo' ? ` ${t('dash.testMode')}` : ''}`)
       : callout('warn', t('dash.missing'), esc(s.problem || t('dash.missingText')))}
@@ -1643,6 +1654,16 @@ const ACTIONS = {
       setTimeout(poll, 1500);
     };
     setTimeout(poll, 3000);
+  }),
+  // The dashboard's "Update invisible sending" notice: one Windows prompt.
+  voiceUpdate: () => run('voiceUpdate', async () => {
+    try {
+      const r = await api('voice-install');
+      toast(r.wowRunning ? 'warn' : 'ok', `<b>${t(r.wowRunning ? 'voice.onRestart' : 'voice.onOk')}</b><br>${t(r.wowRunning ? 'voice.onRestartText' : 'voice.onOkText')}`, 10000);
+    } catch (e) {
+      toast('bad', `<b>${t('voice.onFail')}</b><br>${esc(e.message)}. ${t('dash.voiceUpdateFail')}`, 10000);
+    }
+    await checkVoice();
   }),
   guide: () => run('guide', async () => {
     const r = await api('guide-check');
