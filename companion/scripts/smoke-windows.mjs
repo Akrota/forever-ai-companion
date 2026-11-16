@@ -199,6 +199,10 @@ if (!log().includes('Hola desde la prueba de Windows')) fail('the question is no
 // The window opened and closed right after the first start.
 step('3b. The app window opens and closes (Edge) after the first start');
 await screenshots(base, 'first-');
+// Right away, while the app is handling the closed window (this order once
+// lost the app without a trace on GitHub's machine).
+const early = await api(base, 'update-check').catch((e) => fail(`the app stopped answering right after its window closed: ${e.message}`));
+ok(`the app answers right after its window closed (update ${early.status})`);
 await sleep(3000);
 if (!(await findApp())) fail('the app closed after the Edge window closed (first start)');
 ok('the app keeps running after its window closed');
