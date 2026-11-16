@@ -1,0 +1,209 @@
+// Smoke test of the built ForeverAICompanion.exe on Windows, the way a player
+// uses it (run by .github/workflows/build-windows.yml after the build):
+//   1. opening the exe installs it (into a test folder) and starts it;
+//   2. the addon is installed into a stand-in WoW folder;
+//   3. invisible sending: the silent voice is registered (administrator, like
+//      on a PC) and a question is "spoken" with Windows' speech system, as WoW
+//      does; the answer must reach the addon's inboxes;
+//   4. a screenshot of the app window in Edge;
+//   5. updating: a stand-in GitHub offers a newer version; the app downloads,
+//      checks and installs it, and starts again;
+//   6. uninstalling removes the addon and the voice.
+//
+//   node scripts/smoke-windows.mjs dist/ForeverAICompanion.exe <out folder>
+//
+// Nothing outside the test folders is left behind (the uninstall step removes
+// the voice registration). Exits with an error at the first step that fails.
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawn } from 'node:child_process';
+import { adler32 } from '../src/grid.js';
+
+const exe = path.resolve(process.argv[2] || 'dist/ForeverAICompanion.exe');
+const out = path.resolve(process.argv[3] || 'smoke-out');
+fs.mkdirSync(out, { recursive: true });
+
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-smoke-'));
+const dataDir = path.join(root, 'data');
+const installDir = path.join(root, 'install');
+const wowDir = path.join(root, 'World of Warcraft', '_forever_');
+fs.mkdirSync(path.join(wowDir, 'Interface', 'AddOns'), { recursive: true });
+fs.mkdirSync(path.join(wowDir, 'WTF'), { recursive: true });
+const addons = path.join(wowDir, 'Interface', 'AddOns');
+const logFile = path.join(dataDir, 'forever-ai-companion.log');
+
+const HEADER = { 'x-forever-ai-companion': '1', 'content-type': 'application/json' };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const step = (msg) => console.log(`\n=== ${msg}`);
+const ok = (msg) => console.log(`  OK  ${msg}`);
+
+function fail(msg) {
+  console.error(`  FAIL ${msg}`);
+  try { console.error(`\n--- app log ---\n${fs.readFileSync(logFile, 'utf8')}`); } catch { /* no log yet */ }
+  try { fs.copyFileSync(logFile, path.join(out, 'app.log')); } catch { /* none */ }
+  process.exit(1);
+}
+
+async function until(what, fn, ms = 60000, every = 500) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    try { const v = await fn(); if (v) return v; } catch { /* not yet */ }
+    await sleep(every);
+  }
+  return fail(`${what} (waited ${ms / 1000} s)`);
+}
+
+async function findApp() {
+  for (let port = 47365; port < 47375; port++) {
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/api/ping`, { signal: AbortSignal.timeout(800) });
+      if ((await r.json()).app === 'ForeverAICompanion') return `http://127.0.0.1:${port}/`;
+    } catch { /* not here */ }
+  }
+  return null;
+}
+
+const api = async (base, name, body = {}, timeout = 300000) => {
+  const r = await fetch(`${base}api/${name}`, { method: 'POST', headers: HEADER, body: JSON.stringify(body), signal: AbortSignal.timeout(timeout) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(`${name}: ${j.error || r.status}`);
+  return j;
+};
+const status = async (base) => (await fetch(`${base}api/status`)).json();
+const log = () => { try { return fs.readFileSync(logFile, 'utf8'); } catch { return ''; } };
+
+// A stand-in for GitHub's "latest release" answer, offering this same exe as 9.9.9.
+const exeBytes = fs.readFileSync(exe);
+const sha = crypto.createHash('sha256').update(exeBytes).digest('hex');
+const gh = http.createServer((req, res) => {
+  const port = gh.address().port;
+  if (req.url === '/release') {
+    res.end(JSON.stringify({
+      tag_name: 'v9.9.9', draft: false, prerelease: false, html_url: 'http://127.0.0.1/notes',
+      assets: [{ name: 'ForeverAICompanion.exe', size: exeBytes.length, digest: `sha256:${sha}`, browser_download_url: `http://127.0.0.1:${port}/exe` }],
+    }));
+  } else if (req.url === '/exe') {
+    res.writeHead(200, { 'content-length': exeBytes.length });
+    res.end(exeBytes);
+  } else {
+    res.writeHead(404).end();
+  }
+});
+await new Promise((r) => gh.listen(0, '127.0.0.1', r));
+
+const env = {
+  ...process.env,
+  FAIC_DATA_DIR: dataDir, FAIC_INSTALL_DIR: installDir, FAIC_NO_SHORTCUTS: '1', FAIC_WOW_DIR: wowDir,
+  FAIC_PROVIDER: 'echo', FAIC_LANG: 'es', FAIC_UPDATE_API: `http://127.0.0.1:${gh.address().port}/release`,
+};
+
+// 1. Opening the downloaded exe ----------------------------------------------
+step('1. Opening the exe: it installs itself and starts');
+if (await findApp()) fail('another copy of the app is already running');
+spawn(exe, ['--no-window'], { env, detached: true, stdio: 'ignore' }).unref();
+const base = await until('the app answers on 127.0.0.1', findApp, 90000);
+const installed = path.join(installDir, 'ForeverAICompanion.exe');
+if (!fs.existsSync(installed)) fail(`not installed in ${installed}`);
+ok(`installed in ${installed}, running at ${base}`);
+let s = await status(base);
+if (s.platform !== 'win32') fail(`platform is ${s.platform}`);
+if (!s.wow.valid) fail('the WoW folder was not taken');
+ok(`version ${s.version}, Windows, game folder found`);
+await until('the icon next to the clock starts', async () => (await status(base)).tray, 60000);
+ok('icon next to the clock (tray) running');
+await api(base, 'close-action', { action: 'tray' }); // the Edge screenshot below closes a window
+
+// 2. The addon ------------------------------------------------------------------
+step('2. Installing the addon');
+const inst = await api(base, 'install-addon');
+s = await status(base);
+if (!s.wow.addonInstalled) fail('the addon is not installed');
+if (!fs.existsSync(path.join(addons, 'ForeverAICompanion', 'ForeverAICompanion.toc'))) fail('addon files missing');
+if (!fs.existsSync(path.join(addons, 'ForeverAICompanion_S50', 'Inbox.lua'))) fail('inboxes missing');
+ok(`addon ${s.wow.addonVersion} and its 50 inboxes installed (wowRunning=${inst.wowRunning})`);
+
+// 3. Invisible sending, end to end ----------------------------------------------
+step('3. Invisible sending: silent voice + a question spoken like WoW does');
+const v = await api(base, 'voice-install', {}, 600000).catch((e) => fail(`voice install: ${e.message}`));
+if (!v.active) fail('the voice is not visible to Windows after installing it');
+ok('silent voice registered (administrator step done)');
+
+const req = { id: 'smoke-voice-1', question: 'Hola desde la prueba de Windows', lang: 'es', context: { character: { name: 'Smoke', class: 'Hunter', level: 20, race: 'Dwarf' } }, history: [] };
+const payload = Buffer.from(JSON.stringify(req), 'utf8');
+const head = Buffer.alloc(8);
+head.write('FAIC', 0, 'latin1');
+head[4] = 1;
+head[5] = (payload.length >> 16) & 255; head[6] = (payload.length >> 8) & 255; head[7] = payload.length & 255;
+const sum = Buffer.alloc(4);
+sum.writeUInt32BE(adler32(payload) >>> 0);
+const message = `FAIC:${req.id}:1/1:${Buffer.concat([head, payload, sum]).toString('base64')}`;
+const voices = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
+Add-Type -AssemblyName System.Speech
+$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+($s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }) -join ', '
+$s.SelectVoice('ForeverAICompanion')
+$s.Volume = 0
+$s.Speak($env:FAIC_MSG)
+'spoken'`], { env: { ...process.env, FAIC_MSG: message }, encoding: 'utf8', timeout: 120000 });
+console.log(`  voices: ${voices.trim().replace(/\s*\r?\n\s*/g, ' | ')}`);
+const answered = await until('the answer reached the addon inboxes', () => {
+  const file = path.join(addons, 'ForeverAICompanion_S01', 'Inbox.lua');
+  return fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes('smoke-voice-1');
+}, 60000);
+if (answered) ok('question received through the silent voice and answered into the inboxes');
+if (!log().includes('Hola desde la prueba de Windows')) fail('the question is not in the app log');
+
+// 4. The app window --------------------------------------------------------------
+step('4. Screenshot of the app window (Edge)');
+const edge = ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].find((p) => fs.existsSync(p));
+if (edge) {
+  for (const [name, w, h] of [['window.png', 1000, 860], ['window-tall.png', 1000, 2200]]) {
+    try {
+      execFileSync(edge, ['--headless=new', '--disable-gpu', `--window-size=${w},${h}`, '--virtual-time-budget=8000',
+        `--user-data-dir=${path.join(root, 'edge')}`, `--screenshot=${path.join(out, name)}`, base], { timeout: 120000, stdio: 'ignore' });
+      ok(`${name} saved`);
+    } catch (e) {
+      console.log(`  (screenshot failed: ${e.message})`);
+    }
+  }
+} else {
+  console.log('  (Edge not found: no screenshot)');
+}
+
+// 5. Updating -------------------------------------------------------------------
+step('5. Updating from GitHub (stand-in): download, check, replace, start again');
+const u = await api(base, 'update-check');
+if (u.status !== 'available' || u.latest !== '9.9.9') fail(`update not offered: ${JSON.stringify(u)}`);
+ok('update 9.9.9 offered');
+const before = log();
+await api(base, 'update-install', {}, 600000);
+await until('the updated app starts again', async () => {
+  const now = log();
+  return now.length > before.length && /Installed in/.test(now.slice(before.length)) && await findApp();
+}, 120000);
+if (!/downloaded and verified \(SHA-256\)/.test(log())) fail('the download was not verified');
+ok('downloaded and verified (SHA-256), replaced and started again');
+const base2 = await findApp();
+s = await status(base2);
+if (!s.wow.addonInstalled) fail('after updating, the addon is no longer seen');
+ok(`running again at ${base2}, settings kept`);
+
+// 6. Uninstalling ---------------------------------------------------------------
+step('6. Uninstalling');
+await api(base2, 'uninstall', {}, 600000);
+await until('the app closes', async () => !(await findApp()), 60000);
+if (fs.existsSync(path.join(addons, 'ForeverAICompanion'))) fail('the addon is still there');
+if (fs.existsSync(path.join(addons, 'ForeverAICompanion_S01'))) fail('the inboxes are still there');
+let voiceLeft = true;
+try {
+  execFileSync('reg.exe', ['query', 'HKLM\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\ForeverAICompanion', '/reg:64'], { stdio: 'ignore' });
+} catch { voiceLeft = false; }
+if (voiceLeft) fail('the voice is still registered');
+ok('addon, inboxes, voice and settings removed; app closed');
+
+gh.close();
+console.log('\nAll steps passed.');
+process.exit(0);
