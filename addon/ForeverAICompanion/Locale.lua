@@ -132,7 +132,7 @@ local EN = {
   TIP_RIGHT_CLICK = "Right-click",
   TIP_NEW_CHAT = "new chat",
   TIP_DRAG = "Drag",
-  TIP_MOVE = "move",
+  TIP_MOVE = "move it around the minimap",
   TIP_SHIFT_RIGHT_CLICK = "Shift + right-click",
   TIP_HIDE = "hide",
 
@@ -148,7 +148,6 @@ local EN = {
   FRAME_TOO_BIG = "%d bytes (JSON %d) even after trimming everything",
   COMBAT_ON = "In combat: keep an eye on the game",
   COMBAT_HIT = "You're being hit! Watch the game",
-  COMBAT_HIT_HEALTH = "You're being hit! Watch the game · health %d%%",
   WAIT_PREVIOUS = "Wait a moment: I'm still sending the previous question.",
   PREPARING = "Preparing...",
   PREP_ERROR = "Error preparing the question: %s",
@@ -164,7 +163,7 @@ local EN = {
   BUTTON_RESET = "button moved back to its starting position.",
   SOUND_ON = "notification sound on.",
   SOUND_OFF = "notification sound off.",
-  HELP = "/ia (or /ai) opens the window · /ia <question> asks in the open chat · /ia new creates a chat · /ia assistant picks Fizzi or Rizzik · /ia button shows or hides the floating button (/ia button reset moves it back) · /ia sound toggles the alert · /ia data shows what is sent · /ia status · /ia inbox checks for answers",
+  HELP = "/ia (or /ai) opens the window · /ia <question> asks in the open chat · /ia new creates a chat · /ia assistant picks Fizzi or Rizzik · /ia button shows or hides the minimap button (/ia button reset moves it back) · /ia sound toggles the alert · /ia data shows what is sent · /ia status · /ia inbox checks for answers",
 
   -- Mailboxes and /ia status
   MAILBOX_MISSING = "The addon's mailboxes are missing. Run 'npm run install-addon' and restart WoW.",
@@ -375,7 +374,7 @@ local ES = {
   CONTEXT_TITLE = "Datos de tu personaje que recibe %s",
   ERROR = "Error",
 
-  -- Botón flotante
+  -- Botón del minimapa
   BUTTON_HIDDEN = "botón oculto. Escribe /ia boton para mostrarlo de nuevo.",
   UNREAD_ONE = "%d chat con respuestas nuevas",
   UNREAD_MANY = "%d chats con respuestas nuevas",
@@ -384,7 +383,7 @@ local ES = {
   TIP_RIGHT_CLICK = "Clic derecho",
   TIP_NEW_CHAT = "nuevo chat",
   TIP_DRAG = "Arrastrar",
-  TIP_MOVE = "mover",
+  TIP_MOVE = "moverlo por el minimapa",
   TIP_SHIFT_RIGHT_CLICK = "Shift + clic derecho",
   TIP_HIDE = "ocultar",
 
@@ -400,7 +399,6 @@ local ES = {
   FRAME_TOO_BIG = "%d bytes (JSON %d) incluso recortando todo",
   COMBAT_ON = "En combate: atento al juego",
   COMBAT_HIT = "¡Te están golpeando! Mira el juego",
-  COMBAT_HIT_HEALTH = "¡Te están golpeando! Mira el juego · vida %d%%",
   WAIT_PREVIOUS = "Espera un momento: todavía estoy enviando la pregunta anterior.",
   PREPARING = "Preparando...",
   PREP_ERROR = "Error preparando la pregunta: %s",
@@ -416,7 +414,7 @@ local ES = {
   BUTTON_RESET = "botón devuelto a su posición inicial.",
   SOUND_ON = "sonido de notificación activado.",
   SOUND_OFF = "sonido de notificación desactivado.",
-  HELP = "/ia abre la ventana · /ia <pregunta> pregunta en el chat abierto · /ia nuevo crea un chat · /ia asistente elige entre Fizzi y Rizzik · /ia boton muestra u oculta el botón flotante (/ia boton reset lo recoloca) · /ia sonido activa o silencia el aviso · /ia datos muestra lo que se envía · /ia estado · /ia buzon revisa respuestas",
+  HELP = "/ia abre la ventana · /ia <pregunta> pregunta en el chat abierto · /ia nuevo crea un chat · /ia asistente elige entre Fizzi y Rizzik · /ia boton muestra u oculta el botón del minimapa (/ia boton reset lo recoloca) · /ia sonido activa o silencia el aviso · /ia datos muestra lo que se envía · /ia estado · /ia buzon revisa respuestas",
 
   -- Buzones y /ia estado
   MAILBOX_MISSING = "Faltan los buzones del addon. Ejecuta 'npm run install-addon' y reinicia WoW.",

@@ -52,7 +52,7 @@ Forever AI Companion has two parts that work together:
 
 | Part | Where it lives | What it does |
 |---|---|---|
-| **The addon** | Inside WoW Forever | The floating button, the chat window and your assistant. It reads your character's data and shows the answers. Also on [CurseForge](https://www.curseforge.com/wow/addons/forever-ai-companion). |
+| **The addon** | Inside WoW Forever | The minimap button, the chat window and your assistant. It reads your character's data and shows the answers. Also on [CurseForge](https://www.curseforge.com/wow/addons/forever-ai-companion). |
 | **The app** (`ForeverAICompanion.exe` / `Forever AI Companion.app`) | On your Windows PC or your Mac | Receives your question, asks the AI you chose and sends the answer back to the game. |
 
 With every question the AI receives, without you having to explain anything:
@@ -138,11 +138,11 @@ Coming from version 1.5.0 or earlier, the app and the addon move to new folder n
 
 ## Using it in the game
 
-1. **Click the floating button**: the circle with your assistant's portrait, top right next to the minimap. You can drag it anywhere.
+1. **Click the minimap button**: the circle with your assistant's portrait, on the edge of the minimap like other addons' buttons. Drag it to slide it around the minimap.
 2. **The first time, choose your assistant**: Fizzi (Alliance) or Rizzik (Horde). It suggests the one for your faction.
 3. **Type your question** and click Send. The answer arrives in a few seconds; if the window was closed, you get a notification.
 
-- **Chats by topic**: each chat remembers its conversation (gear, quests, dungeons…). Right-click the floating button to start a new chat.
+- **Chats by topic**: each chat remembers its conversation (gear, quests, dungeons…). Right-click the minimap button to start a new chat.
 - **Ask about a specific item**: while typing, shift-click an item (in your bags, a vendor, a quest reward…) to put it in the question, like in the chat box: *"Is [this ring] better than mine?"*. The AI gets its full stats, and the link stays clickable in your message.
 - **Clickable items in the answers**: when the assistant names an item from your gear, bags, bank, quest rewards or an open vendor, it shows up as a real item link. Hover it for the tooltip, click to open it, shift-click to paste it in the chat or ctrl-click to try it on. Items that aren't in your data (for example, dungeon loot) are written as plain text.
 - **Ask about what's open**: with a quest, vendor, trainer, Beast Training, flight map, auction house or loot window open, the AI sees it, and a new chat suggests questions about that window. Try *"Should I accept this quest?"*, *"Which reward should I pick?"*, *"What should I buy here?"*, *"What should I teach my pet?"* or *"What from my bags should I sell here?"*.
@@ -163,7 +163,7 @@ Every command also works with its Spanish word (shown in parentheses).
 | `/ia <question>` | Asks directly in the open chat |
 | `/ia new` (`nuevo`) | Starts a new chat |
 | `/ia assistant` (`asistente`) | Choose between Fizzi and Rizzik (`/ia assistant fizzi` or `/ia assistant rizzik`) |
-| `/ia button` (`boton`) | Shows or hides the floating button (`/ia button reset` puts it back in place) |
+| `/ia button` (`boton`) | Shows or hides the minimap button (`/ia button reset` puts it back in place) |
 | `/ia sound` (`sonido`) | Turns the answer notification sound on or off |
 | `/ia data` (`datos`) | Shows the data that is sent |
 | `/ia status` (`estado`) · `/ia inbox` (`buzon`) | Diagnostics: connection status and check for pending answers |
@@ -364,7 +364,7 @@ The app is free. With your Claude or ChatGPT subscription you pay nothing extra 
 - Type `/ia inbox` in the game to check for new answers.
 - With the on-screen line, WoW must be visible when asking and in windowed or "fullscreen (windowed)" mode.
 
-**I can't see the floating button.**
+**I can't see the minimap button.**
 You may have hidden it (Shift + right-click). Type `/ia button`, or `/ia button reset` to put it back in place.
 
 **The AI test fails.**
@@ -402,7 +402,7 @@ addon/ForeverAICompanion/   Addon (Lua 5.1, modern client, interface 16001)
   Uplink.lua                Game → app: builds the package and picks the path
   Voice.lua                 Invisible path (text to speech with the silent voice)
   Live.lua                  App → game: inboxes and bell
-  UI.lua Button.lua         Chat window and floating button
+  UI.lua Button.lua         Chat window (and the combat warning) and minimap button
   Chats.lua Notify.lua      Conversations and notifications
   Personas.lua              Fizzi and Rizzik
   Core.lua                  Events and /ia commands

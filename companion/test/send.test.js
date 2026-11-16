@@ -363,8 +363,15 @@ test('chats: each chat keeps its own history, answers land in the right chat', (
 test('floating button: opens the chats, new chat, unread badge, drag, hide', () => {
   const out = runLua(`
     IsShiftKeyDown = function() return SHIFT end
+    -- A round minimap 140 px wide, centered at (1000, 700); the mouse above it.
+    Minimap = CreateFrame("Frame"); Minimap.w, Minimap.h = 140, 140
+    Minimap.GetCenter = function() return 1000, 700 end
+    Minimap.GetEffectiveScale = function() return 1 end
+    Minimap.GetFrameLevel = function() return 2 end
+    GetCursorPosition = function() return 1000, 900 end
     START()
     local b = ForeverAICompanionFloatingButton
+    b.SetPoint = function(self, p, rel, rp, x, y) self.anchorX, self.anchorY = math.floor((x or 0) + 0.5), math.floor((y or 0) + 0.5) end
     assert(b, "button not created")
     b.dragging = false -- the fake UI answers unknown fields with a function
     local shownAtStart = tostring(b.shown)
@@ -383,10 +390,11 @@ test('floating button: opens the chats, new chat, unread badge, drag, hide', () 
     local badge = tostring(ns.Button.badge.shown) .. "," .. ns.Button.badgeText:GetText()
     local thinking = tostring(ns.Button.thinking)
 
-    b.GetPoint = function() return "BOTTOMLEFT", UIParent, "BOTTOMLEFT", 300, 120 end
+    -- Dragged to straight above the minimap's center: it slides there (90°).
     b.scripts.OnDragStart(b)
+    b.scripts.OnUpdate(b, 0.016)
     b.scripts.OnDragStop(b)
-    local saved = ns.db.button.point .. "," .. ns.db.button.x .. "," .. ns.db.button.y
+    local saved = tostring(ns.db.button.angle) .. "," .. tostring(b.anchorX) .. "," .. tostring(b.anchorY)
     b.dragging = false
 
     SHIFT = true
@@ -403,7 +411,7 @@ test('floating button: opens the chats, new chat, unread badge, drag, hide', () 
   assert.equal(newChat, 'true,true');
   assert.equal(badge.split(',')[0], 'true');
   assert.equal(thinking, 'true', 'a pending question makes the icon breathe');
-  assert.equal(saved, 'BOTTOMLEFT,300,120');
+  assert.match(saved, /^90(\.0)?,0,75$/, 'on the minimap edge, above it (radius 70 + 5)');
   assert.equal(hidden, 'false,false');
 });
 
@@ -961,7 +969,7 @@ test('in combat you can ask, and the window warns you to watch the game (and fla
     local other = tostring(C.hitAt)
     FIRE("UNIT_COMBAT", "player", "WOUND", "", 200)      -- the player is hit
     C:Fade(0.1)
-    local hit = string.format("%.2f", C.glow.alpha) .. ":" .. tostring(C.text.textValue)
+    local hit = string.format("%.2f", C.glow.alpha) .. ":" .. tostring(C.text.textValue) .. ":" .. tostring(C.hpText.textValue)
     NOW = NOW + 5; C:Fade(0.1)                            -- a few seconds later
     local calm = tostring(C.text.textValue)
     INCOMBAT = false
@@ -972,7 +980,7 @@ test('in combat you can ask, and the window warns you to watch the game (and fla
   assert.equal(asked, 'pending', 'the question is sent in combat');
   assert.equal(bar, 'true:In combat: keep an eye on the game');
   assert.equal(other, 'nil', 'only hits on the player count');
-  assert.match(hit, /^0\.80:.*You're being hit! Watch the game · health 80%/);
+  assert.match(hit, /^0\.34:.*You're being hit! Watch the game.*:80%$/, 'the edges glow (discreetly); the health shows');
   assert.equal(calm, 'In combat: keep an eye on the game');
   assert.equal(after, 'false', 'the bar goes away after combat');
 });
@@ -985,12 +993,14 @@ test('in combat, with the game hiding health from addons: the warning still work
     INCOMBAT = true
     FIRE("PLAYER_REGEN_DISABLED")
     FIRE("UNIT_HEALTH", "player")
-    FIRE("UNIT_COMBAT", "player", "WOUND", "", 120)
-    RESULT = tostring(ns.Combat.bar.shown) .. "#" .. tostring(ns.Combat.text.textValue)
+    FIRE("UNIT_COMBAT", "player", "WOUND", "", 120)   -- what WoW Forever sends: the amount hidden
+    ns.Combat:Fade(0.1)
+    RESULT = tostring(ns.Combat.bar.shown) .. "#" .. tostring(ns.Combat.text.textValue) .. "#" .. string.format("%.2f", ns.Combat.glow.alpha)
   `, {}, ALL_FILES, 'LOCALE = "esES"\n' + IN_COMBAT);
-  const [shown, text] = out.split('#');
+  const [shown, text, flash] = out.split('#');
   assert.equal(shown, 'true');
-  assert.match(text, /¡Te están golpeando! Mira el juego\|r$/, 'no health when the game hides it');
+  assert.match(text, /¡Te están golpeando! Mira el juego\|r$/);
+  assert.equal(flash, '0.34', 'the hit is seen even with its amount hidden');
 });
 
 test('the "thinking" bubble is big enough for every phrase it cycles through', () => {
