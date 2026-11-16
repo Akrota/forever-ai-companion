@@ -140,14 +140,27 @@ head[5] = (payload.length >> 16) & 255; head[6] = (payload.length >> 8) & 255; h
 const sum = Buffer.alloc(4);
 sum.writeUInt32BE(adler32(payload) >>> 0);
 const message = `FAIC:${req.id}:1/1:${Buffer.concat([head, payload, sum]).toString('base64')}`;
-const voices = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
-Add-Type -AssemblyName System.Speech
-$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
-($s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }) -join ', '
-$s.SelectVoice('ForeverAICompanion')
-$s.Volume = 0
-$s.Speak($env:FAIC_MSG)
-'spoken'`], { env: { ...process.env, FAIC_MSG: message }, encoding: 'utf8', timeout: 120000 });
+// SAPI, like WoW: the voice is chosen from SAPI's own list, and the "audio"
+// goes to a file (GitHub's machines have no sound device).
+const voices = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-STA', '-Command', `
+$ErrorActionPreference = 'Stop'
+$v = New-Object -ComObject SAPI.SpVoice
+$tokens = $v.GetVoices()
+$names = @(); $ours = $null
+for ($i = 0; $i -lt $tokens.Count; $i++) {
+  $t = $tokens.Item($i); $n = $t.GetDescription(); $names += $n
+  if ($n -like 'ForeverAICompanion*') { $ours = $t }
+}
+$names -join ', '
+if (-not $ours) { throw 'SAPI does not list the ForeverAICompanion voice' }
+$v.Voice = $ours
+$fs = New-Object -ComObject SAPI.SpFileStream
+$fs.Open($env:FAIC_WAV, 3, $false)
+$v.AudioOutputStream = $fs
+$v.Volume = 0
+[void]$v.Speak($env:FAIC_MSG, 0)
+$fs.Close()
+'spoken'`], { env: { ...process.env, FAIC_MSG: message, FAIC_WAV: path.join(root, 'spoken.wav') }, encoding: 'utf8', timeout: 120000 });
 console.log(`  voices: ${voices.trim().replace(/\s*\r?\n\s*/g, ' | ')}`);
 const answered = await until('the answer reached the addon inboxes', () => {
   const file = path.join(addons, 'ForeverAICompanion_S01', 'Inbox.lua');
