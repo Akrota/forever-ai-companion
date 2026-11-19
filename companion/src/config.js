@@ -49,7 +49,7 @@ export const DEFAULTS = {
     apiKey: null, // null = use ANTHROPIC_API_KEY
     fallbacks: true,
   },
-  // Any OpenAI-compatible API: OpenAI, Gemini, Ollama, LM Studio, OpenRouter...
+  // Any OpenAI-compatible API: OpenAI, Gemini, Grok, Ollama, LM Studio, OpenRouter...
   openai: {
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-5-mini',
@@ -61,7 +61,7 @@ export const DEFAULTS = {
   // Codex CLI with a ChatGPT Plus / Pro plan. model: "default" (the plan's) or a slug.
   codex: { bin: 'codex', model: 'default', effort: 'low', extraArgs: [] },
 
-  // Set by the app window: "claude" | "chatgpt" | "gemini" | "ollama" | "claude-code" | "codex" | "echo".
+  // Set by the app window: "claude" | "chatgpt" | "gemini" | "grok" | "ollama" | "claude-code" | "codex" | "echo".
   // When set, it overrides provider/anthropic/openai above (see PRESETS).
   preset: null,
   keys: {},
@@ -120,6 +120,7 @@ export const PRESETS = {
   claude: { provider: 'anthropic', model: 'claude-opus-5-5', needsKey: true },
   chatgpt: { provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-mini', needsKey: true },
   gemini: { provider: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', needsKey: true },
+  grok: { provider: 'openai', baseUrl: 'https://api.x.ai/v1', model: 'grok-4', needsKey: true },
   ollama: { provider: 'openai', baseUrl: 'http://localhost:11434/v1', model: 'llama3.2', needsKey: false },
   'claude-code': { provider: 'claude-code', model: 'sonnet', needsKey: false },
   codex: { provider: 'codex', model: 'default', needsKey: false },

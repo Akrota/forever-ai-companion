@@ -180,6 +180,7 @@ Every command also works with its Spanish word (shown in parentheses).
 | **Claude with an API key** | No subscription | Pay per use (≈ 1 US cent per question) | Yes |
 | **ChatGPT with an API key** | No subscription | Pay per use | No |
 | **Gemini** | You want to try it for free | Free usage with limits | No |
+| **Grok** | You prefer xAI's Grok | Pay per use | No |
 | **AI on your PC (Ollama)** | You have a powerful PC | Free, no internet | No |
 | **Test mode** | Check that the game and the app are connected | Free (not an AI) | — |
 
@@ -420,7 +421,7 @@ companion/
   src/secrets.js            Encrypts API keys in config.json (Windows DPAPI, macOS Keychain)
   src/prompt.js             Instructions for the AI
   src/guide.js              WoW Forever guide: date, version, downloads and picking topic sections
-  src/providers.js          Claude, OpenAI/Gemini/Ollama, Claude Code, Codex, test
+  src/providers.js          Claude, OpenAI/Gemini/Grok/Ollama, Claude Code, Codex, test
   src/codex.js              Codex: install, sign-in and running it
   src/claude-code.js        Claude Code: install and sign-in
   src/tts-voice.js          Installs the silent voice
