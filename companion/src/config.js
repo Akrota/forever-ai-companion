@@ -120,7 +120,9 @@ export const PRESETS = {
   claude: { provider: 'anthropic', model: 'claude-opus-5-5', needsKey: true },
   chatgpt: { provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-mini', needsKey: true },
   gemini: { provider: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', needsKey: true },
-  grok: { provider: 'openai', baseUrl: 'https://api.x.ai/v1', model: 'grok-4', needsKey: true },
+  // Grok reasons before answering; low effort keeps answers quick (grok-4.7
+  // defaults to high, which is slow and costly for a question in the game).
+  grok: { provider: 'openai', baseUrl: 'https://api.x.ai/v1', model: 'grok-4.3', needsKey: true, params: { reasoning_effort: 'low' } },
   ollama: { provider: 'openai', baseUrl: 'http://localhost:11434/v1', model: 'llama3.2', needsKey: false },
   'claude-code': { provider: 'claude-code', model: 'sonnet', needsKey: false },
   codex: { provider: 'codex', model: 'default', needsKey: false },
@@ -136,7 +138,7 @@ export function applyPreset(cfg) {
   if (p.provider === 'anthropic') {
     cfg.anthropic = { ...cfg.anthropic, apiKey: key, model };
   } else if (p.provider === 'openai') {
-    cfg.openai = { ...cfg.openai, baseUrl: p.baseUrl, model, apiKey: key, apiKeyEnv: null };
+    cfg.openai = { ...cfg.openai, baseUrl: p.baseUrl, model, apiKey: key, apiKeyEnv: null, params: p.params || null };
   } else if (p.provider === 'claude-code') {
     cfg.claudeCode = { ...cfg.claudeCode, model };
   } else if (p.provider === 'codex') {

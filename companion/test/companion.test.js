@@ -9,9 +9,10 @@ import { loadConfig, wowPaths } from '../src/config.js';
 import { install } from '../src/install.js';
 import { handleRequest, readRequest } from '../src/watcher.js';
 import { cleanAnswer, buildSystem, flattenPrompt } from '../src/prompt.js';
-import { anthropicWebTools, canSearch } from '../src/providers.js';
+import { anthropicWebTools, ask, canSearch, openaiUsage } from '../src/providers.js';
 import { claudeCodeArgs } from '../src/providers.js';
 import { applyPreset } from '../src/config.js';
+import { t } from '../src/i18n.js';
 import { luaString as toLuaString } from '../src/inbox.js';
 import { encodePNG, renderGrid, runLua } from './helpers.js';
 
@@ -113,6 +114,43 @@ test('subscription mode runs Claude Code as a plain chat model', () => {
   const cfg = applyPreset({ preset: 'claude-code', models: { 'claude-code': 'haiku' }, claudeCode: { bin: 'claude' } });
   assert.equal(cfg.provider, 'claude-code');
   assert.equal(cfg.claudeCode.model, 'haiku');
+});
+test('Grok: xAI with low reasoning effort, its reasoning tokens counted, out of credit told apart', async () => {
+  const cfg = applyPreset({ preset: 'grok', keys: { grok: 'xai-test' }, timeoutMs: 5000 });
+  assert.equal(cfg.provider, 'openai');
+  assert.equal(cfg.openai.baseUrl, 'https://api.x.ai/v1');
+  assert.equal(cfg.openai.model, 'grok-4.3');
+  assert.equal(applyPreset({ preset: 'grok', models: { grok: 'grok-4.7' } }).openai.model, 'grok-4.7');
+  // The effort is Grok's only: switching to another AI drops it.
+  assert.equal(applyPreset({ ...cfg, preset: 'chatgpt' }).openai.params, null);
+
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  const reply = (status, body) => { globalThis.fetch = async (url, init) => { calls.push({ url, init }); return new Response(JSON.stringify(body), { status }); }; };
+  try {
+    // xAI's own example: completion_tokens leaves out the 94 reasoning tokens it bills.
+    reply(200, { model: 'grok-4.3', choices: [{ message: { content: 'Hola' } }],
+      usage: { prompt_tokens: 32, completion_tokens: 9, total_tokens: 135, prompt_tokens_details: { cached_tokens: 6 }, completion_tokens_details: { reasoning_tokens: 94 } } });
+    const out = await ask(cfg, 'system', [{ role: 'user', content: 'hi' }]);
+    assert.equal(out.text, 'Hola');
+    assert.deepEqual(out.usage, { input: 32, cached: 6, output: 103 });
+    assert.equal(calls[0].url, 'https://api.x.ai/v1/chat/completions');
+    assert.equal(calls[0].init.headers.authorization, 'Bearer xai-test');
+    const body = JSON.parse(calls[0].init.body);
+    assert.equal(body.reasoning_effort, 'low');
+    assert.equal(body.model, 'grok-4.3');
+
+    reply(403, { code: 'forbidden', error: 'Your newly created team doesn\'t have any credits yet.' });
+    await assert.rejects(ask(cfg, 's', []), { message: t('apiNoCredit') });
+    reply(400, { error: 'Incorrect API key provided: xa***st.' });
+    await assert.rejects(ask(cfg, 's', []), { message: t('badKey') });
+    reply(429, { error: 'Too many requests' });
+    await assert.rejects(ask(cfg, 's', []), { message: t('apiRateLimit') });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  // OpenAI already counts reasoning inside completion_tokens: unchanged.
+  assert.deepEqual(openaiUsage({ prompt_tokens: 10, completion_tokens: 50, total_tokens: 60, completion_tokens_details: { reasoning_tokens: 40 } }), { input: 10, cached: 0, output: 50 });
 });
 test('each assistant has its own personality over the same rules', () => {
   const fizzi = buildSystem('', 'fizzi');

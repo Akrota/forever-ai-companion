@@ -479,7 +479,7 @@ Installed apps (1.7.0 and later) pick up every new release by themselves (`src/u
 
 ### Contributing
 
-Pull requests are welcome: bug fixes, more game data for the AI, translations, safety improvements. Thanks to [@Zemnexx](https://github.com/Zemnexx) for the security hardening merged in 1.10.1 (protected silent voice, encrypted API keys, signed Codex only, fenced guide).
+Pull requests are welcome: bug fixes, more game data for the AI, translations, safety improvements. Thanks to [@Zemnexx](https://github.com/Zemnexx) for the security hardening merged in 1.10.1 (protected silent voice, encrypted API keys, signed Codex only, fenced guide). Thanks to [@lammertw](https://github.com/lammertw) for adding Grok (xAI) as an AI option.
 
 ### To do
 

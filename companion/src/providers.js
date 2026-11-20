@@ -117,20 +117,29 @@ async function openaiCompatible(cfg, system, messages) {
   const res = await fetch(`${c.baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
-    body: JSON.stringify({ model: c.model, messages: [{ role: 'system', content: system }, ...messages] }),
+    body: JSON.stringify({ ...(c.params || {}), model: c.model, messages: [{ role: 'system', content: system }, ...messages] }),
     signal: AbortSignal.timeout(cfg.timeoutMs),
   });
-  if (res.status === 401 || res.status === 403 || (res.status === 400 && /api[_ ]?key/i.test(await res.clone().text()))) {
+  const failure = res.ok ? '' : await res.text();
+  // No credit left (xAI answers 403, OpenAI 429 "insufficient_quota"): not a wrong key.
+  if ([402, 403, 429].includes(res.status) && /credit|insufficient_quota|spending limit|billing/i.test(failure)) throw err('apiNoCredit');
+  if (res.status === 401 || res.status === 403 || (res.status === 400 && /api[_ ]?key/i.test(failure))) {
     throw err('badKey');
   }
   if (res.status === 429) throw err('apiRateLimit');
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${failure.slice(0, 300)}`);
   const json = await res.json();
   const text = json.choices?.[0]?.message?.content;
   if (!text) throw err('noText');
-  const u = json.usage;
-  const usage = u ? tokenUsage(u.prompt_tokens, u.prompt_tokens_details?.cached_tokens, u.completion_tokens) : null;
-  return { text, model: json.model || c.model, usage };
+  return { text, model: json.model || c.model, usage: openaiUsage(json.usage) };
+}
+
+// OpenAI counts reasoning inside completion_tokens; xAI (Grok) doesn't, but
+// bills it, and its total_tokens includes it: output = total - prompt.
+export function openaiUsage(u) {
+  if (!u) return null;
+  const output = Math.max(u.completion_tokens || 0, (u.total_tokens || 0) - (u.prompt_tokens || 0));
+  return tokenUsage(u.prompt_tokens, u.prompt_tokens_details?.cached_tokens, output);
 }
 
 function run(bin, args, input, timeoutMs, cwd, shell = process.platform === 'win32') {

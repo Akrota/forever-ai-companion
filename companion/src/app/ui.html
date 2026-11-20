@@ -378,6 +378,8 @@ const I18N = {
     'p.grok.tag': 'Pay as you go',
     'p.grok.key1': 'Go to <a href="https://console.x.ai" target="_blank">console.x.ai</a> and sign in.',
     'p.grok.key2': 'Add credit in <b>Billing</b>, then create an API key under <b>API Keys</b> and copy it.',
+    'p.grok.fast': 'Fast and cheap: a good fit for questions in the game.',
+    'p.grok.smart': 'xAI\'s smartest, a bit slower and about twice the cost.',
     'p.gemini.desc': 'Google\'s AI. It usually has a free tier with limits.',
     'p.gemini.tag': 'Free use with limits',
     'p.gemini.key1': 'Go to <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> with your Google account.',
@@ -723,6 +725,8 @@ const I18N = {
     'p.grok.tag': 'Pagas por uso',
     'p.grok.key1': 'Entra a <a href="https://console.x.ai" target="_blank">console.x.ai</a> e inicia sesión.',
     'p.grok.key2': 'Carga crédito en <b>Billing</b>, luego crea una clave en <b>API Keys</b> y cópiala.',
+    'p.grok.fast': 'Rápido y barato: ideal para preguntas en el juego.',
+    'p.grok.smart': 'El más inteligente de xAI, algo más lento y cuesta como el doble.',
     'p.gemini.desc': 'La IA de Google. Suele tener un uso gratuito con límites.',
     'p.gemini.tag': 'Uso gratis con límites',
     'p.gemini.key1': 'Entra a <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> con tu cuenta de Google.',
@@ -1118,6 +1122,10 @@ function buildData() {
       desc: t('p.grok.desc'),
       tags: [['cost', t('p.grok.tag')], ['', t('tag.needsKey')]],
       key: [t('p.grok.key1'), t('p.grok.key2')],
+      models: [
+        ['grok-4.3', 'Grok 4.3', t('p.grok.fast'), true],
+        ['grok-4.7', 'Grok 4.7', t('p.grok.smart')],
+      ],
     },
     echo: {
       name: t('p.echo.name'),
