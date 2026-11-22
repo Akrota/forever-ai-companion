@@ -149,6 +149,25 @@ test('Grok: xAI with low reasoning effort, its reasoning tokens counted, out of 
   } finally {
     globalThis.fetch = realFetch;
   }
+  // Gemini: the current Flash by default, quick thinking; a retired model says so.
+  const gem = applyPreset({ preset: 'gemini', keys: { gemini: 'AIza-test' }, timeoutMs: 5000 });
+  assert.equal(gem.openai.model, 'gemini-4-hydrogen');
+  assert.deepEqual(gem.openai.params, { reasoning_effort: 'low' });
+  try {
+    reply(404, [{ error: { code: 404, message: 'This model models/gemini-2.5-flash is no longer available to new users.' } }]);
+    await assert.rejects(ask({ ...gem, openai: { ...gem.openai, model: 'gemini-2.5-flash' } }, 's', []), { message: t('modelGone', { model: 'gemini-2.5-flash' }) });
+    // Overloaded (503): tried again, and answered on the retry.
+    let n = 0;
+    globalThis.fetch = async () => (++n === 1 ? new Response('{"error":{"code":503,"message":"The model is overloaded."}}', { status: 503 })
+      : new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 }));
+    assert.equal((await ask({ ...gem, busyRetryMs: [1, 1] }, 's', [])).text, 'ok');
+    assert.equal(n, 2);
+    // Still overloaded after the retries: says so.
+    reply(503, { error: { code: 503, message: 'The model is overloaded.' } });
+    await assert.rejects(ask({ ...gem, busyRetryMs: [1, 1] }, 's', []), { message: t('apiBusy') });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
   // OpenAI already counts reasoning inside completion_tokens: unchanged.
   assert.deepEqual(openaiUsage({ prompt_tokens: 10, completion_tokens: 50, total_tokens: 60, completion_tokens_details: { reasoning_tokens: 40 } }), { input: 10, cached: 0, output: 50 });
 });

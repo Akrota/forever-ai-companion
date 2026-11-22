@@ -119,7 +119,10 @@ export function readUserConfig(file = configFile()) {
 export const PRESETS = {
   claude: { provider: 'anthropic', model: 'claude-opus-5-5', needsKey: true },
   chatgpt: { provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-mini', needsKey: true },
-  gemini: { provider: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', needsKey: true },
+  // gemini-2.5-flash is closed to new users and shuts down on 2026-12-01.
+  // Gemini 3 and 4 always think: low keeps answers quick. With the app's
+  // full prompt (free tier, 2026-11) 4 Hydrogen took 5-28 s, 3.8 Flash 32-73 s.
+  gemini: { provider: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-4-hydrogen', needsKey: true, params: { reasoning_effort: 'low' } },
   // Grok reasons before answering; low effort keeps answers quick (grok-4.7
   // defaults to high, which is slow and costly for a question in the game).
   grok: { provider: 'openai', baseUrl: 'https://api.x.ai/v1', model: 'grok-4.3', needsKey: true, params: { reasoning_effort: 'low' } },

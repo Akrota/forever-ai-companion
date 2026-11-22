@@ -384,6 +384,8 @@ const I18N = {
     'p.gemini.tag': 'Free use with limits',
     'p.gemini.key1': 'Go to <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> with your Google account.',
     'p.gemini.key2': 'Click <b>Create API key</b> and copy it.',
+    'p.gemini.hydrogen': 'Google\'s newest and the quickest to answer in the game. Free tier with limits.',
+    'p.gemini.flash': 'Half the price if you pay, but much slower to answer. Free tier with limits.',
     'p.echo.name': 'Test mode',
     'p.echo.desc': 'Doesn\'t use AI: it replies with the data it receives. Useful to check that the game and the app are connected.',
     'p.echo.tag': 'Doesn\'t answer with AI',
@@ -731,6 +733,8 @@ const I18N = {
     'p.gemini.tag': 'Uso gratis con límites',
     'p.gemini.key1': 'Entra a <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> con tu cuenta de Google.',
     'p.gemini.key2': 'Pulsa <b>Create API key</b> y cópiala.',
+    'p.gemini.hydrogen': 'El más nuevo de Google y el que responde más rápido en el juego. Uso gratis con límites.',
+    'p.gemini.flash': 'Cuesta la mitad si pagas, pero tarda bastante más en responder. Uso gratis con límites.',
     'p.echo.name': 'Modo prueba',
     'p.echo.desc': 'No usa IA: responde con los datos que recibe. Sirve para comprobar que el juego y la app se conectan.',
     'p.echo.tag': 'No responde con IA',
@@ -1116,6 +1120,10 @@ function buildData() {
       desc: t('p.gemini.desc'),
       tags: [['good', t('p.gemini.tag')], ['', t('tag.needsKey')]],
       key: [t('p.gemini.key1'), t('p.gemini.key2')],
+      models: [
+        ['gemini-4-hydrogen', 'Gemini 4 Hydrogen', t('p.gemini.hydrogen'), true],
+        ['gemini-3.8-flash', 'Gemini 3.8 Flash', t('p.gemini.flash')],
+      ],
     },
     grok: {
       name: 'Grok',

@@ -111,15 +111,27 @@ async function anthropic(cfg, system, messages) {
   return { text, model: response.model, usage };
 }
 
+// Waits between tries when the provider is overloaded (503) or hiccups (500).
+export const BUSY_RETRY_MS = [2000, 5000];
+
 async function openaiCompatible(cfg, system, messages) {
   const c = cfg.openai;
   const key = c.apiKey || (c.apiKeyEnv && process.env[c.apiKeyEnv]);
-  const res = await fetch(`${c.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+  const signal = AbortSignal.timeout(cfg.timeoutMs);
+  const send = () => fetch(`${c.baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
     body: JSON.stringify({ ...(c.params || {}), model: c.model, messages: [{ role: 'system', content: system }, ...messages] }),
-    signal: AbortSignal.timeout(cfg.timeoutMs),
+    signal,
   });
+  let res = await send();
+  for (const wait of cfg.busyRetryMs ?? BUSY_RETRY_MS) {
+    if (res.status !== 503 && res.status !== 500) break;
+    await res.body?.cancel();
+    await new Promise((r) => setTimeout(r, wait));
+    res = await send();
+  }
+  if (res.status === 503) throw err('apiBusy');
   const failure = res.ok ? '' : await res.text();
   // No credit left (xAI answers 403, OpenAI 429 "insufficient_quota"): not a wrong key.
   if ([402, 403, 429].includes(res.status) && /credit|insufficient_quota|spending limit|billing/i.test(failure)) throw err('apiNoCredit');
@@ -127,6 +139,8 @@ async function openaiCompatible(cfg, system, messages) {
     throw err('badKey');
   }
   if (res.status === 429) throw err('apiRateLimit');
+  // The provider retired the model (Gemini: "models/x is no longer available").
+  if (res.status === 404 && /model/i.test(failure)) throw err('modelGone', { model: c.model });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${failure.slice(0, 300)}`);
   const json = await res.json();
   const text = json.choices?.[0]?.message?.content;
