@@ -289,7 +289,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
           keys: Object.fromEntries(Object.keys(PRESETS).map((p) => [p, mask(cfg.keys?.[p])])),
           models: cfg.models || {},
           defaults: Object.fromEntries(Object.entries(PRESETS).map(([k, v]) => [k, v.model || null])),
-          // Reasoning chosen for the AIs that have it (Gemini, Grok), and their recommended one.
+          // Reasoning chosen for each AI that has it, and the recommended one.
           efforts: Object.fromEntries(Object.keys(PRESETS).filter((k) => PRESETS[k].effort).map((k) => [k, presetEffort(cfg, k)])),
           effortDefaults: Object.fromEntries(Object.entries(PRESETS).filter(([, v]) => v.effort).map(([k, v]) => [k, v.effort])),
           webSearch: cfg.webSearch !== false,

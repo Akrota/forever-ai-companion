@@ -121,8 +121,14 @@ test('Grok: xAI with low reasoning effort, its reasoning tokens counted, out of 
   assert.equal(cfg.openai.baseUrl, 'https://api.x.ai/v1');
   assert.equal(cfg.openai.model, 'grok-4.3');
   assert.equal(applyPreset({ preset: 'grok', models: { grok: 'grok-4.7' } }).openai.model, 'grok-4.7');
-  // The effort is Grok's and Gemini's only: switching to another AI drops it.
-  assert.equal(applyPreset({ ...cfg, preset: 'chatgpt' }).openai.params, null);
+  // Each AI keeps its own reasoning; Ollama gets none.
+  assert.deepEqual(applyPreset({ ...cfg, preset: 'chatgpt' }).openai.params, { reasoning_effort: 'low' });
+  assert.equal(applyPreset({ ...cfg, preset: 'ollama' }).openai.params, null);
+  const subs = { efforts: { 'claude-code': 'high', codex: 'medium', claude: 'medium' } };
+  assert.equal(applyPreset({ ...subs, preset: 'claude-code', claudeCode: { effort: 'low' } }).claudeCode.effort, 'high');
+  assert.equal(applyPreset({ ...subs, preset: 'codex', codex: { effort: 'low' } }).codex.effort, 'medium');
+  assert.equal(applyPreset({ ...subs, preset: 'claude', anthropic: { effort: 'low' } }).anthropic.effort, 'medium');
+  assert.equal(applyPreset({ preset: 'claude-code', claudeCode: { effort: 'low' } }).claudeCode.effort, 'low', 'recommended by default');
   // The player can choose more thinking; anything unknown falls back to low.
   assert.deepEqual(applyPreset({ preset: 'grok', efforts: { grok: 'high' } }).openai.params, { reasoning_effort: 'high' });
   assert.deepEqual(applyPreset({ preset: 'grok', efforts: { grok: 'xhigh' } }).openai.params, { reasoning_effort: 'low' });
