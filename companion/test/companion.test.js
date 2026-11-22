@@ -121,8 +121,12 @@ test('Grok: xAI with low reasoning effort, its reasoning tokens counted, out of 
   assert.equal(cfg.openai.baseUrl, 'https://api.x.ai/v1');
   assert.equal(cfg.openai.model, 'grok-4.3');
   assert.equal(applyPreset({ preset: 'grok', models: { grok: 'grok-4.7' } }).openai.model, 'grok-4.7');
-  // The effort is Grok's only: switching to another AI drops it.
+  // The effort is Grok's and Gemini's only: switching to another AI drops it.
   assert.equal(applyPreset({ ...cfg, preset: 'chatgpt' }).openai.params, null);
+  // The player can choose more thinking; anything unknown falls back to low.
+  assert.deepEqual(applyPreset({ preset: 'grok', efforts: { grok: 'high' } }).openai.params, { reasoning_effort: 'high' });
+  assert.deepEqual(applyPreset({ preset: 'grok', efforts: { grok: 'xhigh' } }).openai.params, { reasoning_effort: 'low' });
+  assert.deepEqual(applyPreset({ preset: 'gemini', efforts: { grok: 'high', gemini: 'medium' } }).openai.params, { reasoning_effort: 'medium' });
 
   const realFetch = globalThis.fetch;
   const calls = [];

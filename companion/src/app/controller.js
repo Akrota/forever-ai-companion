@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PRESETS, env, envVar, loadConfig, readUserConfig, saveConfig, wowPaths } from '../config.js';
+import { EFFORTS, PRESETS, env, presetEffort, envVar, loadConfig, readUserConfig, saveConfig, wowPaths } from '../config.js';
 import { startBeacon } from '../beacon.js';
 import { findWowDirs, isWowRunning, isWowRunningAsync, normalizeWowDir } from '../detect.js';
 import {
@@ -289,6 +289,9 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
           keys: Object.fromEntries(Object.keys(PRESETS).map((p) => [p, mask(cfg.keys?.[p])])),
           models: cfg.models || {},
           defaults: Object.fromEntries(Object.entries(PRESETS).map(([k, v]) => [k, v.model || null])),
+          // Reasoning chosen for the AIs that have it (Gemini, Grok), and their recommended one.
+          efforts: Object.fromEntries(Object.keys(PRESETS).filter((k) => PRESETS[k].effort).map((k) => [k, presetEffort(cfg, k)])),
+          effortDefaults: Object.fromEntries(Object.entries(PRESETS).filter(([, v]) => v.effort).map(([k, v]) => [k, v.effort])),
           webSearch: cfg.webSearch !== false,
           // Why the chosen AI can't answer yet: "need-ai" (no AI or no key),
           // "need-login" (Claude Code / Codex signed out), or null.
@@ -371,11 +374,12 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
       return { wowRunning: isWowRunning() };
     },
 
-    setAI({ preset, apiKey, model }) {
+    setAI({ preset, apiKey, model, effort }) {
       if (!PRESETS[preset]) throw err('unknownAI');
       const patch = { preset };
       if (typeof apiKey === 'string' && apiKey.trim()) patch.keys = { [preset]: apiKey.trim() };
       if (typeof model === 'string') patch.models = { [preset]: model.trim() || null };
+      if (PRESETS[preset].effort && EFFORTS.includes(effort)) patch.efforts = { [preset]: effort };
       if (PRESETS[preset].needsKey && !patch.keys && !cfg.keys?.[preset]) {
         throw err('pasteKey');
       }

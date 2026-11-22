@@ -471,6 +471,14 @@ const I18N = {
     'ai.ollama': 'Set up Ollama',
     'ai.model': 'Choose the model',
     'ai.modelText': 'You can change it whenever you want.',
+    'ai.effort': 'Choose how much it thinks',
+    'ai.effortText': 'It thinks before answering: more thinking can help with tricky questions, but takes longer and uses more tokens.',
+    'effort.low': 'Quick',
+    'effort.low.desc': 'Answers fastest, and is enough for most questions in the game.',
+    'effort.medium': 'Balanced',
+    'effort.medium.desc': 'Thinks more for tricky questions (builds, planning). Slower.',
+    'effort.high': 'Deep',
+    'effort.high.desc': 'Thinks the most. It can take a minute or more, so it\'s for questions you ask out of combat.',
     'ai.modelName': 'Type the model name',
     'ai.modelNameText': 'The one you downloaded in Ollama.',
     'ai.web': 'Search the internet when needed',
@@ -816,6 +824,14 @@ const I18N = {
     'ai.ollama': 'Prepara Ollama',
     'ai.model': 'Elige el modelo',
     'ai.modelText': 'Puedes cambiarlo cuando quieras.',
+    'ai.effort': 'Elige cuánto piensa',
+    'ai.effortText': 'Piensa antes de responder: pensar más ayuda con preguntas difíciles, pero tarda más y gasta más tokens.',
+    'effort.low': 'Rápido',
+    'effort.low.desc': 'Responde lo más rápido, y alcanza para la mayoría de las preguntas del juego.',
+    'effort.medium': 'Equilibrado',
+    'effort.medium.desc': 'Piensa más en preguntas difíciles (builds, planificación). Más lento.',
+    'effort.high': 'Profundo',
+    'effort.high.desc': 'Piensa lo máximo. Puede tardar un minuto o más, así que es para preguntas fuera de combate.',
     'ai.modelName': 'Escribe el nombre del modelo',
     'ai.modelNameText': 'El que descargaste en Ollama.',
     'ai.web': 'Buscar en internet cuando haga falta',
@@ -1210,6 +1226,7 @@ let returnToDash = false;  // a step opened from the dashboard ("Change")
 let addonJustInstalled = null;
 let aiChoice = null;       // provider selected in the AI step
 let aiModel = null;        // model picked by the player (survives redraws)
+let aiEffort = null;       // reasoning picked by the player (Gemini, Grok)
 let aiTest = null;         // { state: 'running'|'ok'|'bad', html }
 let voiceChoice = null;    // 'on' | 'off'
 let voiceMsg = null;
@@ -1396,6 +1413,13 @@ const VIEWS = {
     } else if (p.modelText) {
       items.push([true, t('ai.modelName'), t('ai.modelNameText'), `<input type="text" id="model-text" spellcheck="false" value="${esc(aiModel || status.ai.models[id] || status.ai.defaults[id] || 'llama3.2')}">`]);
     }
+    const effortRec = status.ai.effortDefaults?.[id];
+    if (effortRec) {
+      const effort = aiEffort || status.ai.efforts[id] || effortRec;
+      items.push([true, t('ai.effort'), t('ai.effortText'),
+        `<div class="models efforts">${['low', 'medium', 'high'].map((v) => `<label class="choice ${v === effort ? 'sel' : ''}"><input type="radio" name="effort" value="${v}" ${v === effort ? 'checked' : ''}>
+          <div><div class="head"><span class="title">${t(`effort.${v}`)}</span>${v === effortRec ? `<span class="badge rec">${t('badge.rec')}</span>` : ''}</div><div class="desc">${t(`effort.${v}.desc`)}</div></div></label>`).join('')}</div>`]);
+    }
 
     const ready = !CLI[id] || (cli[id]?.installed && cli[id]?.loggedIn);
     const testOk = aiTest?.state === 'ok' && active === id;
@@ -1416,12 +1440,13 @@ const VIEWS = {
       hint: !ready ? t('ai.hintSteps') : testOk ? '' : t('ai.hintTest'),
       after() {
         document.querySelectorAll('input[name=provider]').forEach((r) => {
-          r.onchange = () => { aiChoice = r.value; aiModel = null; aiTest = null; render(); if (CLI[r.value]) checkCli(r.value); };
+          r.onchange = () => { aiChoice = r.value; aiModel = null; aiEffort = null; aiTest = null; render(); if (CLI[r.value]) checkCli(r.value); };
         });
-        document.querySelectorAll('input[name=model]').forEach((r) => {
+        document.querySelectorAll('input[name=model], input[name=effort]').forEach((r) => {
           r.onchange = () => {
-            aiModel = r.value; aiTest = null;
-            document.querySelectorAll('.models .choice').forEach((c) => c.classList.toggle('sel', c.contains(r)));
+            if (r.name === 'model') aiModel = r.value; else aiEffort = r.value;
+            aiTest = null;
+            r.closest('.models').querySelectorAll('.choice').forEach((c) => c.classList.toggle('sel', c.contains(r)));
             renderWizard(false);
           };
         });
@@ -1553,7 +1578,7 @@ function go(id) {
 function openWizard(id, fromDash = false) {
   mode = 'wizard';
   returnToDash = fromDash;
-  aiChoice = null; aiModel = null; aiTest = null;
+  aiChoice = null; aiModel = null; aiEffort = null; aiTest = null;
   voiceChoice = null; voiceMsg = null; addonJustInstalled = null;
   go(id);
 }
@@ -1596,7 +1621,10 @@ function ago(iso) {
 function modelLabel(id) {
   const p = ALL[id];
   const m = status.ai.models[id] || status.ai.defaults[id];
-  return p?.models?.find(([v]) => v === m)?.[1] || m || '';
+  const name = p?.models?.find(([v]) => v === m)?.[1] || m || '';
+  // The reasoning shows in the dashboard only when it isn't the recommended one.
+  const effort = status.ai.efforts?.[id];
+  return effort && effort !== status.ai.effortDefaults?.[id] ? `${name} · ${t(`effort.${effort}`)}` : name;
 }
 
 // "Reviewed on November 13, 2026 · updates itself from the internet"
@@ -1763,7 +1791,8 @@ async function saveAndTest() {
     const model = p.models ? document.querySelector('input[name=model]:checked')?.value
       : p.modelText ? $('model-text')?.value : undefined;
     try {
-      await api('set-ai', { preset: aiChoice, apiKey: $('key')?.value || '', model });
+      const effort = document.querySelector('input[name=effort]:checked')?.value;
+      await api('set-ai', { preset: aiChoice, apiKey: $('key')?.value || '', model, effort });
     } catch (e) {
       aiTest = { state: 'bad', html: callout('bad', t('ai.saveFail'), esc(e.message)) };
       return;

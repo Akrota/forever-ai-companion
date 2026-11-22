@@ -66,6 +66,7 @@ export const DEFAULTS = {
   preset: null,
   keys: {},
   models: {},
+  efforts: {}, // reasoning per preset (Gemini, Grok): "low" | "medium" | "high"
 
   slots: 50,
   signals: 500,
@@ -120,17 +121,28 @@ export const PRESETS = {
   claude: { provider: 'anthropic', model: 'claude-opus-5-5', needsKey: true },
   chatgpt: { provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5-mini', needsKey: true },
   // gemini-2.5-flash is closed to new users and shuts down on 2026-12-01.
-  // Gemini 3 and 4 always think: low keeps answers quick. With the app's
-  // full prompt (free tier, 2026-11) 4 Hydrogen took 5-28 s, 3.8 Flash 32-73 s.
-  gemini: { provider: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-4-hydrogen', needsKey: true, params: { reasoning_effort: 'low' } },
-  // Grok reasons before answering; low effort keeps answers quick (grok-4.7
-  // defaults to high, which is slow and costly for a question in the game).
-  grok: { provider: 'openai', baseUrl: 'https://api.x.ai/v1', model: 'grok-4.3', needsKey: true, params: { reasoning_effort: 'low' } },
+  // With the app's full prompt (free tier, 2026-11, low effort) 4 Hydrogen
+  // took 5-28 s, 3.8 Flash 32-73 s.
+  gemini: { provider: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-4-hydrogen', needsKey: true, effort: 'low' },
+  grok: { provider: 'openai', baseUrl: 'https://api.x.ai/v1', model: 'grok-4.3', needsKey: true, effort: 'low' },
   ollama: { provider: 'openai', baseUrl: 'http://localhost:11434/v1', model: 'llama3.2', needsKey: false },
   'claude-code': { provider: 'claude-code', model: 'sonnet', needsKey: false },
   codex: { provider: 'codex', model: 'default', needsKey: false },
   echo: { provider: 'echo', needsKey: false },
 };
+
+// How much Gemini and Grok think before answering (their reasoning_effort).
+// Both always think, and their own default is often high: slow for a
+// question in the game (a short Gemini answer: 9 s at low, 54 s by default).
+// Every model offered for them accepts these three.
+export const EFFORTS = ['low', 'medium', 'high'];
+
+export function presetEffort(cfg, preset = cfg.preset) {
+  const p = PRESETS[preset];
+  if (!p?.effort) return null;
+  const chosen = cfg.efforts?.[preset];
+  return EFFORTS.includes(chosen) ? chosen : p.effort;
+}
 
 export function applyPreset(cfg) {
   const p = PRESETS[cfg.preset];
@@ -141,7 +153,8 @@ export function applyPreset(cfg) {
   if (p.provider === 'anthropic') {
     cfg.anthropic = { ...cfg.anthropic, apiKey: key, model };
   } else if (p.provider === 'openai') {
-    cfg.openai = { ...cfg.openai, baseUrl: p.baseUrl, model, apiKey: key, apiKeyEnv: null, params: p.params || null };
+    const effort = presetEffort(cfg);
+    cfg.openai = { ...cfg.openai, baseUrl: p.baseUrl, model, apiKey: key, apiKeyEnv: null, params: effort ? { reasoning_effort: effort } : null };
   } else if (p.provider === 'claude-code') {
     cfg.claudeCode = { ...cfg.claudeCode, model };
   } else if (p.provider === 'codex') {
