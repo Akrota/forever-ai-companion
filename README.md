@@ -17,7 +17,7 @@
 
 <p align="center"><sub>The addon is also on <a href="https://www.curseforge.com/wow/addons/forever-ai-companion">CurseForge</a>, but you still need the app: it's the one that talks to the AI.</sub></p>
 
-<p align="center"><sub>English and Spanish · Inglés y español</sub></p>
+<p align="center"><sub>English, Spanish and German · Inglés, español y alemán · Englisch, Spanisch und Deutsch</sub></p>
 
 <p align="center"><sub>Unofficial fan project, not affiliated with Blizzard. Use it at your own risk: <a href="#blizzards-rules-and-your-own-risk">read the risks</a>.</sub></p>
 
@@ -192,15 +192,15 @@ You can change the AI or the model at any time from the app's dashboard (**Chang
 
 ## Languages
 
-Everything is available in **English and Spanish**, chosen automatically:
+Everything is available in **English, Spanish and German**, chosen automatically:
 
 | Part | Language |
 |---|---|
-| The addon (window, button, assistant, commands) | Your WoW client's language: Spanish for `esES`/`esMX`, English for everything else |
-| The app window and the tray icon | Your Windows language: Spanish if Windows is in Spanish, English otherwise |
+| The addon (window, button, assistant, commands) | Your WoW client's language: Spanish for `esES`/`esMX`, German for `deDE` (commands stay in English), English for everything else |
+| The app window and the tray icon | Your Windows language: Spanish or German if Windows is in that language, English otherwise |
 | The AI's answers | The language of your question, using the names your game client shows (zones, quests, items) |
 
-To force the app's language, set `"language": "en"` or `"es"` in `%APPDATA%\ForeverAICompanion\config.json` (`"auto"` by default).
+To force the app's language, set `"language": "en"`, `"es"` or `"de"` in `%APPDATA%\ForeverAICompanion\config.json` (`"auto"` by default).
 
 ---
 
@@ -397,7 +397,7 @@ Open the app and, under **More options**, click **Uninstall**. It removes the ad
 
 ```
 addon/ForeverAICompanion/   Addon (Lua 5.1, modern client, interface 16001)
-  Locale.lua                English and Spanish texts (by the client's language)
+  Locale.lua                English, Spanish and German texts (by the client's language)
   Collect.lua               Reads the character's data (each section separately),
                             linked items, open windows and recipes
   Uplink.lua                Game → app: builds the package and picks the path
@@ -410,7 +410,7 @@ addon/ForeverAICompanion/   Addon (Lua 5.1, modern client, interface 16001)
 companion/
   src/app/                  App: main (self-install, tray), controller,
                             server (local window), system (Windows, macOS), ui.html
-  src/i18n.js               English and Spanish messages (app, tray, in-game errors)
+  src/i18n.js               English, Spanish and German messages (app, tray, in-game errors)
   src/watcher.js            Receives questions and publishes answers
   src/voice-inbox.js        Reads what the silent voice delivers
   src/screen-reader.js      Reads the on-screen line
