@@ -49,7 +49,7 @@ function registryPath() {
 }
 
 let pathCache = { at: 0, dirs: [] };
-function pathDirs() {
+export function pathDirs() {
   if (Date.now() - pathCache.at > 15000) {
     const dirs = [...String(process.env.PATH || '').split(path.delimiter), ...registryPath()]
       .map((d) => d.trim().replace(/^"|"$/g, ''))

@@ -39,7 +39,7 @@ export const DEFAULTS = {
   // null = detect it. The FAIC_WOW_DIR variable also works.
   wowDir: null,
 
-  // "anthropic" | "openai" | "claude-code" | "codex" | "echo"
+  // "anthropic" | "openai" | "claude-code" | "codex" | "antigravity" | "echo"
   provider: 'echo',
 
   anthropic: {
@@ -60,8 +60,10 @@ export const DEFAULTS = {
   claudeCode: { bin: 'claude', model: 'sonnet', effort: 'low', extraArgs: [] },
   // Codex CLI with a ChatGPT Plus / Pro plan. model: "default" (the plan's) or a slug.
   codex: { bin: 'codex', model: 'default', effort: 'low', extraArgs: [] },
+  // Antigravity CLI (`agy`) with a Google account or Google AI Pro / Ultra plan.
+  antigravity: { bin: 'agy', model: 'default', effort: 'low', extraArgs: [] },
 
-  // Set by the app window: "claude" | "chatgpt" | "gemini" | "grok" | "ollama" | "claude-code" | "codex" | "echo".
+  // Set by the app window: "claude" | "chatgpt" | "gemini" | "grok" | "ollama" | "claude-code" | "codex" | "antigravity" | "echo".
   // When set, it overrides provider/anthropic/openai above (see PRESETS).
   preset: null,
   keys: {},
@@ -74,7 +76,7 @@ export const DEFAULTS = {
   keepAnswers: 30,
   timeoutMs: 180000,
 
-  // Let the AI search the web when it needs to (Claude, Codex).
+  // Let the AI search the web when it needs to (Claude, Codex, Antigravity).
   webSearch: true,
 
   // Where the up-to-date WoW Forever guide is published (see src/guide.js).
@@ -128,6 +130,7 @@ export const PRESETS = {
   ollama: { provider: 'openai', baseUrl: 'http://localhost:11434/v1', model: 'llama3.2', needsKey: false },
   'claude-code': { provider: 'claude-code', model: 'sonnet', needsKey: false, effort: 'low' },
   codex: { provider: 'codex', model: 'default', needsKey: false, effort: 'low' },
+  antigravity: { provider: 'antigravity', model: 'default', needsKey: false, effort: 'low' },
   echo: { provider: 'echo', needsKey: false },
 };
 
@@ -160,6 +163,8 @@ export function applyPreset(cfg) {
     cfg.claudeCode = { ...cfg.claudeCode, model, ...(effort ? { effort } : {}) };
   } else if (p.provider === 'codex') {
     cfg.codex = { ...cfg.codex, model, ...(effort ? { effort } : {}) };
+  } else if (p.provider === 'antigravity') {
+    cfg.antigravity = { ...cfg.antigravity, model, ...(effort ? { effort } : {}) };
   }
   return cfg;
 }

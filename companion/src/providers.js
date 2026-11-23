@@ -10,6 +10,10 @@ import {
   CODEX_DISABLE, CODEX_MODELS, CODEX_MUST_DISABLE, codexArgs, codexAuthStatus, findCodex, friendlyCodexError, parseCodexEvents,
   rejectedCodexFeatures, shellQuote,
 } from './codex.js';
+import {
+  ANTIGRAVITY_NOTE, antigravityArgs, antigravityAuthStatus, antigravityInput, antigravitySettings, antigravityUsage,
+  fallbackAntigravityEffort, findAntigravity, friendlyAntigravityError, parseAntigravityEvents, prettyAntigravityModel,
+} from './antigravity.js';
 
 // Tokens an answer used, the same shape for every provider (shown in the game):
 // input = everything the AI read (including what came from the cache),
@@ -43,7 +47,7 @@ const FALLBACK_MODELS = new Set(['claude-fable-5-1', 'claude-opus-5-5', 'claude-
 
 // Providers that can search the web (WoW Forever is newer than the models).
 export function canSearch(cfg) {
-  return cfg.webSearch !== false && ['claude-code', 'anthropic', 'codex'].includes(cfg.provider);
+  return cfg.webSearch !== false && ['claude-code', 'anthropic', 'codex', 'antigravity'].includes(cfg.provider);
 }
 
 // Server-side web tools for the Claude API. The newest variants (dynamic
@@ -156,9 +160,9 @@ export function openaiUsage(u) {
   return tokenUsage(u.prompt_tokens, u.prompt_tokens_details?.cached_tokens, output);
 }
 
-function run(bin, args, input, timeoutMs, cwd, shell = process.platform === 'win32') {
+function run(bin, args, input, timeoutMs, cwd, shell = process.platform === 'win32', env = undefined) {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { cwd, shell, windowsHide: true });
+    const child = spawn(bin, args, { cwd, shell, windowsHide: true, ...(env ? { env } : {}) });
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
@@ -186,7 +190,7 @@ function run(bin, args, input, timeoutMs, cwd, shell = process.platform === 'win
 }
 
 // An empty working folder so CLI agents have nothing local to read or edit.
-function sandboxDir() {
+export function sandboxDir() {
   const dir = path.join(os.tmpdir(), 'forever-ai-companion-cli');
   fs.mkdirSync(dir, { recursive: true });
   return dir;
@@ -344,6 +348,81 @@ async function codex(cfg, system, messages) {
   };
 }
 
+let antigravityLogin = { ok: false, at: 0, bin: null };
+
+// Antigravity CLI (`agy`): uses the Google account / Google AI plan you are signed into.
+async function antigravity(cfg, system, messages) {
+  const c = cfg.antigravity;
+  const found = findAntigravity(c.bin);
+  if (!found) {
+    throw err('antigravityMissing');
+  }
+  // Signed out, `agy` waits 60s for interactive OAuth: check first (`agy models` fails in <1s).
+  if (!antigravityLogin.ok || antigravityLogin.bin !== found.path || Date.now() - antigravityLogin.at > 10 * 60000) {
+    const s = await antigravityAuthStatus(found.path);
+    if (!s.loggedIn && !s.error) throw new Error(friendlyAntigravityError('not signed in'));
+    if (s.loggedIn) antigravityLogin = { ok: true, at: Date.now(), bin: found.path };
+  }
+  const { file, shell } = spawnArgs(found.path);
+  const work = sandboxDir();
+  const stamp = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const settingsFile = path.join(work, `agy-settings-${stamp}.json`);
+  const webSearch = canSearch(cfg);
+  fs.writeFileSync(settingsFile, JSON.stringify(antigravitySettings({ webSearch }), null, 2), 'utf8');
+  const prompt = antigravityInput(flattenPrompt(`${system}\n\n${ANTIGRAVITY_NOTE}`, messages));
+  const env = { ...process.env, AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
+
+  const invoke = (effortOverride) => {
+    const args = antigravityArgs(c, { settingsFile, webSearch, timeoutMs: cfg.timeoutMs, effortOverride });
+    return run(file, shell ? shellQuote(args) : args, prompt, cfg.timeoutMs, work, shell, env);
+  };
+
+  const hasExplicitModel = Boolean(c.model && c.model !== 'default');
+  let out;
+  try {
+    try {
+      out = await invoke(undefined);
+    } catch (e) {
+      const parsedErr = parseAntigravityEvents(e.stdout);
+      const errMsg = parsedErr.error || e.stderr || e.message;
+      const retryEffort = !hasExplicitModel && c.effort ? fallbackAntigravityEffort(errMsg, c.effort) : undefined;
+      if (retryEffort !== undefined) {
+        out = await invoke(retryEffort);
+      } else {
+        throw e;
+      }
+    }
+  } catch (e) {
+    out = e.stdout;
+    const parsed = parseAntigravityEvents(out);
+    if (parsed.error) {
+      if (/authentication required|please sign in|not (?:signed|logged) in|401|unauthori[sz]ed/i.test(parsed.error)) {
+        antigravityLogin = { ok: false, at: 0, bin: null };
+      }
+      throw new Error(friendlyAntigravityError(parsed.error));
+    }
+    throw e;
+  } finally {
+    fs.rmSync(settingsFile, { force: true });
+  }
+
+  const parsed = parseAntigravityEvents(out);
+  if (parsed.error) {
+    if (/authentication required|please sign in|not (?:signed|logged) in|401|unauthori[sz]ed/i.test(parsed.error)) {
+      antigravityLogin = { ok: false, at: 0, bin: null };
+    }
+    throw new Error(friendlyAntigravityError(parsed.error));
+  }
+  const text = parsed.text;
+  if (!text.trim()) throw err('antigravityNoAnswer');
+  const name = prettyAntigravityModel(parsed.model || c.model);
+  return {
+    text,
+    model: `${name || 'Gemini'} · ${t('yourSubscription')}`,
+    usage: antigravityUsage(parsed.usage),
+  };
+}
+
 // No AI: echoes what arrived. Use it to test the in-game round trip for free.
 async function echo(cfg, system, messages, req) {
   const ctx = req.context || {};
@@ -363,7 +442,7 @@ async function echo(cfg, system, messages, req) {
   };
 }
 
-const PROVIDERS = { anthropic, openai: openaiCompatible, 'claude-code': claudeCode, codex, echo };
+const PROVIDERS = { anthropic, openai: openaiCompatible, 'claude-code': claudeCode, codex, antigravity, echo };
 
 export async function ask(cfg, system, messages, req) {
   const fn = PROVIDERS[cfg.provider];

@@ -12,12 +12,16 @@ import {
 } from '../install.js';
 import { knowledgeReadme, sampleContext } from '../assets.js';
 import { buildMessages, buildSystem, cleanAnswer, loadKnowledge, plainAnswer } from '../prompt.js';
-import { ask, canSearch } from '../providers.js';
+import { ask, canSearch, sandboxDir } from '../providers.js';
 import { startWatcher } from '../watcher.js';
 import { authStatus, findClaudeCode, openInstall, openLogin } from '../claude-code.js';
 import {
   codexAuthStatus, codexInstallState, codexSearchState, codexVersion, findCodex, installCodex, openCodexLogin, searchCodex,
 } from '../codex.js';
+import {
+  antigravityAuthStatus, findAntigravity, notifyAntigravityLoggedIn, openAntigravityInstall, openAntigravityLogin,
+  stopAntigravityLoginWatch,
+} from '../antigravity.js';
 import { ttsEngineSource } from '../assets.js';
 import {
   ENGINE_DLL, compileEngine, installVoiceMachineWide, isLegacyEngineRegistered, isLegacyVoiceVisible, isVoiceVisible,
@@ -166,23 +170,31 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
     checkLogin();
   }
 
-  // Whether the chosen subscription AI (Claude Code, Codex) is installed and
+  // Whether the chosen subscription AI (Claude Code, Codex, Antigravity) is installed and
   // signed in: true / false, or null when unknown or not needed. Checked now
   // and then (it runs the AI's own program), and whenever settings change.
   let aiSignedIn = null;
   let loginCheck = null;
   function checkLogin() {
     const provider = cfg.provider;
-    if (provider !== 'claude-code' && provider !== 'codex') {
+    if (provider !== 'claude-code' && provider !== 'codex' && provider !== 'antigravity') {
       aiSignedIn = null;
       beacon?.refresh();
       return Promise.resolve();
     }
     // Not installed: false. The status check itself failing: unknown.
     const run = (async () => {
-      const found = provider === 'claude-code' ? findClaudeCode(cfg.claudeCode.bin) : findCodex(cfg.codex.bin);
+      const found = provider === 'claude-code'
+        ? findClaudeCode(cfg.claudeCode.bin)
+        : provider === 'codex'
+        ? findCodex(cfg.codex.bin)
+        : findAntigravity(cfg.antigravity.bin);
       if (!found) return false;
-      const s = provider === 'claude-code' ? await authStatus(found.path) : await codexAuthStatus(found.path);
+      const s = provider === 'claude-code'
+        ? await authStatus(found.path)
+        : provider === 'codex'
+        ? await codexAuthStatus(found.path)
+        : await antigravityAuthStatus(found.path);
       return s.error ? null : s.loggedIn;
     })();
     loginCheck = run;
@@ -518,6 +530,28 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
       return {};
     },
 
+    async antigravityStatus() {
+      const found = findAntigravity(cfg.antigravity.bin);
+      const out = found
+        ? { installed: true, source: found.source, ...(await antigravityAuthStatus(found.path)) }
+        : { installed: false, loggedIn: false };
+      if (out.loggedIn) notifyAntigravityLoggedIn();
+      noteSignIn('antigravity', out);
+      return out;
+    },
+
+    antigravityInstall() {
+      openAntigravityInstall();
+      return {};
+    },
+
+    antigravityLogin() {
+      const found = findAntigravity(cfg.antigravity.bin);
+      if (!found) throw err('installAntigravityFirst');
+      openAntigravityLogin(found.path, sandboxDir());
+      return {};
+    },
+
     async setAutostart({ enabled }) {
       autostart = await sys.setAutostart(Boolean(enabled));
       return { autostart };
@@ -530,6 +564,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
     },
 
     stop() {
+      stopAntigravityLoginWatch();
       beacon.stop();
       clearInterval(loginTimer);
       guideUpdates.stop();

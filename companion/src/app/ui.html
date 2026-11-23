@@ -359,6 +359,11 @@ const I18N = {
     'p.codex.name': 'My ChatGPT subscription',
     'p.codex.desc': 'Uses your ChatGPT Plus or Pro plan through Codex, the official OpenAI program. No keys needed and nothing extra to pay.',
     'p.codex.tag': 'Requires ChatGPT Plus or Pro',
+    'p.antigravity.name': 'My Gemini subscription',
+    'p.antigravity.desc': 'Uses your Google account or Google AI Pro / Ultra plan through Antigravity CLI, Google\'s official program. No keys needed and nothing extra to pay.',
+    'p.antigravity.tag': 'Free, Pro, or Ultra Google plan',
+    'p.antigravity.hydrogen': 'Fast and smart; requires Google AI Pro or Ultra.',
+    'p.antigravity.flash': 'Included on all Google accounts (including Free); slower.',
     'p.claude.name': 'Claude with an API key',
     'p.claude.desc': 'For people without a subscription: you only pay for what you use, on Anthropic\'s website.',
     'p.claude.tag': 'Pay as you go (≈ 1 cent per question)',
@@ -380,7 +385,8 @@ const I18N = {
     'p.grok.key2': 'Add credit in <b>Billing</b>, then create an API key under <b>API Keys</b> and copy it.',
     'p.grok.fast': 'Fast and cheap: a good fit for questions in the game.',
     'p.grok.smart': 'xAI\'s smartest, a bit slower and about twice the cost.',
-    'p.gemini.desc': 'Google\'s AI. It usually has a free tier with limits.',
+    'p.gemini.name': 'Gemini with an API key',
+    'p.gemini.desc': 'Google\'s AI with an API key from Google AI Studio (usually has a free tier with limits). If you have a Google account or Google AI plan, choose “My Gemini subscription”.',
     'p.gemini.tag': 'Free use with limits',
     'p.gemini.key1': 'Go to <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> with your Google account.',
     'p.gemini.key2': 'Click <b>Create API key</b> and copy it.',
@@ -396,6 +402,8 @@ const I18N = {
     'p.ollama.local2': 'Download a model (for example <code>llama3.2</code>) from the Ollama app.',
     'cli.claudeCode.about': 'It\'s Anthropic\'s free, official program that connects your subscription. It installs with one click.',
     'cli.codex.about': 'It\'s OpenAI\'s free, official program that connects your ChatGPT plan. The app downloads and installs it for you (about 130 MB).',
+    'cli.antigravity.about': 'It\'s Google\'s free, official program that connects your Google account or Google AI plan. It installs with one click.',
+    'cli.antigravity.loginText': 'A window and your browser will open so you can sign in with your Google account (first time only).',
     'ai.codexDownloading': 'Downloading Codex from OpenAI… {n}%',
     'ai.codexExtracting': 'Installing Codex…',
     'ai.codexError': 'Could not install it: {error}. Try again or, if you already have Codex, find it with the button below.',
@@ -452,7 +460,7 @@ const I18N = {
 
     // AI
     'ai.title': 'Choose your AI',
-    'ai.lead': 'It\'s what answers your questions. If you have Claude Pro or Max, or ChatGPT Plus or Pro, use your subscription: you pay nothing extra.',
+    'ai.lead': 'It\'s what answers your questions. If you have Claude Pro or Max, ChatGPT Plus or Pro, or a Google AI plan, use your subscription: you pay nothing extra.',
     'ai.more': 'More options',
     'ai.setup': 'Set up: {name}',
     'ai.cliInstall': 'Install {app}',
@@ -716,6 +724,11 @@ const I18N = {
     'p.codex.name': 'Mi suscripción de ChatGPT',
     'p.codex.desc': 'Usa tu plan ChatGPT Plus o Pro a través de Codex, el programa oficial de OpenAI. No necesitas claves ni pagar nada extra.',
     'p.codex.tag': 'Requiere ChatGPT Plus o Pro',
+    'p.antigravity.name': 'Mi suscripción de Gemini',
+    'p.antigravity.desc': 'Usa tu cuenta de Google o tu plan Google AI Pro o Ultra a través de Antigravity CLI, el programa oficial de Google. No necesitas claves ni pagar nada extra.',
+    'p.antigravity.tag': 'Plan de Google gratis, Pro o Ultra',
+    'p.antigravity.hydrogen': 'Rápido y listo; requiere Google AI Pro o Ultra.',
+    'p.antigravity.flash': 'Incluido en todas las cuentas de Google (también gratis); más lento.',
     'p.claude.name': 'Claude con clave de API',
     'p.claude.desc': 'Para quien no tiene suscripción: pagas solo lo que usas en la web de Anthropic.',
     'p.claude.tag': 'Pagas por uso (≈ 1 centavo por pregunta)',
@@ -737,7 +750,8 @@ const I18N = {
     'p.grok.key2': 'Carga crédito en <b>Billing</b>, luego crea una clave en <b>API Keys</b> y cópiala.',
     'p.grok.fast': 'Rápido y barato: ideal para preguntas en el juego.',
     'p.grok.smart': 'El más inteligente de xAI, algo más lento y cuesta como el doble.',
-    'p.gemini.desc': 'La IA de Google. Suele tener un uso gratuito con límites.',
+    'p.gemini.name': 'Gemini con clave de API',
+    'p.gemini.desc': 'La IA de Google con clave de Google AI Studio (suele tener uso gratuito con límites). Si tienes una cuenta de Google o un plan de Google AI, elige «Mi suscripción de Gemini».',
     'p.gemini.tag': 'Uso gratis con límites',
     'p.gemini.key1': 'Entra a <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> con tu cuenta de Google.',
     'p.gemini.key2': 'Pulsa <b>Create API key</b> y cópiala.',
@@ -753,6 +767,8 @@ const I18N = {
     'p.ollama.local2': 'Descarga un modelo (por ejemplo <code>llama3.2</code>) desde la app de Ollama.',
     'cli.claudeCode.about': 'Es el programa oficial y gratuito de Anthropic que conecta tu suscripción. Se instala con un clic.',
     'cli.codex.about': 'Es el programa oficial y gratuito de OpenAI que conecta tu plan de ChatGPT. La app lo descarga e instala por ti (unos 130 MB).',
+    'cli.antigravity.about': 'Es el programa oficial y gratuito de Google que conecta tu cuenta de Google o tu plan de Google AI. Se instala con un clic.',
+    'cli.antigravity.loginText': 'Se abrirá una ventana y tu navegador para que entres con tu cuenta de Google (solo la primera vez).',
     'ai.codexDownloading': 'Descargando Codex de OpenAI… {n}%',
     'ai.codexExtracting': 'Instalando Codex…',
     'ai.codexError': 'No se pudo instalar: {error}. Vuelve a intentarlo o, si ya tienes Codex, búscalo con el botón de abajo.',
@@ -805,7 +821,7 @@ const I18N = {
     'addon.hint': 'Un clic y listo',
 
     'ai.title': 'Elige tu IA',
-    'ai.lead': 'Es quien responde tus preguntas. Si tienes Claude Pro o Max, o ChatGPT Plus o Pro, usa tu suscripción: no pagas nada extra.',
+    'ai.lead': 'Es quien responde tus preguntas. Si tienes Claude Pro o Max, ChatGPT Plus o Pro o un plan de Google AI, usa tu suscripción: no pagas nada extra.',
     'ai.more': 'Más opciones',
     'ai.setup': 'Configura: {name}',
     'ai.cliInstall': 'Instalar {app}',
@@ -1114,6 +1130,17 @@ function buildData() {
         ['gpt-6-astra', 'GPT-6 Astra', t('model.smartest')],
       ],
     },
+    antigravity: {
+      name: t('p.antigravity.name'),
+      desc: t('p.antigravity.desc'),
+      tags: [['good', t('tag.inPlan')], ['', t('p.antigravity.tag')]],
+      models: [
+        ['default', t('model.planDefault'), t('model.planDefault.descRec'), true],
+        ['gemini-4-hydrogen', 'Gemini 4 Hydrogen', t('p.antigravity.hydrogen')],
+        ['gemini-4-neon', 'Gemini 4 Neon', t('model.smartest')],
+        ['gemini-3.8-flash', 'Gemini 3.8 Flash', t('p.antigravity.flash')],
+      ],
+    },
     claude: {
       name: t('p.claude.name'),
       desc: t('p.claude.desc'),
@@ -1132,7 +1159,7 @@ function buildData() {
       key: [t('p.chatgpt.key1'), t('p.chatgpt.key2'), t('p.chatgpt.key3')],
     },
     gemini: {
-      name: 'Gemini',
+      name: t('p.gemini.name'),
       desc: t('p.gemini.desc'),
       tags: [['good', t('p.gemini.tag')], ['', t('tag.needsKey')]],
       key: [t('p.gemini.key1'), t('p.gemini.key2')],
@@ -1172,6 +1199,7 @@ function buildData() {
   CLI = {
     'claude-code': { api: 'claude', app: 'Claude Code', account: 'Claude', about: t('cli.claudeCode.about') },
     codex: { api: 'codex', app: 'Codex', account: 'ChatGPT', about: t('cli.codex.about') },
+    antigravity: { api: 'antigravity', app: 'Antigravity CLI', account: 'Google', about: t('cli.antigravity.about'), loginText: t('cli.antigravity.loginText') },
   };
 
   STEPS = ['welcome', 'game', 'addon', 'ai', 'voice', 'done'].map((id) => ({
@@ -1191,7 +1219,7 @@ function setLang(next) {
 }
 
 // Options that can search the internet.
-const SEARCHES = ['claude-code', 'claude', 'codex'];
+const SEARCHES = ['claude-code', 'claude', 'codex', 'antigravity'];
 
 const ICON = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="#06210f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -1396,7 +1424,10 @@ const VIEWS = {
         }
       }
       items.push([c.installed, t('ai.cliInstall', { app: m.app }), installText, actions]);
-      items.push([c.loggedIn, t('ai.cliLogin', { account: m.account }), c.loggedIn ? t('ai.cliLoggedIn') : t('ai.cliLoginText'),
+      const loginDesc = c.loggedIn ? t('ai.cliLoggedIn')
+        : c.error ? `<span style="color:var(--warn)">${esc(c.error)}</span>`
+          : (m.loginText || t('ai.cliLoginText'));
+      items.push([c.loggedIn, t('ai.cliLogin', { account: m.account }), loginDesc,
         c.installed && !c.loggedIn ? `<button class="btn primary small" data-act="cli-login">${t('ai.cliLoginBtn')}</button>` : '']);
       if (c.waiting && !(c.installed && c.loggedIn)) items.push([false, t('ai.cliWaiting'), t('ai.cliWaitingText'), '']);
     }
@@ -1921,19 +1952,23 @@ function endScreen(title, text) {
 // Data refresh
 // ---------------------------------------------------------------------------
 let stopped = false;
-async function checkCli(id) {
-  let next;
-  try {
-    next = await api(`${CLI[id].api}-status`);
-    if (cli[id]?.waiting && !(next.installed && next.loggedIn)) next.waiting = true;
-  } catch { next = { installed: false, loggedIn: false }; }
-  cli[id] = next;
-  // Codex not in the usual places: search the PC once, without being asked.
-  if (id === 'codex' && !next.installed && next.search?.status === 'idle' && !codexAutoSearched) {
-    codexAutoSearched = true;
-    api('codex-search').then(() => checkCli('codex')).catch(() => {});
-  }
-  if (mode === 'wizard' && step === 'ai') render();
+const cliInFlight = {};
+function checkCli(id) {
+  if (cliInFlight[id]) return cliInFlight[id];
+  return (cliInFlight[id] = (async () => {
+    let next;
+    try {
+      next = await api(`${CLI[id].api}-status`);
+      if (cli[id]?.waiting && !(next.installed && next.loggedIn)) next.waiting = true;
+    } catch { next = { installed: false, loggedIn: false }; }
+    cli[id] = next;
+    // Codex not in the usual places: search the PC once, without being asked.
+    if (id === 'codex' && !next.installed && next.search?.status === 'idle' && !codexAutoSearched) {
+      codexAutoSearched = true;
+      api('codex-search').then(() => checkCli('codex')).catch(() => {});
+    }
+    if (mode === 'wizard' && step === 'ai') render();
+  })().finally(() => { delete cliInFlight[id]; }));
 }
 let codexAutoSearched = false;
 setInterval(() => {
