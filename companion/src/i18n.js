@@ -1,4 +1,4 @@
-// English (default) and Spanish messages for everything the player reads:
+// English (default), Spanish and German messages for everything the player reads:
 // the app window's errors, the tray icon and errors shown in the game.
 //
 // Language: the player's system language (or FAIC_LANG / config "language").
@@ -7,11 +7,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { execFileSync } from 'node:child_process';
 
-export const LANGS = ['en', 'es'];
+export const LANGS = ['en', 'es', 'de'];
 
 export function normalizeLang(value) {
   const v = String(value || '').toLowerCase();
   if (v.startsWith('es')) return 'es';
+  if (v.startsWith('de')) return 'de';
   if (v.startsWith('en')) return 'en';
   return null;
 }
@@ -233,6 +234,95 @@ const MESSAGES = {
     trayKeep: 'Seguir en segundo plano',
     trayQuit: 'Cerrar la app',
   },
+  de: {
+    needGameFolder: 'Wähle zuerst den Spielordner.',
+    needAddon: 'Installiere zuerst das Addon.',
+    unknownOption: 'Unbekannte Option.',
+    unknownAI: 'Unbekannte KI-Option.',
+    notForeverFolder: 'In diesem Ordner ist kein WoW Forever. Wähle den Ordner "World of Warcraft" oder den Ordner "_forever_" darin.',
+    pasteKey: 'Füge deinen API-Schlüssel für diese Option ein.',
+    installClaudeFirst: 'Installiere zuerst Claude Code.',
+    installCodexFirst: 'Installiere zuerst Codex.',
+    installedOnly: 'Nur in der installierten Version verfügbar.',
+    typePath: 'Gib den Pfad in den Einstellungen ein.',
+    requestTooLarge: 'Anfrage zu groß.',
+    adminCancelled: 'Die Administratorberechtigung wurde abgebrochen.',
+    voiceRegisterFailed: 'Die Stimme konnte nicht registriert werden (Code {code}).',
+    noCsc: 'Der C#-Compiler von Windows (.NET Framework 4) wurde nicht gefunden.',
+    installFailed: 'Installation in {target} fehlgeschlagen: {error}',
+
+    claudeBadKey: 'Der Claude-Schlüssel ist ungültig. Prüf, ob du ihn vollständig kopiert hast (er beginnt mit sk-ant-).',
+    claudeNoPermission: 'Dein Claude-Konto darf dieses Modell nicht verwenden.',
+    apiRateLimit: 'Das Nutzungslimit der API ist erreicht. Warte kurz oder prüf dein Guthaben.',
+    apiNoCredit: 'Dein API-Konto hat kein Guthaben mehr. Lade auf der Billing-Seite neues auf.',
+    modelGone: 'Das Modell {model} ist nicht mehr verfügbar. Wähl in der App ein anderes Modell oder aktualisiere die App.',
+    apiBusy: 'Die KI ist gerade überlastet. Versuch es gleich noch mal.',
+    apiRejected: 'Die API hat die Anfrage abgelehnt: {error}',
+    anthropicError: 'Fehler der Anthropic-API ({status}): {error}',
+    refused: 'Die KI wollte diese Frage nicht beantworten.',
+    badKey: 'Der API-Schlüssel ist ungültig. Prüf, ob du ihn vollständig kopiert hast.',
+    noText: 'Die API hat keinen Text zurückgegeben.',
+    tooSlow: '{bin} hat zu lange für die Antwort gebraucht.',
+    cannotRun: '"{bin}" konnte nicht gestartet werden: {error}. Ist es installiert?',
+    exitCode: '{bin} wurde mit Code {code} beendet: {output}',
+    claudeMissing: `Claude Code ist nicht installiert. Klick im Fenster von ${APP} auf "Claude Code installieren".`,
+    claudeUnexpected: 'Unerwartete Antwort von Claude Code: {output}',
+    claudeSignedOut: `Claude Code ist nicht angemeldet. Klick im Fenster von ${APP} auf "Anmelden".`,
+    claudeError: 'Claude Code: {error}',
+    claudeStatusFailed: 'Claude Code konnte nicht geprüft werden.',
+    yourSubscription: 'dein Abo',
+    yourClaudeSubscription: 'dein Claude-Abo',
+    codexMissing: `Codex ist nicht installiert. Klick im Fenster von ${APP} auf "Codex installieren".`,
+    codexSignedOut: `Codex ist nicht angemeldet. Klick im Fenster von ${APP} auf "Anmelden".`,
+    codexLimit: `Du hast das Nutzungslimit deines ChatGPT-Plans erreicht. Warte eine Weile oder wähl im Fenster von ${APP} eine andere KI.`,
+    codexModel: `Dein ChatGPT-Plan enthält dieses Modell nicht. Wähl im Fenster von ${APP} "Standard deines Abos".`,
+    codexNoAnswer: 'Codex hat keine Antwort zurückgegeben.',
+    codexError: 'Codex: {error}',
+    probeRecording: 'Aufnahme läuft. Der Kanaltest startet jetzt und dauert etwa 25 Sekunden.',
+    codexUnsafe: 'Diese Codex-Version akzeptiert eine Sicherheitseinstellung nicht mehr, auf die sich die App verlässt ({feature}), deshalb wurde sie nicht verwendet. Aktualisiere Forever AI Companion oder wähl eine andere KI.',
+    codexStatusFailed: 'Codex konnte nicht geprüft werden.',
+    pickCodex: 'Such codex.exe (das Codex-Programm)',
+    codexPickInvalid: 'Diese Datei ist nicht Codex. Wähl codex.exe (oder codex.cmd, wenn du es mit npm installiert hast).',
+    emptyAnswer: '(leere Antwort)',
+    unreadable: 'Die Anfrage konnte nicht gelesen werden: Etwas hat die obere linke Ecke des Bildschirms verdeckt.',
+    unreadableScreen: 'Ich konnte die Frage auf dem Bildschirm nicht lesen: Etwas hat den oberen Rand des Spielfensters verdeckt.',
+    unreadableQuestion: '(unlesbare Frage)',
+    pickFolder: 'Wähl den Ordner von World of Warcraft (oder den Ordner _forever_ darin)',
+
+    echoIntro: 'Verbindungstest OK. Das ist keine KI: Die App hat deine Frage und diese Daten empfangen.',
+    echoQuestion: '- Frage: {q}',
+    echoCharacter: '- Charakter: {name}, {race} {cls}, Stufe {level}',
+    echoPosition: '- Position: {where}',
+    echoCounts: '- Angelegte Gegenstände: {gear} · Quests: {quests}',
+    echoPick: `Für echte Antworten wähl im Fenster von ${APP} eine KI.`,
+
+    testQuestion: 'Welchen Dungeon empfiehlst du mir gerade? Antworte in zwei Sätzen.',
+
+    // Console windows: no umlauts or ß (the console code page may not show them).
+    consoleDone: `Fertig. Du kannst dieses Fenster jetzt schliessen und zu ${APP} zurueckkehren.`,
+    consoleSignInClaude: 'Bei Claude anmelden',
+    consoleSignInChatGPT: 'Bei ChatGPT anmelden',
+    consoleInstallClaude: 'Claude Code installieren',
+    consoleInstallCodex: 'Codex installieren',
+
+    updateUnsupported: 'Updates gibt es nur in der installierten App.',
+    updateNoticeTitle: 'Forever AI Companion {version} ist verfügbar',
+    updateNoticeText: 'Klick hier, um mit einem Klick zu aktualisieren.',
+    voiceUpdateNoticeTitle: 'Unsichtbares Senden aktualisieren',
+    voiceUpdateNoticeText: 'Es funktioniert weiter, aber diese Version verschiebt es in einen geschützten Ordner. Klick hier und dann auf „Unsichtbares Senden aktualisieren“.',
+    startFailed: 'Forever AI Companion konnte nicht starten:',
+
+    trayRunning: `${APP}: läuft`,
+    trayOpen: `${APP} öffnen`,
+    trayClose: `${APP} schließen`,
+    trayStillRunning: `${APP} läuft weiter`,
+    trayClickHint: 'Klick auf dieses Symbol, um die App zu öffnen, oder mit rechts, um sie zu schließen.',
+    trayAskTitle: 'Im Hintergrund weiterlaufen lassen?',
+    trayAskText: 'Wenn die App im Hintergrund weiterläuft, kannst du weiter aus dem Spiel fragen. Du findest sie neben der Windows-Uhr: Klick auf ihr Symbol, um sie wieder zu öffnen.\n\nWenn du sie schließt, bekommt das Spiel keine Antworten, bis du sie wieder öffnest.',
+    trayRemember: 'Meine Auswahl merken',
+    trayKeep: 'Im Hintergrund weiterlaufen',
+    trayQuit: 'App schließen',
+  },
 };
 
 // macOS wording where Windows' doesn't fit (menu bar instead of the clock,
@@ -253,6 +343,14 @@ const MAC = {
     trayAskText: 'Si sigue en segundo plano, podrás seguir preguntando desde el juego. La encontrarás en la barra de menús, arriba en la pantalla: haz clic en su ícono para volver a abrirla.\n\nSi la cierras, el juego no recibirá respuestas hasta que la abras de nuevo.',
     trayClose: `Salir de ${APP}`,
     voiceUpdateNoticeText: 'Haz clic aquí y pulsa «Actualizar envío invisible».',
+  },
+  de: {
+    pickCodexMac: 'Such codex (das Codex-Programm)',
+    codexPickInvalidMac: 'Diese Datei ist nicht Codex. Wähl das Programm codex (zum Beispiel in /opt/homebrew/bin oder ~/.local/bin).',
+    trayClickHint: 'Klick auf ihr Symbol in der Menüleiste, um sie wieder zu öffnen.',
+    trayAskText: 'Wenn die App im Hintergrund weiterläuft, kannst du weiter aus dem Spiel fragen. Du findest sie in der Menüleiste oben am Bildschirm: Klick auf ihr Symbol, um sie wieder zu öffnen.\n\nWenn du sie schließt, bekommt das Spiel keine Antworten, bis du sie wieder öffnest.',
+    trayClose: `${APP} beenden`,
+    voiceUpdateNoticeText: 'Klick hier und dann auf „Unsichtbares Senden aktualisieren“.',
   },
 };
 const isMac = process.platform === 'darwin';
