@@ -5,10 +5,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
-import { macTerminal, shQuote, spawnArgs, visibleConsole } from './claude-code.js';
+import { execFile, spawn } from 'node:child_process';
+import { macTerminal, spawnArgs, visibleConsole } from './claude-code.js';
+import { openUrl as defaultOpenUrl } from './app/system.js';
 import { pathDirs, shellQuote } from './codex.js';
-import { t } from './i18n.js';
+import { err, t } from './i18n.js';
 
 const isWin = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
@@ -164,16 +165,6 @@ export async function antigravityAuthStatus(bin, timeout = 20000) {
   return parseAntigravityAuthStatus(res.code, res.stdout, res.stderr);
 }
 
-function isPidAlive(pid) {
-  if (!pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return e?.code === 'EPERM';
-  }
-}
-
 function killProcessTree(pid) {
   if (!isWin || !pid) return Promise.resolve();
   return new Promise((resolve) => {
@@ -182,14 +173,174 @@ function killProcessTree(pid) {
   });
 }
 
-let activeLogin = null;
-
-export function stopAntigravityLoginWatch() {
-  activeLogin?.stop();
+function killChild(child) {
+  if (!child || !child.pid || child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve();
+  }
+  if (isWin) return killProcessTree(child.pid);
+  return new Promise((resolve) => {
+    let done = false;
+    let killTimer = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (killTimer) clearTimeout(killTimer);
+      resolve();
+    };
+    child.once('close', finish);
+    try {
+      child.kill('SIGTERM');
+    } catch {
+      finish();
+      return;
+    }
+    killTimer = setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch { /* already exited */ }
+      finish();
+    }, 1500);
+    killTimer.unref?.();
+  });
 }
 
+export const ANTIGRAVITY_CODE_REDIRECT_URI = 'https://antigravity.google/oauth-callback';
+
+// Validates a Google OAuth URL emitted by `agy acp` (loopback or oauth-callback code flow).
+export function parseAntigravityAuthUrl(url, kind = 'code') {
+  if (typeof url !== 'string' || !url || url.length > 16384 || /\s/.test(url)) return null;
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  if (u.origin !== 'https://accounts.google.com') return null;
+  if (u.pathname !== '/o/oauth2/auth' && u.pathname !== '/o/oauth2/v2/auth') return null;
+  if (u.username !== '' || u.password !== '' || u.hash !== '') return null;
+  const responseTypes = u.searchParams.getAll('response_type');
+  if (responseTypes.length !== 1 || responseTypes[0] !== 'code') return null;
+  const states = u.searchParams.getAll('state');
+  const state = states.length === 1 ? states[0] : '';
+  if (!state || state.length > 512 || /\s/.test(state)) return null;
+  const redirects = u.searchParams.getAll('redirect_uri');
+  const redirectUri = redirects.length === 1 ? redirects[0] : '';
+  if (!redirectUri) return null;
+  if (kind === 'code') {
+    if (redirectUri !== ANTIGRAVITY_CODE_REDIRECT_URI) return null;
+  } else if (kind === 'loopback') {
+    const m = /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):([1-9][0-9]{0,4})\/(?:oauth-callback)?$/.exec(redirectUri);
+    const port = m ? Number(m[1]) : 0;
+    if (!m || port < 1024 || port > 65535) return null;
+  } else {
+    return null;
+  }
+  return { authUrl: url, redirectUri, state };
+}
+
+// Validates the user-pasted code or full `antigravity.google/oauth-callback` URL.
+export function parseAntigravityLoginCode(pending, input) {
+  const value = String(input ?? '').trim();
+  if (!value || value.length > 16384 || /\s|\0/.test(value)) return null;
+  if (/^[A-Za-z0-9._/~+=-]{1,2048}$/.test(value)) return value;
+  let u;
+  try { u = new URL(value); } catch { return null; }
+  if (!pending || `${u.origin}${u.pathname}` !== pending.redirectUri) return null;
+  if (u.username !== '' || u.password !== '') return null;
+  const states = u.searchParams.getAll('state');
+  const codes = u.searchParams.getAll('code');
+  if (states.length !== 1 || states[0] !== pending.state) return null;
+  if (codes.length !== 1 || !codes[0]) return null;
+  return value;
+}
+
+export function friendlyAntigravityLoginError(message) {
+  const m = String(message || '');
+  if (/unknown (?:sub)?command|flag provided but not defined|unknown flag|usage of agy/i.test(m)) {
+    return t('antigravityUpdateCli');
+  }
+  if (/SUBSCRIPTION_REQUIRED/i.test(m)) {
+    return t('antigravitySubscriptionRequired');
+  }
+  if (/access_denied|denied access|cancelled|canceled/i.test(m)) {
+    return t('antigravityLoginDenied');
+  }
+  if (/invalid_grant|malformed auth code|expired.*code|code.*expired|couldn't log in/i.test(m)) {
+    return t('antigravityCodeRejected');
+  }
+  if (/timed out|timeout/i.test(m)) {
+    return t('antigravityLoginTimeout');
+  }
+  return t('antigravityLoginFailed');
+}
+
+const IDLE_LOGIN_STATE = { phase: 'idle', mode: null, authUrl: null, error: null };
+let loginState = { ...IDLE_LOGIN_STATE };
+let activeLogin = null;
+let nextSessionId = 0;
+
+export function antigravityLoginState() {
+  return { ...loginState };
+}
+
+function createLoginSession(mode, onLoggedIn) {
+  const id = ++nextSessionId;
+  const session = {
+    id,
+    mode,
+    phase: 'starting',
+    child: null,
+    pending: null,
+    authUrl: null,
+    authTimer: null,
+    startupTimer: null,
+    cancelled: false,
+    onLoggedIn,
+    onCancel: null,
+    clearTimers() {
+      if (session.authTimer) { clearTimeout(session.authTimer); session.authTimer = null; }
+      if (session.startupTimer) { clearTimeout(session.startupTimer); session.startupTimer = null; }
+    },
+  };
+  activeLogin = session;
+  return session;
+}
+
+const isCurrentSession = (session) => !session.cancelled && activeLogin === session && session.id === nextSessionId;
+
+function spawnAntigravityChild(bin, args, cwd, env) {
+  const { file, shell } = spawnArgs(bin);
+  const finalArgs = shell ? shellQuote(args) : args;
+  return spawn(file, finalArgs, {
+    cwd: cwd || os.tmpdir(),
+    shell,
+    windowsHide: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env,
+  });
+}
+
+export function cancelAntigravityLogin() {
+  const session = activeLogin;
+  activeLogin = null;
+  nextSessionId++;
+  loginState = { ...IDLE_LOGIN_STATE };
+  if (!session) return Promise.resolve({ ...loginState });
+  session.cancelled = true;
+  session.clearTimers();
+  try { session.onCancel?.(); } catch { /* ignore */ }
+  try { session.child?.stdin?.end(); } catch { /* ignore */ }
+  return killChild(session.child).then(() => ({ ...loginState }));
+}
+
+export const stopAntigravityLogin = cancelAntigravityLogin;
+
 export function notifyAntigravityLoggedIn() {
-  activeLogin?.onLoggedIn();
+  const session = activeLogin;
+  if (session) {
+    session.cancelled = true;
+    session.clearTimers();
+    activeLogin = null;
+    nextSessionId++;
+    try { session.onCancel?.(); } catch { /* ignore */ }
+    try { session.child?.stdin?.end(); } catch { /* ignore */ }
+    killChild(session.child).catch(() => {});
+  }
+  loginState = { ...IDLE_LOGIN_STATE };
 }
 
 export function openAntigravityInstall() {
@@ -201,121 +352,427 @@ export function openAntigravityInstall() {
     `powershell -NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm https://antigravity.google/cli/install.ps1 | iex; Write-Host; Write-Host '${t('consoleDone')}'"`);
 }
 
-// Opens a visible terminal running `agy` for first-time OAuth sign-in, and
-// closes that terminal once sign-in succeeds (since `agy` otherwise stays in
-// its interactive TUI instead of exiting after browser login).
-export function openAntigravityLogin(bin, workDir, {
-  check = antigravityAuthStatus, pollMs = 2500, graceMs = 1500, maxWaitMs = 10 * 60000, windowsHide = false,
+function appendBounded(buf, chunk, max = 16384) {
+  const next = buf + chunk;
+  return next.length > max ? next.slice(-max) : next;
+}
+
+function extractAuthUrlFromText(text, preferKind) {
+  for (const rawLine of String(text || '').split(/\r?\n/)) {
+    const m = /https:\/\/accounts\.google\.com\/\S+/.exec(rawLine.trim());
+    if (!m) continue;
+    const candidate = m[0];
+    const parsed = preferKind === 'code'
+      ? parseAntigravityAuthUrl(candidate, 'code')
+      : (parseAntigravityAuthUrl(candidate, 'loopback') || parseAntigravityAuthUrl(candidate, 'code'));
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+async function startCodeFlow(bin, workDir, {
+  openUrl = defaultOpenUrl,
+  onLoggedIn = () => {},
+  authTimeoutMs = 300000,
+  startupTimeoutMs = 30000,
+  env = null,
 } = {}) {
-  if (isMac) {
-    const qBin = shQuote(bin);
-    const cd = workDir ? `cd ${shQuote(workDir)} && ` : '';
-    const script = [
-      'PARENT=$$',
-      `(i=0; while [ "$i" -lt 300 ] && kill -0 "$PARENT" 2>/dev/null; do sleep 2; i=$((i+1)); if AGY_CLI_DISABLE_AUTO_UPDATE=true ${qBin} --output-format json models >/dev/null 2>&1 || AGY_CLI_DISABLE_AUTO_UPDATE=true ${qBin} models >/dev/null 2>&1; then sleep 1.5; pkill -TERM -P "$PARENT" 2>/dev/null || true; break; fi; done) &`,
-      'WATCHER=$!',
-      `${cd}${qBin}`,
-      'kill "$WATCHER" 2>/dev/null || true',
-    ].join('\n');
-    macTerminal(t('consoleSignInAntigravity'), script);
-    return { ready: Promise.resolve(null), stop() {} };
+  const session = createLoginSession('code', onLoggedIn);
+  loginState = { phase: 'starting', mode: 'code', authUrl: null, error: null };
+
+  const childEnv = { ...(env || process.env), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
+  if (!isWin && !isMac) {
+    delete childEnv.DISPLAY;
+    delete childEnv.WAYLAND_DISPLAY;
   }
 
-  stopAntigravityLoginWatch();
-  const title = t('consoleSignInAntigravity').replace(/[&|<>^%"]/g, '').trim() || 'Sign in to Google (Antigravity)';
-  const cwd = workDir || os.tmpdir();
-  const style = windowsHide ? 'Hidden' : 'Normal';
-  const ps = `$p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/d /s /c "title %FAIC_AGY_TITLE% & call "%FAIC_AGY_BIN%" || (echo. & pause)"' -WorkingDirectory $env:FAIC_AGY_CWD -WindowStyle ${style} -PassThru; $p.Id`;
+  let child;
+  try {
+    child = spawnAntigravityChild(bin, ['acp', '--login'], workDir, childEnv);
+  } catch {
+    if (activeLogin === session) activeLogin = null;
+    loginState = { phase: 'failed', mode: 'code', authUrl: null, error: t('antigravityLoginStartFailed') };
+    return { ...loginState };
+  }
+  session.child = child;
+  child.stdin.on('error', () => {});
 
-  const state = {
-    pid: null,
-    stopped: false,
-    closing: false,
-    pendingClose: false,
-    timer: null,
-    stop() {
-      state.stopped = true;
-      if (state.timer) clearTimeout(state.timer);
-      state.timer = null;
-      if (activeLogin === state) activeLogin = null;
-    },
-    closeSoon() {
-      if (state.stopped || state.closing) return;
-      if (!state.pid) {
-        state.pendingClose = true;
-        return;
-      }
-      state.closing = true;
-      if (state.timer) clearTimeout(state.timer);
-      state.timer = setTimeout(async () => {
-        state.timer = null;
-        if (!state.stopped && isPidAlive(state.pid)) {
-          await killProcessTree(state.pid);
-        }
-        state.stop();
-      }, graceMs);
-      state.timer.unref?.();
-    },
-    onLoggedIn() {
-      state.closeSoon();
-    },
+  let output = '';
+  let stdoutTail = '';
+  let stderrTail = '';
+  let urlSettled = false;
+  let resolveUrl;
+  const urlPromise = new Promise((resolve) => { resolveUrl = resolve; });
+  const finishUrl = (res) => {
+    if (urlSettled) return;
+    urlSettled = true;
+    resolveUrl(res);
   };
-  activeLogin = state;
+  session.onCancel = () => finishUrl({ ok: false, cancelled: true });
 
-  const ready = new Promise((resolve) => {
-    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
-      env: { ...process.env, FAIC_AGY_BIN: bin, FAIC_AGY_CWD: cwd, FAIC_AGY_TITLE: title },
-      windowsHide: true,
-      timeout: 15000,
-      encoding: 'utf8',
-    }, (err, stdout) => {
-      const pid = !err ? Number(String(stdout || '').trim()) : 0;
-      if (!Number.isInteger(pid) || pid <= 0) {
-        state.stop();
-        if (!windowsHide) {
-          visibleConsole(t('consoleSignInAntigravity'), `cmd /k ""${bin}" && echo. && echo ${t('consoleDone')}"`, { cwd: workDir });
-        }
-        resolve(null);
-        return;
-      }
-      if (state.stopped) {
-        resolve(pid);
-        return;
-      }
-      state.pid = pid;
-      if (state.pendingClose) {
-        state.closeSoon();
-        resolve(pid);
-        return;
-      }
-      const deadline = Date.now() + maxWaitMs;
-      const schedule = () => {
-        if (state.stopped || state.closing) return;
-        state.timer = setTimeout(tick, pollMs);
-        state.timer.unref?.();
-      };
-      const tick = async () => {
-        state.timer = null;
-        if (state.stopped || state.closing) return;
-        if (!isPidAlive(pid) || Date.now() >= deadline) {
-          state.stop();
-          return;
-        }
-        try {
-          const s = await check(bin);
-          if (s?.loggedIn) {
-            state.closeSoon();
-            return;
-          }
-        } catch { /* retry next poll */ }
-        schedule();
-      };
-      schedule();
-      resolve(pid);
-    });
+  const handleChunk = (isOut, chunk) => {
+    const s = String(chunk);
+    output = appendBounded(output, s);
+    const combined = (isOut ? stdoutTail : stderrTail) + s;
+    const lines = combined.split(/\r?\n/);
+    const tail = lines.pop() ?? '';
+    if (isOut) stdoutTail = tail; else stderrTail = tail;
+    if (!urlSettled && lines.length) {
+      const parsed = extractAuthUrlFromText(lines.join('\n'), 'code');
+      if (parsed) finishUrl({ ok: true, parsed });
+    }
+  };
+  child.stdout.on('data', (d) => handleChunk(true, d));
+  child.stderr.on('data', (d) => handleChunk(false, d));
+
+  child.once('error', () => finishUrl({ ok: false, error: t('antigravityLoginStartFailed') }));
+  child.once('close', () => {
+    if (!urlSettled) {
+      const parsed = extractAuthUrlFromText(`${stdoutTail}\n${stderrTail}`, 'code');
+      if (parsed) finishUrl({ ok: true, parsed });
+      else finishUrl({ ok: false, error: friendlyAntigravityLoginError(output) });
+    }
+    if (isCurrentSession(session) && session.phase === 'code') {
+      session.clearTimers();
+      activeLogin = null;
+      loginState = { phase: 'failed', mode: 'code', authUrl: null, error: friendlyAntigravityLoginError(output) };
+    }
   });
 
-  return { ready, stop: () => state.stop() };
+  session.startupTimer = setTimeout(() => {
+    finishUrl({ ok: false, error: t('antigravityLoginTimeout') });
+  }, startupTimeoutMs);
+  session.startupTimer.unref?.();
+
+  const urlRes = await urlPromise;
+  session.clearTimers();
+  if (!isCurrentSession(session)) {
+    await killChild(child);
+    return { ...loginState };
+  }
+  if (!urlRes.ok) {
+    if (activeLogin === session) activeLogin = null;
+    await killChild(child);
+    loginState = { phase: 'failed', mode: 'code', authUrl: null, error: urlRes.error || t('antigravityLoginFailed') };
+    return { ...loginState };
+  }
+
+  session.pending = urlRes.parsed;
+  session.phase = 'code';
+  session.authUrl = urlRes.parsed.authUrl;
+  session.getOutput = () => output;
+  loginState = { phase: 'code', mode: 'code', authUrl: urlRes.parsed.authUrl, error: null };
+
+  try { openUrl(urlRes.parsed.authUrl); } catch { /* link also shown in UI */ }
+
+  session.authTimer = setTimeout(() => {
+    if (!isCurrentSession(session)) return;
+    session.cancelled = true;
+    session.clearTimers();
+    activeLogin = null;
+    loginState = { phase: 'failed', mode: 'code', authUrl: null, error: t('antigravityLoginTimeout') };
+    try { child.stdin.end(); } catch { /* ignore */ }
+    killChild(child).catch(() => {});
+  }, authTimeoutMs);
+  session.authTimer.unref?.();
+
+  return { ...loginState };
+}
+
+async function startAcpFlow(bin, workDir, opts = {}) {
+  const {
+    onLoggedIn = () => {},
+    authTimeoutMs = 300000,
+    startupTimeoutMs = 30000,
+    settleMs = 1200,
+    env = null,
+  } = opts;
+  const session = createLoginSession('acp', onLoggedIn);
+  loginState = { phase: 'starting', mode: 'acp', authUrl: null, error: null };
+
+  const childEnv = { ...(env || process.env), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
+  let child;
+  try {
+    child = spawnAntigravityChild(bin, ['acp', '--stdio'], workDir, childEnv);
+  } catch {
+    if (activeLogin === session) activeLogin = null;
+    loginState = { phase: 'failed', mode: 'acp', authUrl: null, error: t('antigravityLoginStartFailed') };
+    return { ...loginState };
+  }
+  session.child = child;
+  child.stdin.on('error', () => {});
+
+  let stderrBuf = '';
+  let stdoutNonJson = '';
+  let stdoutTail = '';
+  let stderrTail = '';
+  let initSettled = false;
+  let authSettled = false;
+  let resolveInit;
+  let resolveAuth;
+  const initPromise = new Promise((resolve) => { resolveInit = resolve; });
+  const authPromise = new Promise((resolve) => { resolveAuth = resolve; });
+  const finishInit = (res) => {
+    if (initSettled) return;
+    initSettled = true;
+    resolveInit(res);
+  };
+  const finishAuth = (res) => {
+    if (authSettled) return;
+    authSettled = true;
+    resolveAuth(res);
+  };
+  session.onCancel = () => {
+    finishInit({ ok: false, cancelled: true });
+    finishAuth({ status: 'cancelled' });
+  };
+
+  const maybeCaptureUrl = (line) => {
+    if (!/accounts\.google\.com/.test(line)) return;
+    const parsed = extractAuthUrlFromText(line, 'loopback');
+    if (parsed && isCurrentSession(session)) {
+      session.authUrl = parsed.authUrl;
+      if (loginState.phase === 'browser') {
+        loginState = { ...loginState, authUrl: parsed.authUrl };
+      }
+    }
+  };
+
+  const handleStdoutLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    maybeCaptureUrl(trimmed);
+    if (trimmed.startsWith('{')) {
+      try {
+        const msg = JSON.parse(trimmed);
+        if (msg.id === 1) finishInit({ ok: true, msg });
+        else if (msg.id === 2) finishAuth({ status: 'rpc', msg });
+        return;
+      } catch { /* non-JSON line */ }
+    }
+    stdoutNonJson = appendBounded(stdoutNonJson, `${trimmed}\n`, 4096);
+  };
+
+  child.stdout.on('data', (d) => {
+    const combined = stdoutTail + String(d);
+    const lines = combined.split(/\r?\n/);
+    stdoutTail = lines.pop() ?? '';
+    for (const line of lines) handleStdoutLine(line);
+  });
+  child.stderr.on('data', (d) => {
+    const s = String(d);
+    stderrBuf = appendBounded(stderrBuf, s, 8192);
+    const combined = stderrTail + s;
+    const lines = combined.split(/\r?\n/);
+    stderrTail = lines.pop() ?? '';
+    for (const line of lines) maybeCaptureUrl(line);
+  });
+
+  child.once('error', () => {
+    finishInit({ ok: false, error: t('antigravityLoginStartFailed') });
+    finishAuth({ status: 'error', error: t('antigravityLoginStartFailed') });
+  });
+  child.once('close', () => {
+    if (stdoutTail) handleStdoutLine(stdoutTail);
+    if (stderrTail) maybeCaptureUrl(stderrTail);
+    const errText = `${stderrBuf}\n${stdoutNonJson}`;
+    finishInit({ ok: false, error: friendlyAntigravityLoginError(errText) });
+    finishAuth({ status: 'closed', error: friendlyAntigravityLoginError(errText) });
+  });
+
+  session.startupTimer = setTimeout(() => {
+    finishInit({ ok: false, error: t('antigravityLoginTimeout') });
+  }, startupTimeoutMs);
+  session.startupTimer.unref?.();
+
+  try {
+    child.stdin.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: 1,
+        clientCapabilities: {},
+        clientInfo: { name: 'forever-ai-companion', version: '1.12.1' },
+      },
+    })}\n`);
+  } catch {
+    finishInit({ ok: false, error: t('antigravityLoginStartFailed') });
+  }
+
+  const initRes = await initPromise;
+  session.clearTimers();
+  if (!isCurrentSession(session)) {
+    await killChild(child);
+    return { ...loginState };
+  }
+  if (!initRes.ok) {
+    if (activeLogin === session) activeLogin = null;
+    await killChild(child);
+    loginState = { phase: 'failed', mode: 'acp', authUrl: null, error: initRes.error || t('antigravityLoginFailed') };
+    return { ...loginState };
+  }
+  if (initRes.msg?.error) {
+    if (activeLogin === session) activeLogin = null;
+    await killChild(child);
+    loginState = {
+      phase: 'failed',
+      mode: 'acp',
+      authUrl: null,
+      error: friendlyAntigravityLoginError(initRes.msg.error.message || ''),
+    };
+    return { ...loginState };
+  }
+
+  const methods = initRes.msg?.result?.authMethods;
+  if (Array.isArray(methods) && methods.length > 0 && !methods.some((m) => m?.id === 'oauth-personal')) {
+    if (activeLogin === session) activeLogin = null;
+    await killChild(child);
+    return startCodeFlow(bin, workDir, opts);
+  }
+
+  session.phase = 'browser';
+  loginState = { phase: 'browser', mode: 'acp', authUrl: session.authUrl, error: null };
+
+  session.authTimer = setTimeout(() => {
+    if (!isCurrentSession(session)) return;
+    session.cancelled = true;
+    session.clearTimers();
+    activeLogin = null;
+    loginState = { phase: 'failed', mode: 'acp', authUrl: null, error: t('antigravityLoginTimeout') };
+    try { child.stdin.end(); } catch { /* ignore */ }
+    killChild(child).catch(() => {});
+    finishAuth({ status: 'timeout' });
+  }, authTimeoutMs);
+  session.authTimer.unref?.();
+
+  let fallbackPromise = null;
+  const outcomePromise = authPromise.then(async (res) => {
+    if (!isCurrentSession(session)) return 'cancelled';
+    session.clearTimers();
+    if (activeLogin === session) activeLogin = null;
+    try { child.stdin.end(); } catch { /* ignore */ }
+    await killChild(child);
+    if (session.cancelled) return 'cancelled';
+
+    if (res.status === 'rpc' && !res.msg?.error) {
+      loginState = { phase: 'succeeded', mode: 'acp', authUrl: null, error: null };
+      try { await onLoggedIn(); } catch { /* status check handles */ }
+      return 'succeeded';
+    }
+    const errMsg = res.status === 'rpc' ? String(res.msg?.error?.message || '') : '';
+    const needsCodeFallback = res.status === 'rpc'
+      && /no browser is available|sign-in redirect can't reach|cannot open browser|failed to open browser|localhost|loopback|bind|address already in use|eaddrinuse/i.test(errMsg);
+    if (needsCodeFallback) {
+      fallbackPromise = startCodeFlow(bin, workDir, opts).catch((e) => {
+        loginState = { phase: 'failed', mode: 'code', authUrl: null, error: e?.message || t('antigravityLoginFailed') };
+        return { ...loginState };
+      });
+      return 'fallback-code';
+    }
+    const message = res.status === 'rpc' ? friendlyAntigravityLoginError(errMsg) : (res.error || t('antigravityLoginFailed'));
+    loginState = { phase: 'failed', mode: 'acp', authUrl: null, error: message };
+    return 'failed';
+  });
+
+  try {
+    child.stdin.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'authenticate',
+      params: { methodId: 'oauth-personal' },
+    })}\n`);
+  } catch {
+    finishAuth({ status: 'error', error: t('antigravityLoginStartFailed') });
+  }
+
+  let settleTimer = null;
+  const settled = await Promise.race([
+    outcomePromise,
+    new Promise((resolve) => {
+      settleTimer = setTimeout(() => resolve('pending'), settleMs);
+      settleTimer.unref?.();
+    }),
+  ]);
+  if (settleTimer) clearTimeout(settleTimer);
+
+  if (settled === 'fallback-code' && fallbackPromise) {
+    return fallbackPromise;
+  }
+  return { ...loginState };
+}
+
+// Signs in with Google Account without opening a terminal window.
+// Tier 1 (`auto`): `agy acp --stdio` -> `initialize` -> `authenticate(oauth-personal)`
+// (automatically handles browser launch & localhost OAuth callback).
+// Tier 2 (`code`, automatic fallback or user-requested): `agy acp --login` -> opens
+// the Google URL in the default browser and accepts the pasted code in-app.
+export async function startAntigravityLogin(bin, workDir, opts = {}) {
+  await cancelAntigravityLogin();
+  if (opts.mode === 'code') {
+    return startCodeFlow(bin, workDir, opts);
+  }
+  return startAcpFlow(bin, workDir, opts);
+}
+
+export async function submitAntigravityLoginCode(rawCode, { exchangeTimeoutMs = 30000 } = {}) {
+  const session = activeLogin;
+  if (!session || session.cancelled || session.mode !== 'code' || session.phase !== 'code' || !session.pending) {
+    throw err('antigravityNoActiveLogin');
+  }
+  const validated = parseAntigravityLoginCode(session.pending, rawCode);
+  if (!validated) {
+    throw err('antigravityInvalidCode');
+  }
+
+  session.phase = 'submitting';
+  session.clearTimers();
+  loginState = { phase: 'submitting', mode: 'code', authUrl: null, error: null };
+
+  const child = session.child;
+  const result = await new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+    const finish = (res) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(res);
+    };
+    timer = setTimeout(() => finish({ ok: false, timedOut: true }), exchangeTimeoutMs);
+    timer.unref?.();
+
+    if (!child || child.exitCode !== null || child.signalCode !== null) {
+      finish({ ok: child?.exitCode === 0, timedOut: false });
+      return;
+    }
+    child.once('close', (code) => finish({ ok: code === 0, timedOut: false }));
+    child.once('error', () => finish({ ok: false, timedOut: false }));
+    try {
+      child.stdin.end(`${validated}\n`);
+    } catch {
+      finish({ ok: false, timedOut: false });
+    }
+  });
+
+  if (session.cancelled) {
+    await killChild(child);
+    return { ok: false, login: { ...loginState } };
+  }
+
+  if (activeLogin === session) activeLogin = null;
+  const output = session.getOutput ? session.getOutput() : '';
+  await killChild(child);
+
+  if (result.ok) {
+    loginState = { phase: 'succeeded', mode: 'code', authUrl: null, error: null };
+    try { await session.onLoggedIn(); } catch { /* status check handles */ }
+    return { ok: true, login: { ...loginState } };
+  }
+
+  const message = result.timedOut ? t('antigravityLoginTimeout') : friendlyAntigravityLoginError(output);
+  loginState = { phase: 'failed', mode: 'code', authUrl: null, error: message };
+  throw new Error(message);
 }
 
 // --- Running headless chat turns --------------------------------------------

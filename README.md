@@ -120,7 +120,7 @@ Differences from Windows:
 | Invisible sending | Already on: the silent voice comes inside the app and needs **no permission**. You can turn it off in the setup or the dashboard |
 | On-screen line | Needs the **Screen Recording** permission (macOS asks once). WoW must not be minimized when you ask |
 | Open when you log in | The **Open when you log in to your Mac** switch (it shows up in *System Settings › General › Login Items*) |
-| Signing in to Claude Code / Codex / Antigravity | Happens in a **Terminal** window the app opens |
+| Signing in to Claude Code / Codex | Happens in a **Terminal** window the app opens |
 
 ### Updating
 

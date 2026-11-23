@@ -7,10 +7,12 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  ANTIGRAVITY_NOTE, antigravityArgs, antigravityAuthStatus, antigravityInput, antigravitySettings, antigravityUsage,
-  fallbackAntigravityEffort, findAntigravity, friendlyAntigravityError, openAntigravityLogin, parseAntigravityAuthStatus,
-  parseAntigravityEvents, parseAntigravityModels, prettyAntigravityModel, resolveAntigravityModel,
-  stopAntigravityLoginWatch,
+  ANTIGRAVITY_CODE_REDIRECT_URI, ANTIGRAVITY_NOTE, antigravityArgs, antigravityAuthStatus, antigravityInput,
+  antigravityLoginState, antigravitySettings, antigravityUsage, cancelAntigravityLogin, fallbackAntigravityEffort,
+  findAntigravity, friendlyAntigravityError, friendlyAntigravityLoginError, parseAntigravityAuthStatus,
+  parseAntigravityAuthUrl, parseAntigravityEvents, parseAntigravityLoginCode, parseAntigravityModels,
+  prettyAntigravityModel, resolveAntigravityModel, startAntigravityLogin, stopAntigravityLogin,
+  submitAntigravityLoginCode,
 } from '../src/antigravity.js';
 import { ROOT, applyPreset, env, loadConfig } from '../src/config.js';
 import { runInLang, t } from '../src/i18n.js';
@@ -469,13 +471,64 @@ test('app window I18N has every key in English and Spanish with matching placeho
   }
 });
 
-test('openAntigravityLogin closes the login terminal automatically once sign-in completes', { skip: !isWin }, async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-agy login '));
-  const script = path.join(dir, 'fake-login-agy.mjs');
-  fs.writeFileSync(script, `
+test('Antigravity OAuth URL, pasted code validation, and localized login errors', () => {
+  const codeUrl = `https://accounts.google.com/o/oauth2/auth?response_type=code&state=st-1&redirect_uri=${encodeURIComponent(ANTIGRAVITY_CODE_REDIRECT_URI)}`;
+  const parsedCode = parseAntigravityAuthUrl(codeUrl, 'code');
+  assert.deepEqual(parsedCode, { authUrl: codeUrl, redirectUri: ANTIGRAVITY_CODE_REDIRECT_URI, state: 'st-1' });
+  assert.equal(parseAntigravityAuthUrl(codeUrl, 'loopback'), null);
+
+  const loopUrl = 'https://accounts.google.com/o/oauth2/v2/auth?response_type=code&state=st-loop&redirect_uri=http%3A%2F%2F127.0.0.1%3A51234%2F';
+  assert.deepEqual(parseAntigravityAuthUrl(loopUrl, 'loopback'), {
+    authUrl: loopUrl,
+    redirectUri: 'http://127.0.0.1:51234/',
+    state: 'st-loop',
+  });
+  assert.deepEqual(
+    parseAntigravityAuthUrl('https://accounts.google.com/o/oauth2/auth?response_type=code&state=s&redirect_uri=http%3A%2F%2F%5B%3A%3A1%5D%3A45678%2Foauth-callback', 'loopback')?.state,
+    's',
+  );
+
+  // Reject malformed or untrusted auth URLs.
+  assert.equal(parseAntigravityAuthUrl('https://evil.example/o/oauth2/auth?response_type=code&state=s&redirect_uri=https%3A%2F%2Fantigravity.google%2Foauth-callback', 'code'), null);
+  assert.equal(parseAntigravityAuthUrl('https://accounts.google.com/o/oauth2/auth?response_type=token&state=s&redirect_uri=https%3A%2F%2Fantigravity.google%2Foauth-callback', 'code'), null);
+  assert.equal(parseAntigravityAuthUrl('https://accounts.google.com/o/oauth2/auth?response_type=code&state=s&state=s2&redirect_uri=https%3A%2F%2Fantigravity.google%2Foauth-callback', 'code'), null);
+  assert.equal(parseAntigravityAuthUrl('https://accounts.google.com/o/oauth2/auth?response_type=code&state=s&redirect_uri=http%3A%2F%2F127.0.0.1%3A80%2F', 'loopback'), null);
+  assert.equal(parseAntigravityAuthUrl(`${codeUrl} extra`, 'code'), null);
+  assert.equal(parseAntigravityAuthUrl(`${codeUrl}#frag`, 'code'), null);
+
+  // Pasted code or full callback URL validation.
+  assert.equal(parseAntigravityLoginCode(parsedCode, '  4/0AeanS0_xyz-123  \n'), '4/0AeanS0_xyz-123');
+  const fullCallback = `${ANTIGRAVITY_CODE_REDIRECT_URI}?state=st-1&code=4%2F0AeanS0_xyz`;
+  assert.equal(parseAntigravityLoginCode(parsedCode, fullCallback), fullCallback);
+  assert.equal(parseAntigravityLoginCode(parsedCode, ''), null);
+  assert.equal(parseAntigravityLoginCode(parsedCode, 'abc\ndef'), null);
+  assert.equal(parseAntigravityLoginCode(parsedCode, `${ANTIGRAVITY_CODE_REDIRECT_URI}?state=WRONG&code=abc`), null);
+  assert.equal(parseAntigravityLoginCode(parsedCode, `${ANTIGRAVITY_CODE_REDIRECT_URI}?state=st-1`), null);
+  assert.equal(parseAntigravityLoginCode(parsedCode, 'https://evil.example/oauth-callback?state=st-1&code=abc'), null);
+
+  assert.match(runInLang('en', () => friendlyAntigravityLoginError('Error: unknown command "acp"')), /too old/);
+  assert.match(runInLang('es', () => friendlyAntigravityLoginError('flag provided but not defined: -login')), /demasiado antigua/);
+  assert.match(runInLang('en', () => friendlyAntigravityLoginError('SUBSCRIPTION_REQUIRED')), /eligible Antigravity plan/);
+  assert.match(runInLang('es', () => friendlyAntigravityLoginError('access_denied')), /canceló/);
+  assert.match(runInLang('en', () => friendlyAntigravityLoginError('couldn\'t log in: oauth2: "invalid_grant"')), /not accepted/);
+  assert.match(runInLang('es', () => friendlyAntigravityLoginError('timed out')), /tardó demasiado/);
+});
+
+const FAKE_LOGIN_AGY = `
+import fs from 'node:fs';
 const args = process.argv.slice(2);
+const logFile = process.env.FAKE_LOGIN_LOG;
+const authFile = process.env.FAKE_LOGIN_AUTH_FILE;
+const record = (entry) => {
+  if (!logFile) return;
+  const prev = fs.existsSync(logFile) ? JSON.parse(fs.readFileSync(logFile, 'utf8')) : [];
+  prev.push(entry);
+  fs.writeFileSync(logFile, JSON.stringify(prev));
+};
+
 if (args.includes('models')) {
-  if (process.env.FAKE_AGY_SIGNED_OUT === '1') {
+  const authed = authFile ? fs.existsSync(authFile) : process.env.FAKE_AGY_SIGNED_OUT !== '1';
+  if (!authed) {
     console.error('Error: Please sign in to view available models.');
     process.exit(1);
   }
@@ -487,42 +540,297 @@ if (args.includes('models')) {
   }));
   process.exit(0);
 }
-setInterval(() => {}, 1000);
-`);
+
+if (args[0] === 'acp' && process.env.FAKE_LOGIN_OLD_CLI === '1') {
+  console.error('Error: unknown command "acp" for "agy"');
+  process.exit(1);
+}
+
+if (args[0] === 'acp' && args.includes('--stdio')) {
+  let buf = '';
+  process.stdin.on('data', (d) => {
+    buf += d;
+    const lines = buf.split(/\\r?\\n/);
+    buf = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const msg = JSON.parse(line);
+      if (msg.method === 'initialize') {
+        record({ cmd: 'acp-init', noUpdate: process.env.AGY_CLI_DISABLE_AUTO_UPDATE });
+        console.log(JSON.stringify({
+          jsonrpc: '2.0',
+          id: msg.id,
+          result: { protocolVersion: 1, authMethods: [{ id: 'oauth-personal', name: 'Log in with Google' }] },
+        }));
+      } else if (msg.method === 'authenticate') {
+        const mode = process.env.FAKE_ACP_MODE || 'delayed';
+        record({ cmd: 'acp-auth', methodId: msg.params?.methodId, mode, noUpdate: process.env.AGY_CLI_DISABLE_AUTO_UPDATE });
+        if (mode === 'immediate') {
+          if (authFile) fs.writeFileSync(authFile, 'ok');
+          console.log(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} }));
+        } else if (mode === 'delayed') {
+          console.log('Open the following link to authenticate the ACP server: https://accounts.google.com/o/oauth2/v2/auth?response_type=code&state=loop1&redirect_uri=http%3A%2F%2F127.0.0.1%3A54321%2F');
+          setTimeout(() => {
+            if (authFile) fs.writeFileSync(authFile, 'ok');
+            console.log(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} }));
+          }, Number(process.env.FAKE_ACP_DELAY_MS || 260));
+        } else if (mode === 'no-browser') {
+          console.log(JSON.stringify({
+            jsonrpc: '2.0',
+            id: msg.id,
+            error: { code: -32603, message: 'No browser is available here (this is a remote (SSH) session, so the browser\\'s sign-in redirect can\\'t reach this machine).' },
+          }));
+        } else if (mode === 'denied') {
+          console.log(JSON.stringify({
+            jsonrpc: '2.0',
+            id: msg.id,
+            error: { code: -32000, message: 'access_denied' },
+          }));
+        }
+      }
+    }
+  });
+  setInterval(() => {}, 1000);
+}
+
+if (args[0] === 'acp' && args.includes('--login')) {
+  record({ cmd: 'acp-login', pid: process.pid, noUpdate: process.env.AGY_CLI_DISABLE_AUTO_UPDATE });
+  console.log('Open this link in a browser to log in with Google:\\n');
+  console.log('  https://accounts.google.com/o/oauth2/auth?access_type=offline&client_id=test&prompt=consent&redirect_uri=https%3A%2F%2Fantigravity.google%2Foauth-callback&response_type=code&scope=openid&state=st-test-123\\n');
+  console.log('Then paste the authorization code, or the full URL of the page you land on, and press Enter:');
+  let buf = '';
+  process.stdin.on('data', (d) => {
+    buf += d;
+    const idx = buf.indexOf('\\n');
+    if (idx === -1) return;
+    const code = buf.slice(0, idx).trim();
+    record({ cmd: 'acp-login-code', code });
+    if (process.env.FAKE_LOGIN_EXCHANGE_FAIL === '1') {
+      console.log('\\ncouldn\\'t log in: token exchange failed: oauth2: "invalid_grant" "Malformed auth code."');
+      process.exit(1);
+    }
+    if (authFile) fs.writeFileSync(authFile, 'ok');
+    process.exit(0);
+  });
+  setInterval(() => {}, 1000);
+}
+`;
+
+test('startAntigravityLogin runs headless ACP OAuth and falls back to in-app code paste', { skip: !isWin }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-agy login '));
+  fs.writeFileSync(path.join(dir, 'fake-login-agy.mjs'), FAKE_LOGIN_AGY);
   const bin = path.join(dir, 'agy.cmd');
   fs.writeFileSync(bin, '@node "%~dp0fake-login-agy.mjs" %*\r\n');
-
-  let pid = null;
+  const logFile = path.join(dir, 'login-calls.json');
+  const authFile = path.join(dir, 'authed.flag');
+  process.env.FAKE_LOGIN_LOG = logFile;
+  process.env.FAKE_LOGIN_AUTH_FILE = authFile;
   t.after(async () => {
-    stopAntigravityLoginWatch();
-    if (pid) {
-      await new Promise((r) => execFile(
-        path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe'),
-        ['/PID', String(pid), '/T', '/F'],
-        { windowsHide: true, timeout: 10000 },
-        () => r(),
-      ));
+    await cancelAntigravityLogin();
+    for (const k of ['FAKE_LOGIN_LOG', 'FAKE_LOGIN_AUTH_FILE', 'FAKE_ACP_MODE', 'FAKE_LOGIN_OLD_CLI', 'FAKE_LOGIN_EXCHANGE_FAIL']) {
+      delete process.env[k];
     }
-    delete process.env.FAKE_AGY_SIGNED_OUT;
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  const isAlive = (p) => {
-    try { process.kill(p, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
+  // 1. Tier 1 delayed browser callback transitions browser -> succeeded and triggers onLoggedIn.
+  process.env.FAKE_ACP_MODE = 'delayed';
+  let loggedInCount = 0;
+  const opened = [];
+  const s1 = await startAntigravityLogin(bin, dir, {
+    settleMs: 120,
+    openUrl: (u) => opened.push(u),
+    onLoggedIn: () => { loggedInCount++; },
+  });
+  assert.equal(s1.phase, 'browser');
+  assert.equal(s1.mode, 'acp');
+  assert.equal(opened.length, 0, 'ACP mode lets agy open browser natively');
+
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && antigravityLoginState().phase !== 'succeeded') {
+    await new Promise((r) => setTimeout(r, 40));
+  }
+  assert.equal(antigravityLoginState().phase, 'succeeded');
+  assert.equal(loggedInCount, 1);
+  let calls = JSON.parse(fs.readFileSync(logFile, 'utf8'));
+  assert.equal(calls[0].cmd, 'acp-init');
+  assert.equal(calls[1].cmd, 'acp-auth');
+  assert.equal(calls[1].methodId, 'oauth-personal');
+  assert.equal(calls[1].noUpdate, 'true');
+
+  // 2. Immediate keyring auth succeeds before settleMs.
+  process.env.FAKE_ACP_MODE = 'immediate';
+  const s2 = await startAntigravityLogin(bin, dir, {
+    settleMs: 600,
+    openUrl: (u) => opened.push(u),
+    onLoggedIn: () => { loggedInCount++; },
+  });
+  assert.equal(s2.phase, 'succeeded');
+  assert.equal(loggedInCount, 2);
+
+  // 3. No browser / SSH fallback spawns `agy acp --login`, opens browser URL, validates paste, and succeeds.
+  process.env.FAKE_ACP_MODE = 'no-browser';
+  try { fs.unlinkSync(authFile); } catch {}
+  const s3 = await startAntigravityLogin(bin, dir, {
+    settleMs: 1000,
+    openUrl: (u) => opened.push(u),
+    onLoggedIn: () => { loggedInCount++; },
+  });
+  assert.equal(s3.phase, 'code');
+  assert.equal(s3.mode, 'code');
+  assert.match(s3.authUrl, /^https:\/\/accounts\.google\.com\/o\/oauth2\/auth\?/);
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0], s3.authUrl);
+
+  // Invalid pastes keep the login session alive so user can correct and retry.
+  await assert.rejects(runInLang('en', () => submitAntigravityLoginCode('')), /Paste the code/);
+  await assert.rejects(runInLang('es', () => submitAntigravityLoginCode('bad\ncode')), /Pega el código/);
+  await assert.rejects(
+    runInLang('en', () => submitAntigravityLoginCode(`${ANTIGRAVITY_CODE_REDIRECT_URI}?state=wrong&code=abc`)),
+    /Paste the code/,
+  );
+  assert.equal(antigravityLoginState().phase, 'code');
+
+  const submit1 = await submitAntigravityLoginCode('4/0AeanS0_good_code');
+  assert.equal(submit1.ok, true);
+  assert.equal(submit1.login.phase, 'succeeded');
+  assert.equal(loggedInCount, 3);
+  assert.equal(fs.existsSync(authFile), true);
+  calls = JSON.parse(fs.readFileSync(logFile, 'utf8'));
+  assert.equal(calls.at(-1).cmd, 'acp-login-code');
+  assert.equal(calls.at(-1).code, '4/0AeanS0_good_code');
+
+  // 4. Full callback URL also works in direct code mode; cancel kills process tree cleanly.
+  const s4 = await startAntigravityLogin(bin, dir, {
+    mode: 'code',
+    openUrl: (u) => opened.push(u),
+  });
+  assert.equal(s4.phase, 'code');
+  const cbUrl = `${ANTIGRAVITY_CODE_REDIRECT_URI}?state=st-test-123&code=4%2F0Afull`;
+  const submit2 = await submitAntigravityLoginCode(cbUrl);
+  assert.equal(submit2.ok, true);
+  assert.equal(JSON.parse(fs.readFileSync(logFile, 'utf8')).at(-1).code, cbUrl);
+
+  // 5. Rejected exchange code surfaces localized error and sets phase = failed.
+  process.env.FAKE_LOGIN_EXCHANGE_FAIL = '1';
+  await startAntigravityLogin(bin, dir, { mode: 'code', openUrl: () => {} });
+  await assert.rejects(runInLang('en', () => submitAntigravityLoginCode('4/0Abad')), /not accepted or has expired/);
+  assert.equal(antigravityLoginState().phase, 'failed');
+  delete process.env.FAKE_LOGIN_EXCHANGE_FAIL;
+
+  // 6. Cancel cleans up running code-login child and resets state to idle.
+  const s6 = await startAntigravityLogin(bin, dir, { mode: 'code', openUrl: () => {} });
+  assert.equal(s6.phase, 'code');
+  const loginPid = JSON.parse(fs.readFileSync(logFile, 'utf8')).filter((c) => c.cmd === 'acp-login').at(-1).pid;
+  await cancelAntigravityLogin();
+  assert.equal(antigravityLoginState().phase, 'idle');
+  let alive = true;
+  try { process.kill(loginPid, 0); } catch (e) { alive = e?.code === 'EPERM'; }
+  assert.equal(alive, false, 'cancelled login process terminated');
+
+  // 7. Denied consent and outdated CLI errors map cleanly.
+  process.env.FAKE_ACP_MODE = 'denied';
+  const sDenied = await runInLang('en', () => startAntigravityLogin(bin, dir, { settleMs: 1000 }));
+  assert.equal(sDenied.phase, 'failed');
+  assert.match(sDenied.error, /cancelled or not approved/);
+
+  process.env.FAKE_LOGIN_OLD_CLI = '1';
+  const sOld = await runInLang('en', () => startAntigravityLogin(bin, dir, { settleMs: 1000 }));
+  assert.equal(sOld.phase, 'failed');
+  assert.match(sOld.error, /too old/);
+});
+
+test('controller and server handle Antigravity auto-fallback and in-app code submission', { skip: !isWin }, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faic-agy-login-http-'));
+  const prevDataDir = env.dataDir;
+  env.dataDir = path.join(dir, 'data');
+  fs.mkdirSync(env.dataDir, { recursive: true });
+  const authFile = path.join(dir, 'authed.flag');
+  fs.writeFileSync(path.join(dir, 'fake-login-agy.mjs'), FAKE_LOGIN_AGY);
+  const bin = path.join(dir, 'agy.cmd');
+  fs.writeFileSync(bin, '@node "%~dp0fake-login-agy.mjs" %*\r\n');
+  process.env.FAKE_LOGIN_AUTH_FILE = authFile;
+  process.env.FAKE_ACP_MODE = 'no-browser';
+
+  const wowDir = path.join(dir, 'World of Warcraft', '_forever_');
+  fs.mkdirSync(path.join(wowDir, 'Interface', 'AddOns'), { recursive: true });
+  fs.mkdirSync(path.join(wowDir, 'WTF'), { recursive: true });
+  fs.writeFileSync(path.join(env.dataDir, 'config.json'), JSON.stringify({ wowDir, antigravity: { bin } }));
+
+  const openedUrls = [];
+  const controller = createController({ log: () => {}, openUrl: (u) => openedUrls.push(u) });
+  const server = createServer(controller, { log: () => {} });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(async () => {
+    stopAntigravityLogin();
+    controller.stop();
+    server.close();
+    env.dataDir = prevDataDir;
+    delete process.env.FAKE_LOGIN_AUTH_FILE;
+    delete process.env.FAKE_ACP_MODE;
+    delete process.env.FAKE_ACP_DELAY_MS;
+    await new Promise((r) => setTimeout(r, 100));
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const post = async (p, body = {}) => {
+    const res = await fetch(`${base}/api/${p}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forever-ai-companion': '1' },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, json: await res.json() };
   };
 
-  process.env.FAKE_AGY_SIGNED_OUT = '1';
-  const handle = openAntigravityLogin(bin, dir, { windowsHide: true, pollMs: 80, graceMs: 80, maxWaitMs: 10000 });
-  pid = await handle.ready;
-  assert.ok(pid > 0, 'spawned login terminal PID');
+  await post('install-addon');
+  await post('set-ai', { preset: 'antigravity', model: 'default', effort: 'low' });
 
-  await new Promise((r) => setTimeout(r, 250));
-  assert.equal(isAlive(pid), true, 'stays open while signed out');
+  const loginRes = await post('antigravity-login', { mode: 'auto' });
+  assert.equal(loginRes.status, 200);
+  assert.equal(loginRes.json.loggedIn, false);
+  assert.equal(loginRes.json.login.phase, 'code');
+  assert.equal(openedUrls.length, 1);
 
-  delete process.env.FAKE_AGY_SIGNED_OUT;
+  const stCode = await post('antigravity-status');
+  assert.equal(stCode.json.loggedIn, false);
+  assert.equal(stCode.json.login.phase, 'code');
+
+  const badSubmit = await post('antigravity-login-code', { code: 'bad\ncode' });
+  assert.equal(badSubmit.status, 400);
+
+  const goodSubmit = await post('antigravity-login-code', { code: '4/0Avalid-via-http' });
+  assert.equal(goodSubmit.status, 200);
+  assert.equal(goodSubmit.json.loggedIn, true);
+  assert.equal(goodSubmit.json.login.phase, 'idle');
+
+  const status = await fetch(`${base}/api/status`).then((r) => r.json());
+  assert.equal(status.ai.issue, null);
+
+  // Explicit code mode + cancel route.
+  const codeOnly = await post('antigravity-login', { mode: 'code' });
+  assert.equal(codeOnly.status, 200);
+  assert.equal(codeOnly.json.login.phase, 'code');
+  const cancelled = await post('antigravity-login-cancel');
+  assert.equal(cancelled.status, 200);
+  assert.equal(cancelled.json.login.phase, 'idle');
+
+  // Automatic ACP browser callback flow via HTTP (`delayed` success -> status updates automatically).
+  try { fs.unlinkSync(authFile); } catch {}
+  process.env.FAKE_ACP_MODE = 'delayed';
+  process.env.FAKE_ACP_DELAY_MS = '1500';
+  const acpLogin = await post('antigravity-login', { mode: 'auto' });
+  assert.equal(acpLogin.status, 200);
+  assert.equal(acpLogin.json.loggedIn, false);
+  assert.equal(acpLogin.json.login.phase, 'browser');
+
   const deadline = Date.now() + 5000;
-  while (Date.now() < deadline && isAlive(pid)) {
+  let finalStatus;
+  while (Date.now() < deadline) {
+    finalStatus = await post('antigravity-status');
+    if (finalStatus.json.loggedIn) break;
     await new Promise((r) => setTimeout(r, 50));
   }
-  assert.equal(isAlive(pid), false, 'login terminal closed automatically after sign-in');
+  assert.equal(finalStatus.json.loggedIn, true);
+  assert.equal(finalStatus.json.login.phase, 'idle');
 });

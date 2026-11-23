@@ -133,10 +133,10 @@ export function macTerminal(title, script) {
 
 // Opens a visible console window running `command` so the player sees progress
 // (the sign-in also opens the browser).
-export function visibleConsole(title, commandLine, { cwd } = {}) {
+export function visibleConsole(title, commandLine) {
   if (!isWin) throw new Error('Windows only.');
   const child = spawn('cmd.exe', [`/d /c start "${title}" ${commandLine}`], {
-    detached: true, stdio: 'ignore', windowsVerbatimArguments: true, ...(cwd ? { cwd } : {}),
+    detached: true, stdio: 'ignore', windowsVerbatimArguments: true,
   });
   child.on('error', () => {});
   child.unref();

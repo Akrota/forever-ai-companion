@@ -19,8 +19,8 @@ import {
   codexAuthStatus, codexInstallState, codexSearchState, codexVersion, findCodex, installCodex, openCodexLogin, searchCodex,
 } from '../codex.js';
 import {
-  antigravityAuthStatus, findAntigravity, notifyAntigravityLoggedIn, openAntigravityInstall, openAntigravityLogin,
-  stopAntigravityLoginWatch,
+  antigravityAuthStatus, antigravityLoginState, cancelAntigravityLogin, findAntigravity, notifyAntigravityLoggedIn,
+  openAntigravityInstall, startAntigravityLogin, stopAntigravityLogin, submitAntigravityLoginCode,
 } from '../antigravity.js';
 import { ttsEngineSource } from '../assets.js';
 import {
@@ -50,7 +50,7 @@ const LEGACY_ADDON_CHECK_MS = 10000;
 const LOGIN_CHECK_MS = 5 * 60 * 1000;
 
 // onUpdateAvailable(version): a newer release was found (tray notice).
-export function createController({ log = () => {}, onUpdateAvailable = () => {}, onQuit = () => process.exit(0) } = {}) {
+export function createController({ log = () => {}, onUpdateAvailable = () => {}, onQuit = () => process.exit(0), openUrl = sys.openUrl } = {}) {
   let cfg = loadConfig();
   setAppLang(cfg.language && cfg.language !== 'auto' ? cfg.language : null);
   let watcher = null;
@@ -532,10 +532,14 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
 
     async antigravityStatus() {
       const found = findAntigravity(cfg.antigravity.bin);
-      const out = found
-        ? { installed: true, source: found.source, ...(await antigravityAuthStatus(found.path)) }
-        : { installed: false, loggedIn: false };
+      const login = antigravityLoginState();
+      if (!found) return { installed: false, loggedIn: false, login };
+      if (login.phase === 'starting' || login.phase === 'submitting') {
+        return { installed: true, source: found.source, loggedIn: false, login };
+      }
+      const out = { installed: true, source: found.source, ...(await antigravityAuthStatus(found.path)) };
       if (out.loggedIn) notifyAntigravityLoggedIn();
+      out.login = antigravityLoginState();
       noteSignIn('antigravity', out);
       return out;
     },
@@ -545,11 +549,39 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
       return {};
     },
 
-    antigravityLogin() {
+    async antigravityLogin({ mode } = {}) {
       const found = findAntigravity(cfg.antigravity.bin);
       if (!found) throw err('installAntigravityFirst');
-      openAntigravityLogin(found.path, sandboxDir());
-      return {};
+      const login = await startAntigravityLogin(found.path, sandboxDir(), {
+        mode: mode === 'code' ? 'code' : 'auto',
+        openUrl,
+        onLoggedIn: () => checkLogin(),
+      });
+      if (login.phase === 'succeeded') {
+        const s = await antigravityAuthStatus(found.path);
+        if (s.loggedIn) {
+          notifyAntigravityLoggedIn();
+          noteSignIn('antigravity', { installed: true, ...s });
+          return { loggedIn: true, login: antigravityLoginState() };
+        }
+      }
+      return { loggedIn: false, login };
+    },
+
+    async antigravityLoginCode({ code } = {}) {
+      const found = findAntigravity(cfg.antigravity.bin);
+      if (!found) throw err('installAntigravityFirst');
+      await submitAntigravityLoginCode(code);
+      const s = await antigravityAuthStatus(found.path);
+      if (s.loggedIn) notifyAntigravityLoggedIn();
+      const out = { installed: true, source: found.source, ...s, login: antigravityLoginState() };
+      noteSignIn('antigravity', out);
+      return { loggedIn: Boolean(out.loggedIn), login: out.login };
+    },
+
+    async antigravityLoginCancel() {
+      await cancelAntigravityLogin();
+      return { login: antigravityLoginState() };
     },
 
     async setAutostart({ enabled }) {
@@ -564,7 +596,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
     },
 
     stop() {
-      stopAntigravityLoginWatch();
+      stopAntigravityLogin();
       beacon.stop();
       clearInterval(loginTimer);
       guideUpdates.stop();

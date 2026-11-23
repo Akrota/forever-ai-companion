@@ -230,8 +230,12 @@ export function openWindow(url) {
   else detached('rundll32.exe', ['url.dll,FileProtocolHandler', url]);
 }
 
-// macOS: opens a URL with the system (System Settings pages, websites).
+// Opens a URL with the system's default browser / handler (System Settings, OAuth...).
 export function openUrl(url) {
+  if (isWindows) {
+    detached('rundll32.exe', ['url.dll,FileProtocolHandler', url], { windowsHide: true });
+    return;
+  }
   detached(isMac ? '/usr/bin/open' : 'xdg-open', [url]);
 }
 
