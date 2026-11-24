@@ -1193,11 +1193,21 @@ test('a proactive tip goes out silently to its own chat, and a tip the app drops
       if ns.Uplink.grid and ns.Uplink.grid.shown then break end
       RUN_FRAMES(1)
     end
-    local tips = ns.Chats:Proactive()
+    local tips
+    local proactiveCount = 0
+    for _, c in ipairs(ns.db.chats) do
+      if c.proactive then
+        proactiveCount = proactiveCount + 1
+        if c.messages[1] then tips = c end
+      end
+    end
+    ns.Chats:NewProactive("We entered Westfall")
+    local afterSecond = 0
+    for _, c in ipairs(ns.db.chats) do if c.proactive then afterSecond = afterSecond + 1 end end
     local tip = tips.messages[1]
     RESULT = table.concat({
       settings, tostring(ns.UI:IsShown()), ns.db.currentChat == mine.id and "mine" or "other", #tips.messages, tips.title,
-      tostring(tip.proactive.kind), #mine.messages, DUMP(), tip.id,
+      tostring(tip.proactive.kind), #mine.messages, DUMP(), tip.id, proactiveCount, afterSecond,
     }, "#")
     -- The app turned it down: the tip disappears without an error or a card.
     ns.Core.working, ns.Uplink.busy = false, false
@@ -1205,12 +1215,14 @@ test('a proactive tip goes out silently to its own chat, and a tip the app drops
     TIPS_AFTER = #tips.messages
     RESULT = RESULT .. "#" .. TIPS_AFTER .. "#" .. tostring(tips.unread)
   `, {}, files, FAKE_UI + PRELUDE_DRIVE);
-  const [settings, shown, current, tipCount, title, kind, myCount, dump, , after, unread] = out.split('#');
+  const [settings, shown, current, tipCount, title, kind, myCount, dump, , proactiveCount, afterSecond, after, unread] = out.split('#');
   assert.equal(settings, 'truefalse');
   assert.notEqual(shown, 'true', 'the window stays closed');
   assert.equal(current, 'mine', 'the open chat is not changed');
   assert.equal(tipCount, '1');
-  assert.equal(title, 'Proactive tips');
+  assert.match(title, /^We've hit level 12/);
+  assert.equal(proactiveCount, '1');
+  assert.equal(afterSecond, '2', 'the next tip starts another chat');
   assert.equal(kind, 'level');
   assert.equal(myCount, '1', 'nothing lands in the player\'s chat');
   const { req } = decodeDump(dump);

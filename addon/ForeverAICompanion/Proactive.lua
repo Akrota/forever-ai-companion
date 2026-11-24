@@ -5,8 +5,8 @@
 -- The switches live in the game (Esc → Options → AddOns → Forever AI
 -- Companion) and are saved in ns.db.proactive. Nothing is sent while they
 -- say "off". The game detects the moment, builds a question and sends it
--- like any other one (Core:Ask with silent = true): the answer lands in the
--- "Proactive tips" chat and shows as a notification card.
+-- like any other one (Core:Ask with silent = true): each tip starts its own
+-- chat and shows as a notification card.
 --
 -- Safety rules, so a tip never gets in the way:
 --   * each moment is asked once per character (the `seen` keys below);

@@ -359,8 +359,8 @@ end
 -- again: a question already asked (its chat entry), sent once more through
 -- the strip with the same id (see VOICE_TIMEOUT).
 -- opts.silent: a proactive tip (see Proactive.lua): the window stays closed,
--- the question goes to the "Proactive tips" chat with no history, and nothing
--- is said in the window's status line.
+-- the question starts its own chat with no history, and nothing is said in
+-- the window's status line.
 function Core:Ask(question, extra, chatId, again, opts)
   local silent = opts and opts.silent
   -- Items (and spells, quests...) linked with shift-click go along with their
@@ -387,7 +387,7 @@ function Core:Ask(question, extra, chatId, again, opts)
   end
 
   -- The question belongs to the open chat (or to the given one, for resends).
-  local chatData = ns.Chats:Get(chatId) or (silent and ns.Chats:Proactive()) or ns.Chats:Current()
+  local chatData = ns.Chats:Get(chatId) or (silent and ns.Chats:NewProactive(question)) or ns.Chats:Current()
   local id = again and again.id or string.format("%d%04d", time(), math.random(0, 9999))
   local sig, resetSignals = ns.Live:RequestFields()
   local req = {
