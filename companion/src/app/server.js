@@ -49,6 +49,7 @@ export function createServer(controller, {
     knowledge: () => controller.openKnowledge(),
     'close-action': (body) => controller.setCloseAction(body),
     'web-search': (body) => controller.setWebSearch(body),
+    proactive: (body) => controller.setProactive(body),
     'window-closed': (body) => {
       const closedAt = Date.now();
       pages.delete(String(body?.page || ''));

@@ -29,9 +29,16 @@ function Core:HasPending()
   local now = time()
   local any = false
   local resend
+  local expired = {}
   ns.Chats:EachEntry(function(e, c)
     if e.status ~= "pending" then return end
     if now - (e.t or now) > PENDING_TIMEOUT then
+      -- A tip nobody answered is not worth an error in the chat: it is removed.
+      if e.proactive then
+        expired[#expired + 1] = e.id
+        if e.viaVoice then ns.Voice.broken = true end
+        return
+      end
       e.status = "error"
       e.answer = L.NO_ANSWER
       e.timedOut = true -- an answer that still arrives is shown (see ApplyInbox)
@@ -42,11 +49,13 @@ function Core:HasPending()
       return
     end
     any = true
-    if e.viaVoice and not e.resent and not resend and not self.working and now - (e.t or now) > VOICE_TIMEOUT then
+    if e.viaVoice and not e.proactive and not e.resent and not resend and not self.working and now - (e.t or now) > VOICE_TIMEOUT then
       e.resent = true
       resend = { entry = e, question = e.shown or e.question, chatId = c.id }
     end
   end)
+  for _, id in ipairs(expired) do ns.Chats:RemoveEntry(id) end
+  if #expired > 0 then ns.UI:Refresh() end
   if resend then
     C_Timer.After(0, function() Core:Ask(resend.question, nil, resend.chatId, resend.entry) end)
   end
@@ -349,7 +358,11 @@ end
 -- Returns the request id, or nil when nothing was sent.
 -- again: a question already asked (its chat entry), sent once more through
 -- the strip with the same id (see VOICE_TIMEOUT).
-function Core:Ask(question, extra, chatId, again)
+-- opts.silent: a proactive tip (see Proactive.lua): the window stays closed,
+-- the question goes to the "Proactive tips" chat with no history, and nothing
+-- is said in the window's status line.
+function Core:Ask(question, extra, chatId, again, opts)
+  local silent = opts and opts.silent
   -- Items (and spells, quests...) linked with shift-click go along with their
   -- full description; the question itself keeps just their "[Name]".
   local linked = ns.Collect:Links(question)
@@ -358,18 +371,23 @@ function Core:Ask(question, extra, chatId, again)
   if question == "" then return end
   -- Asking in combat is allowed: the window then warns the player to keep an
   -- eye on the game (see Combat.lua).
-  ns.UI:Show()
+  if not silent then ns.UI:Show() end
   if self.working or ns.Uplink.busy then
-    ns.UI:SetStatus(L.WAIT_PREVIOUS)
+    if not silent then ns.UI:SetStatus(L.WAIT_PREVIOUS) end
     return
+  end
+  local function status(msg)
+    if not silent then ns.UI:SetStatus(msg) end
   end
 
   -- Asking before choosing an assistant: keep the one of the character's faction.
-  if not ns.Personas:Chosen() then ns.Personas:Set(ns.Personas:Suggested().id) end
-  ns.UI.choosing = false
+  if not silent then
+    if not ns.Personas:Chosen() then ns.Personas:Set(ns.Personas:Suggested().id) end
+    ns.UI.choosing = false
+  end
 
   -- The question belongs to the open chat (or to the given one, for resends).
-  local chatData = ns.Chats:Get(chatId) or ns.Chats:Current()
+  local chatData = ns.Chats:Get(chatId) or (silent and ns.Chats:Proactive()) or ns.Chats:Current()
   local id = again and again.id or string.format("%d%04d", time(), math.random(0, 9999))
   local sig, resetSignals = ns.Live:RequestFields()
   local req = {
@@ -381,11 +399,11 @@ function Core:Ask(question, extra, chatId, again)
     charKey = (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?"),
     assistant = ns.Personas:Current().id,
     lang = L.code,                  -- the app writes its error messages in this language
-    history = self:RecentTurns(chatData, HISTORY_TURNS_SENT),
+    history = silent and {} or self:RecentTurns(chatData, HISTORY_TURNS_SENT),
   }
   for k, v in pairs(extra or {}) do req[k] = v end
 
-  local entry = again or { id = id, question = question, shown = shown, status = "pending", t = time() }
+  local entry = again or { id = id, question = question, shown = shown, status = "pending", t = time(), proactive = silent and req.proactive or nil }
   if not again then ns.Chats:AddMessage(chatData, entry) end
   req.chat = { id = chatData.id, title = chatData.title }
 
@@ -393,12 +411,14 @@ function Core:Ask(question, extra, chatId, again)
     Core.working = false
     entry.status = "error"
     entry.answer = msg
-    ns.UI:SetStatus("")
+    status("")
+    -- A tip that could not be prepared is dropped, not shown as an error.
+    if entry.proactive then ns.Chats:RemoveEntry(entry.id) end
     ns.UI:Refresh()
   end
 
   ns.UI:Refresh()
-  ns.UI:SetStatus(L.PREPARING)
+  status(L.PREPARING)
   self.working = true
 
   -- The preparation runs a few milliseconds per frame (see Core.step).
@@ -438,14 +458,14 @@ function Core:Ask(question, extra, chatId, again)
     if err == "voice" then
       entry.viaVoice = true
       Core.working = false
-      ns.UI:SetStatus(string.format(L.SENT_TO, ns.Personas:Current().name))
+      status(string.format(L.SENT_TO, ns.Personas:Current().name))
       ns.Live:OnSent()
       return
     end
-    ns.UI:SetStatus(string.format(L.SENDING, ns.Uplink.last.bytes / 1024))
+    status(string.format(L.SENDING, ns.Uplink.last.bytes / 1024))
     ns.Uplink:Reveal(function()
       Core.working = false
-      ns.UI:SetStatus(string.format(L.SENT_TO, ns.Personas:Current().name))
+      status(string.format(L.SENT_TO, ns.Personas:Current().name))
       ns.Live:OnSent()
     end)
   end)
@@ -458,6 +478,7 @@ function Core:ApplyInbox(inbox)
   local arrived = 0
   local toNotify = {}
   local answered = {}
+  local dropped = {}
   local data = self:CharData()
   for _, a in ipairs(inbox.answers) do
     local entry, owner
@@ -473,13 +494,18 @@ function Core:ApplyInbox(inbox)
       if type(a.tokens) == "table" then
         entry.tokens = { i = tonumber(a.tokens.i) or 0, c = tonumber(a.tokens.c) or 0, o = tonumber(a.tokens.o) or 0 }
       end
-      arrived = arrived + 1
       answered[#answered + 1] = { id = a.id, ok = a.ok and true or false }
-      -- Chats with news the player is not looking at: mark and notify.
-      owner.updated = time()
-      if owner.id ~= ns.db.currentChat or not ns.UI:IsShown() then
-        owner.unread = true
-        toNotify[#toNotify + 1] = { entry = entry, chat = owner }
+      if entry.proactive and (a.skipped or not a.ok) then
+        -- The app turned the tip down or the AI failed: nothing to show.
+        dropped[#dropped + 1] = entry.id
+      else
+        arrived = arrived + 1
+        -- Chats with news the player is not looking at: mark and notify.
+        owner.updated = time()
+        if owner.id ~= ns.db.currentChat or not ns.UI:IsShown() then
+          owner.unread = true
+          toNotify[#toNotify + 1] = { entry = entry, chat = owner }
+        end
       end
       -- The companion has now cached these sections: next time, skip them.
       data.acked = data.acked or {}
@@ -487,6 +513,8 @@ function Core:ApplyInbox(inbox)
       entry.sent = nil
     end
   end
+  for _, id in ipairs(dropped) do ns.Chats:RemoveEntry(id) end
+  if #dropped > 0 then ns.UI:Refresh() end
   -- The companion lost its cache: send everything next time.
   if inbox.resync and tonumber(inbox.resync) and tonumber(inbox.resync) > (data.resyncSeen or 0) then
     data.resyncSeen = tonumber(inbox.resync)
@@ -570,10 +598,12 @@ events:SetScript("OnEvent", function(_, event, arg1)
     ForeverAICompanion_DB = ForeverAICompanion_DB or {}
     ns.db = ForeverAICompanion_DB
     ns.Chats:Init()
+    if ns.Proactive then ns.Proactive:EnsureSettings() end
   elseif event == "PLAYER_LOGIN" then
     ns.Uplink:Init()
     ns.Live:Init()
     if ns.Button then pcall(ns.Button.Init, ns.Button) end
+    if ns.Proactive then pcall(ns.Proactive.Init, ns.Proactive) end
     -- Build the strip's textures in the background once the login rush is over.
     C_Timer.After(5, function() pcall(ns.Uplink.Warmup, ns.Uplink) end)
   elseif not ns.db then
@@ -606,6 +636,7 @@ local COMMANDS = {
   button = "button", boton = "button", ["botón"] = "button",
   sound = "sound", sonido = "sound",
   assistant = "assistant", asistente = "assistant",
+  proactive = "proactive", proactivo = "proactive",
   help = "help", ayuda = "help",
 }
 Core.COMMANDS = COMMANDS
@@ -646,6 +677,8 @@ SlashCmdList.FOREVERAICOMPANION = function(msg)
   elseif cmd == "assistant" and (rest == "fizzi" or rest == "rizzik") then
     ns.Personas:Set(rest)
     chat(string.format(L.NOW_YOUR_ASSISTANT, ns.Personas:Current().name))
+  elseif cmd == "proactive" and (rest == "" or rest == "on" or rest == "off") then
+    chat(ns.Proactive:Command(rest))
   elseif cmd == "help" and rest == "" then
     chat(L.HELP)
   else

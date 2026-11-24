@@ -77,7 +77,7 @@ end
 -- Opens a new empty chat (reuses the current one if it is still empty).
 function Chats:New()
   local current = self:Get(ns.db.currentChat)
-  if current and #current.messages == 0 then return current end
+  if current and #current.messages == 0 and not current.proactive then return current end
   local chat = { id = newId(), title = self.DEFAULT_TITLE, created = time(), updated = time(), messages = {} }
   table.insert(ns.db.chats, chat)
   ns.db.currentChat = chat.id
@@ -92,6 +92,32 @@ function Chats:New()
     self:Delete(victim.id)
   end
   return chat
+end
+
+-- The chat where proactive tips land (created when the first one is sent). It
+-- never becomes the open chat by itself, so the player's own chat is left alone.
+function Chats:Proactive()
+  for _, chat in ipairs(ns.db.chats) do
+    if chat.proactive then return chat end
+  end
+  local chat = {
+    id = newId(), title = L.PROACTIVE_CHAT, created = time(), updated = time(),
+    messages = {}, proactive = true, renamed = true,
+  }
+  table.insert(ns.db.chats, chat)
+  return chat
+end
+
+-- Removes a message by request id (a tip that failed or was dropped).
+function Chats:RemoveEntry(id)
+  for _, chat in ipairs(ns.db.chats) do
+    for i, m in ipairs(chat.messages) do
+      if m.id == id then
+        table.remove(chat.messages, i)
+        return true
+      end
+    end
+  end
 end
 
 function Chats:Select(id)

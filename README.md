@@ -150,6 +150,7 @@ Coming from version 1.5.0 or earlier, the app and the addon move to new folder n
 - **Professions**: open each profession window once and the addon remembers your recipes, so you can ask *"What can I craft with what I have?"* or *"Which recipe should I make to level up?"*.
 - **Is the app ready?** The line under the chat title tells you. Green: the app is open and ready. Red: questions won't be answered yet, and it says why (the app is closed or not responding, no AI is chosen, or your AI needs you to sign in). Hover it for what to do.
 - **Tokens used**: next to each answer's time you see how many tokens it used (*"18.2k tokens"*), and under the text box, below **Send**, the whole chat's total. Hover them for the detail: tokens read (your data, the guide and what it looked up; the part from the cache counts much less) and written. It's what your plan or API key is measured in. The dashboard's recent questions show it too.
+- **Proactive tips** (off by default): in the game, open **Options → AddOns → Forever AI Companion** and turn on **Let the assistant speak up on its own**. Your assistant then sends a short tip, without you asking, when you reach a new level (every 2nd by default), enter a new zone that suits your level, enter a dungeon for the first time, reach a profession milestone (75, 150, 225, 300) or have unspent talent points. Each moment has its own switch. Tips go to a chat called *Proactive tips* with a notification card, never in the middle of a fight, never repeated for the same character, with a few minutes between them (3 by default), and only while the app is open. They use your AI like any question. In the game, `/ia proactive` shows what is on and `/ia proactive off` silences it on that PC.
 - **See what is sent**: in the window click **See the data I send**.
 - **In combat** you can still ask, but keep your eyes on the game: while you're in combat a red bar in the window reminds you, and the window's edge flashes red each time you get hit.
 
@@ -165,6 +166,7 @@ Every command also works with its Spanish word (shown in parentheses).
 | `/ia assistant` (`asistente`) | Choose between Fizzi and Rizzik (`/ia assistant fizzi` or `/ia assistant rizzik`) |
 | `/ia button` (`boton`) | Shows or hides the minimap button (`/ia button reset` puts it back in place) |
 | `/ia sound` (`sonido`) | Turns the answer notification sound on or off |
+| `/ia proactive` (`proactivo`) | Shows the proactive tips; `/ia proactive off` or `on` silences or allows them on this PC |
 | `/ia data` (`datos`) | Shows the data that is sent |
 | `/ia status` (`estado`) · `/ia inbox` (`buzon`) | Diagnostics: connection status and check for pending answers |
 | `/ia help` (`ayuda`) | List of commands |
@@ -374,6 +376,9 @@ Check the steps in *Your AI*: the program must be installed and signed in, or th
 **Does the app need to stay open?**
 Yes, while you play. When you close its window it can keep running next to the Windows clock (click the icon to open it again; right-click to close it). With **Open when Windows starts** you don't have to remember.
 
+**My assistant speaks up on its own and I don't want it to.**
+In the game, open **Options → AddOns → Forever AI Companion** and turn off **Let the assistant speak up on its own** (or just the moments you don't want). To silence it right away, type `/ia proactive off`.
+
 **Does it work on Mac?**
 Yes, from version 1.11.0: macOS 13 Ventura or later, Apple silicon or Intel. See [On a Mac](#on-a-mac).
 
@@ -405,6 +410,8 @@ addon/ForeverAICompanion/   Addon (Lua 5.1, modern client, interface 16001)
   Live.lua                  App → game: inboxes and bell
   UI.lua Button.lua         Chat window (and the combat warning) and minimap button
   Chats.lua Notify.lua      Conversations and notifications
+  Proactive.lua ZoneLevels.lua
+                            Proactive tips: moments, queue and safety rules; zone levels
   Personas.lua              Fizzi and Rizzik
   Core.lua                  Events and /ia commands
 companion/

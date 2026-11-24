@@ -1171,3 +1171,53 @@ test('a new chat suggests questions about the game window that is open (vendor, 
   assert.equal(asked, first, 'clicking asks it');
   assert.equal(welcomeShown, 'false');
 });
+test('a proactive tip goes out silently to its own chat, and a tip the app drops leaves no trace', () => {
+  const files = [...ALL_FILES.slice(0, -1), 'ZoneLevels.lua', 'Proactive.lua', 'Core.lua'];
+  const out = runLua(`
+    START()
+    ns.Personas:Set("fizzi")
+    local mine = ns.Chats:New()
+    mine.messages[1] = { id = "m1", question = "my own question", answer = "an answer", status = "done", t = time() }
+    ns.Chats:Select(mine.id)
+    -- The player turned tips on in Options → AddOns. An answer must not overwrite that.
+    ns.Proactive:SetSettings({ enabled = true, level = true, zone = false })
+    ns.Core:ApplyInbox({ answers = {}, proactive = { enabled = false, zone = true } })
+    local settings = tostring(ns.db.proactive.enabled) .. tostring(ns.db.proactive.zone)
+    -- A level-up: queued, then sent once the app is seen ready.
+    ns.Live.CheckApp = function() end
+    ns.Live.AppState = function() return "ready" end
+    ns.Proactive.readyAt = 0
+    FIRE("PLAYER_LEVEL_UP", 12)
+    for i = 1, 4 do NOW = NOW + 2; ns.Proactive:Tick() end
+    for i = 1, 2000 do
+      if ns.Uplink.grid and ns.Uplink.grid.shown then break end
+      RUN_FRAMES(1)
+    end
+    local tips = ns.Chats:Proactive()
+    local tip = tips.messages[1]
+    RESULT = table.concat({
+      settings, tostring(ns.UI:IsShown()), ns.db.currentChat == mine.id and "mine" or "other", #tips.messages, tips.title,
+      tostring(tip.proactive.kind), #mine.messages, DUMP(), tip.id,
+    }, "#")
+    -- The app turned it down: the tip disappears without an error or a card.
+    ns.Core.working, ns.Uplink.busy = false, false
+    ns.Core:ApplyInbox({ answers = { { id = tip.id, ok = false, answer = "", skipped = true } } })
+    TIPS_AFTER = #tips.messages
+    RESULT = RESULT .. "#" .. TIPS_AFTER .. "#" .. tostring(tips.unread)
+  `, {}, files, FAKE_UI + PRELUDE_DRIVE);
+  const [settings, shown, current, tipCount, title, kind, myCount, dump, , after, unread] = out.split('#');
+  assert.equal(settings, 'truefalse');
+  assert.notEqual(shown, 'true', 'the window stays closed');
+  assert.equal(current, 'mine', 'the open chat is not changed');
+  assert.equal(tipCount, '1');
+  assert.equal(title, 'Proactive tips');
+  assert.equal(kind, 'level');
+  assert.equal(myCount, '1', 'nothing lands in the player\'s chat');
+  const { req } = decodeDump(dump);
+  assert.equal(req.proactive.kind, 'level');
+  assert.equal(req.proactive.key, 'level:12');
+  assert.deepEqual(req.history, [], 'the player\'s chats are not sent');
+  assert.match(req.question, /level 12/);
+  assert.equal(after, '0');
+  assert.equal(unread, 'nil');
+});
