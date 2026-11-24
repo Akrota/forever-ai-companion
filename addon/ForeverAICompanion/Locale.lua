@@ -566,7 +566,7 @@ local DE = {
     beastTraining = { title = "Du hast die Wildtierausbildung offen: Ich sehe, was dein Tier lernen kann.",
       "Was sollte ich meinem Tier jetzt beibringen?",
       "Wie verteile ich die Ausbildungspunkte meines Tiers?",
-      "Welche Fähigkeiten sollten auf Autozauber stehen?" },
+      "Welche Fähigkeiten sollte mein Tier automatisch wirken?" },
     questOffer = { title = "Dir wird eine Quest angeboten: Ich sehe sie. Frag mich dazu.",
       "Lohnt sich diese Quest?",
       "Wo und wie erledige ich diese Quest?",
