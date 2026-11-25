@@ -79,6 +79,20 @@ export const DEFAULTS = {
   // Let the AI search the web when it needs to (Claude, Codex, Antigravity).
   webSearch: true,
 
+  // Proactive mode: the assistant speaks up on its own at key moments with a
+  // short tip. `enabled` is the master switch (off by default); the others
+  // are the moments (see proactiveSettings and addon/.../Proactive.lua).
+  proactive: {
+    enabled: false,
+    level: true,
+    zone: true,
+    dungeon: true,
+    profession: true,
+    talents: true,
+    cooldownMin: 3, // minutes between two tips
+    levelEvery: 2,  // a tip every N levels
+  },
+
   // Where the up-to-date WoW Forever guide is published (see src/guide.js).
   // The app downloads it every few hours; null = only the guide inside the app.
   guideUrl: GUIDE_URL,
@@ -94,6 +108,28 @@ export const DEFAULTS = {
   // voice ships inside the app and is on by default; see mac-voice.js).
   macVoice: true,
 };
+
+export const PROACTIVE_KINDS = ['level', 'zone', 'dungeon', 'profession', 'talents'];
+export const PROACTIVE_LEVEL_STEPS = [1, 2, 5, 10];
+
+// The proactive settings, checked: switches are booleans, anything else falls
+// back to the defaults (the file may have been edited by hand).
+export function proactiveSettings(cfg) {
+  const d = DEFAULTS.proactive;
+  const p = cfg?.proactive && typeof cfg.proactive === 'object' ? cfg.proactive : {};
+  const out = { enabled: p.enabled === true };
+  for (const k of PROACTIVE_KINDS) out[k] = typeof p[k] === 'boolean' ? p[k] : d[k];
+  const minutes = Number(p.cooldownMin);
+  out.cooldownMin = Number.isFinite(minutes) ? Math.min(60, Math.max(0, Math.round(minutes))) : d.cooldownMin;
+  out.levelEvery = PROACTIVE_LEVEL_STEPS.includes(Number(p.levelEvery)) ? Number(p.levelEvery) : d.levelEvery;
+  return out;
+}
+
+// Whether a request from the game (req.proactive = { kind, key }) may be answered.
+export function proactiveAllowed(cfg, kind) {
+  const p = proactiveSettings(cfg);
+  return p.enabled && PROACTIVE_KINDS.includes(kind) && p[kind];
+}
 
 function merge(base, over) {
   if (!over || typeof over !== 'object' || Array.isArray(over)) return over ?? base;

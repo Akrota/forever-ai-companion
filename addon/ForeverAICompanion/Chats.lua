@@ -74,24 +74,70 @@ local function hasPending(chat)
   return false
 end
 
+-- Drops the oldest chat that is safe to lose: a past proactive tip first, then
+-- any other chat that is not waiting for an answer. `keepId` is never dropped.
+function Chats:DropOldest(keepId)
+  local victim
+  for _, chat in ipairs(ns.db.chats) do
+    if chat.id ~= keepId and chat.id ~= ns.db.currentChat and chat.proactive and not hasPending(chat) then
+      victim = chat
+      break
+    end
+  end
+  if not victim then
+    local all = self:All()
+    for i = #all, 1, -1 do
+      if all[i].id ~= keepId and not hasPending(all[i]) then victim = all[i] break end
+    end
+  end
+  if not victim then return false end
+  self:Delete(victim.id)
+  return true
+end
+
 -- Opens a new empty chat (reuses the current one if it is still empty).
 function Chats:New()
   local current = self:Get(ns.db.currentChat)
-  if current and #current.messages == 0 then return current end
+  if current and #current.messages == 0 and not current.proactive then return current end
   local chat = { id = newId(), title = self.DEFAULT_TITLE, created = time(), updated = time(), messages = {} }
   table.insert(ns.db.chats, chat)
   ns.db.currentChat = chat.id
-  -- Too many chats: drop the oldest ones that are not waiting for an answer.
   while #ns.db.chats > self.MAX_CHATS do
-    local all = self:All()
-    local victim
-    for i = #all, 1, -1 do
-      if all[i].id ~= chat.id and not hasPending(all[i]) then victim = all[i] break end
-    end
-    if not victim then break end
-    self:Delete(victim.id)
+    if not self:DropOldest(chat.id) then break end
   end
   return chat
+end
+
+-- A fresh chat for one proactive tip. It does not become the open chat, so the
+-- player's conversation stays put, and a later reply only carries this tip.
+function Chats:NewProactive(question)
+  local title = titleFrom(question or "")
+  if title == "" then title = L.PROACTIVE_CHAT end
+  local chat = {
+    id = newId(), title = title, created = time(), updated = time(),
+    messages = {}, proactive = true, renamed = true,
+  }
+  table.insert(ns.db.chats, chat)
+  while #ns.db.chats > self.MAX_CHATS do
+    if not self:DropOldest(chat.id) then break end
+  end
+  return chat
+end
+
+-- Removes a message by request id (a tip that failed or was dropped).
+function Chats:RemoveEntry(id)
+  for _, chat in ipairs(ns.db.chats) do
+    for i, m in ipairs(chat.messages) do
+      if m.id == id then
+        table.remove(chat.messages, i)
+        -- A tip that never got an answer should not leave an empty chat behind.
+        if chat.proactive and #chat.messages == 0 and chat.id ~= ns.db.currentChat then
+          self:Delete(chat.id)
+        end
+        return true
+      end
+    end
+  end
 end
 
 function Chats:Select(id)

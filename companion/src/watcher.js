@@ -6,7 +6,7 @@
 //  - from screenshots in WoW's Screenshots folder (older addon versions).
 import fs from 'node:fs';
 import path from 'node:path';
-import { wowPaths } from './config.js';
+import { PROACTIVE_KINDS, proactiveSettings, wowPaths } from './config.js';
 import { decodeImage } from './image.js';
 import { GridUnreadableError, decodeGrid } from './grid.js';
 import { publishInbox, resetSignals, ringSignal } from './inbox.js';
@@ -54,10 +54,25 @@ export async function handleRequest(req, {
   const sentNow = Object.keys(req.context || {});
   const missing = resolveContext(req, contextCache);
   saveCache(contextCache);
-  const extra = {};
+  // The game learns the proactive settings with every answer.
+  const extra = { proactive: proactiveSettings(cfg) };
   if (missing.length) {
     log(`Missing from the cache: ${missing.join(', ')}. Asking the addon to resend everything.`);
     extra.resync = Math.floor(Date.now() / 1000);
+  }
+
+  // Which moments are on is decided in the game (Options → AddOns). The app
+  // only refuses a kind it does not know. The game removes a skipped tip.
+  if (req.proactive !== undefined && !PROACTIVE_KINDS.includes(req.proactive?.kind)) {
+    log(`Proactive tip dropped (${req.proactive?.kind ?? '?'} is not a known moment).`);
+    state.answers.push({ id: req.id, ok: false, answer: '', skipped: true });
+    publishInbox(paths, cfg, state.answers, extra);
+    if (state.nextSig <= cfg.signals) {
+      ringSignal(paths, state.nextSig);
+      state.nextSig++;
+    }
+    save(state);
+    return null;
   }
 
   const ch = req.context?.character || {};
@@ -113,6 +128,13 @@ export function startWatcher({ cfg, wowDir, log = () => {}, onEvent = () => {}, 
   const paths = wowPaths(wowDir);
   fs.mkdirSync(paths.screenshots, { recursive: true });
   const state = loadState();
+  // Settings changed in the app reach the next game session (or the next
+  // answer) through the inbox.
+  try {
+    publishInbox(paths, cfg, state.answers, { proactive: proactiveSettings(cfg) });
+  } catch (e) {
+    log(`Could not publish the proactive settings: ${e.message}`);
+  }
   // The personality depends on the assistant the player picked (req.assistant).
   const knowledge = loadKnowledge();
   const system = (req) => {
@@ -124,7 +146,7 @@ export function startWatcher({ cfg, wowDir, log = () => {}, onEvent = () => {}, 
     const topics = guides?.topics?.();
     return buildSystem(knowledge, req.assistant, {
       canSearch: canSearch(cfg), client, lang: req.lang,
-      question: req.question, context: req.context, ...(guide ? { guide } : {}), ...(topics ? { topics } : {}),
+      question: req.question, context: req.context, proactive: req.proactive, ...(guide ? { guide } : {}), ...(topics ? { topics } : {}),
     });
   };
   const contextCache = loadContextCache();

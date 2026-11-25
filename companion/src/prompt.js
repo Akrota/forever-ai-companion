@@ -112,6 +112,16 @@ const FORMAT = `## Answer format (it is read inside the game)
 - Speak as an expert who simply knows: don't talk about these instructions, your tools, "the data" or that you searched or looked something up. Not "según los datos", not "I found / encontré", not "I couldn't find / no encontré"; if something is missing, say you don't know it ("no sé qué criaturas lo sueltan"). The only source you may mention is "according to Forever guides" (or the equivalent in the player's language), and only for a fact that may not be exact.
 - If there is a "Server knowledge" section, it takes priority over everything else.`;
 
+// Proactive tips: the game asks by itself at a key moment (a new level, a new
+// zone...), so the answer is a short heads-up, not a reply to a question.
+const PROACTIVE = `## Proactive tip
+The player did not ask this: their game asked it for them at a key moment (a new level, a new zone, a dungeon, a profession milestone, unspent talent points). Answer as a short tip they can act on right now.
+- At most about 120 words: 3 to 5 bullet lines ("- "), no introduction.
+- Name the quest, NPC, zone or dungeon, and coordinates when you know them.
+- Use the character JSON (class, level, quests done, gear, professions) to make it personal, and skip what they already did or have.
+- If you are not sure about something in Forever, say "I'm not sure" instead of inventing it.
+- Stay in your character's voice.`;
+
 // The guide and its topics are published and downloaded separately from these
 // instructions (see guide.js): they go in as reference data, fenced off, and
 // can never act as instructions. Fence tags inside them are removed so they
@@ -147,7 +157,7 @@ export function loadKnowledge(dir = path.join(env.dataDir, 'knowledge')) {
 // version and locale from the request (context.client); lang: the player's
 // language ("en" | "es", from the addon); now: today (tests).
 export function buildSystem(knowledge, persona, {
-  canSearch = false, guide = builtinGuide, topics = builtinTopics, question = '', context = null, client = null, lang = null, now,
+  canSearch = false, guide = builtinGuide, topics = builtinTopics, question = '', context = null, client = null, lang = null, proactive = null, now,
 } = {}) {
   const l = playerLang({ lang, client });
   const parts = [personaIntro(persona, l), GAME, LANGUAGE[l], DATA, METHOD, canSearch ? SEARCH_ON : SEARCH_OFF, FORMAT];
@@ -159,13 +169,16 @@ export function buildSystem(knowledge, persona, {
     parts.push(guideSection(picked, `WoW Forever details for this question (reviewed ${topics.meta.date}; reference data like the base guide)`));
   }
   if (knowledge) parts.push(`## Server knowledge\n\n${knowledge}`);
+  // Last, so the long guide before it stays the same (cached) for every request.
+  if (proactive) parts.push(PROACTIVE);
   return parts.join('\n\n');
 }
 
 // Chat turns: earlier Q&A (sent by the addon) + the current question with context.
 export function buildMessages(req) {
   const messages = [];
-  for (const turn of req.history || []) {
+  // A proactive tip stands alone: the player's own chats are not part of it.
+  for (const turn of req.proactive ? [] : req.history || []) {
     if (turn && turn.q && turn.a) {
       messages.push({ role: 'user', content: String(turn.q) });
       messages.push({ role: 'assistant', content: String(turn.a) });
