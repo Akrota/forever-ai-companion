@@ -75,7 +75,8 @@ local function hasPending(chat)
 end
 
 -- Drops the oldest chat that is safe to lose: a past proactive tip first, then
--- any other chat that is not waiting for an answer. `keepId` is never dropped.
+-- any other chat that is not waiting for an answer. `keepId` and the open chat
+-- are never dropped (a tip's chat is not the open one, see NewProactive).
 function Chats:DropOldest(keepId)
   local victim
   for _, chat in ipairs(ns.db.chats) do
@@ -87,7 +88,8 @@ function Chats:DropOldest(keepId)
   if not victim then
     local all = self:All()
     for i = #all, 1, -1 do
-      if all[i].id ~= keepId and not hasPending(all[i]) then victim = all[i] break end
+      local chat = all[i]
+      if chat.id ~= keepId and chat.id ~= ns.db.currentChat and not hasPending(chat) then victim = chat break end
     end
   end
   if not victim then return false end

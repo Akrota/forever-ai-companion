@@ -390,6 +390,8 @@ function Core:Ask(question, extra, chatId, again, opts)
   end
 
   -- The question belongs to the open chat (or to the given one, for resends).
+  -- A tip only goes by the invisible voice, never the strip on screen.
+  if silent and not ns.Voice:Available() then return end
   local chatData = ns.Chats:Get(chatId) or (silent and ns.Chats:NewProactive(question)) or ns.Chats:Current()
   local id = again and again.id or string.format("%d%04d", time(), math.random(0, 9999))
   local sig, resetSignals = ns.Live:RequestFields()
@@ -435,6 +437,7 @@ function Core:Ask(question, extra, chatId, again, opts)
         return true, "voice"
       end
     end
+    if silent then return false, "no voice" end
     Core.lastChannel = "strip"
     local frame, why = Core:BuildFrame(req, Core.step, nil, context)
     if not frame then return false, why end
@@ -644,6 +647,10 @@ local COMMANDS = {
 }
 Core.COMMANDS = COMMANDS
 
+-- Every command works with both: /ai is the English one (artificial
+-- intelligence, shown to English and German players) and /ia the Spanish one
+-- (inteligencia artificial, shown to Spanish players). Never add a command or
+-- a text that only works with one of them.
 SLASH_FOREVERAICOMPANION1 = "/ia"
 SLASH_FOREVERAICOMPANION2 = "/azia"
 SLASH_FOREVERAICOMPANION3 = "/ai"
