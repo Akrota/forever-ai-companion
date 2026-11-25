@@ -75,7 +75,7 @@ You get an assistant with personality: **Fizzi**, a gnome inventor, for the Alli
 
 ## Installation (3 minutes)
 
-**Requirements:** Windows 10 or 11, or a Mac with macOS 13 Ventura or later ([Mac steps](#on-a-mac)), WoW Forever installed, and an AI (see [Which AI to choose](#which-ai-to-choose): with Claude Pro/Max or ChatGPT Plus/Pro you pay nothing extra).
+**Requirements:** Windows 10 or 11, or a Mac with macOS 13 Ventura or later ([Mac steps](#on-a-mac)), WoW Forever installed, and an AI (see [Which AI to choose](#which-ai-to-choose): with Claude Pro/Max, ChatGPT Plus/Pro, or a Google account / Google AI plan you pay nothing extra).
 
 ### 1. Download and open the app
 
@@ -177,14 +177,15 @@ Every command also works with its Spanish word (shown in parentheses).
 |---|---|---|---|
 | **My Claude subscription** (recommended) | You have Claude Pro or Max | Included in your plan | Yes |
 | **My ChatGPT subscription** | You have ChatGPT Plus or Pro | Included in your plan | Yes |
+| **My Gemini subscription** | You have a Google account or Google AI Pro / Ultra | Free or included in your plan | Yes |
 | **Claude with an API key** | No subscription | Pay per use (≈ 1 US cent per question) | Yes |
 | **ChatGPT with an API key** | No subscription | Pay per use | No |
-| **Gemini** | You want to try it for free | Free usage with limits | No |
+| **Gemini with an API key** | API key from Google AI Studio | Free usage with limits | No |
 | **Grok** | You prefer xAI's Grok | Pay per use | No |
 | **AI on your PC (Ollama)** | You have a powerful PC | Free, no internet | No |
 | **Test mode** | Check that the game and the app are connected | Free (not an AI) | — |
 
-With the subscriptions, the app installs the official program (**Claude Code** by Anthropic or **Codex** by OpenAI) and opens your browser to sign in. Your questions count toward your plan's usage limit.
+With the subscriptions, the app installs the official program (**Claude Code** by Anthropic, **Codex** by OpenAI, or **Antigravity CLI** by Google) and opens your browser to sign in. Your questions count toward your plan's usage limit.
 
 You can change the AI or the model at any time from the app's dashboard (**Change**, next to *Artificial intelligence*).
 
@@ -260,7 +261,7 @@ That's why you need to **restart WoW** after installing: the game only sees file
 - **Your data and the question**, plus the earlier questions of the same chat.
 - If the AI can, it **searches the internet** for whatever the guide doesn't cover (a few seconds more), with its own search tools: it's told to prefer WoW Forever guides (Wowhead, Warcraft Tavern, Method, Maxroll, the Fextralife wiki) and to search before saying it doesn't know something. It can be turned off in the dashboard.
 
-With the subscriptions, Claude Code and Codex run as a plain chat: our instructions replace their coding ones, with no access to your files or commands, without your settings and without saving sessions.
+With the subscriptions, Claude Code and Codex run as a plain chat: our instructions replace their coding ones, with no access to your files or commands, without your settings and without saving sessions. Antigravity CLI runs in headless mode inside an empty temporary folder with per-call settings that deny local file, command and MCP tools (and only allow web reading when internet search is enabled).
 
 ---
 
@@ -349,14 +350,14 @@ Blizzard's Terms of Use and EULA forbid bots, cheats and unauthorized third-part
 2. **Blizzard can break it at any time.** If Blizzard doesn't like this kind of tool, the most likely result is a game patch that closes one of these paths, for example by limiting the text-to-speech or sound functions, rather than action against accounts. Blizzard already restricted combat addons heavily in Midnight, the engine WoW Forever runs on. If that happens, the assistant stops working until another way is found, if one exists.
 3. **Action against your account is possible.** Because it doesn't automate anything or touch the game's memory, we consider the risk low, but Blizzard has the final word on what its Terms of Use allow, and its rules and how it enforces them can change. If your account matters more to you than the convenience, don't use it.
 4. **The AI can be wrong.** Answers can be inaccurate or out of date, especially about things that change with patches. Double-check before spending a lot of gold or time on an answer.
-5. **Your AI provider's terms apply too.** Using Claude, Codex or an API key through this app is subject to that provider's own terms and limits.
+5. **Your AI provider's terms apply too.** Using Claude, Codex, Antigravity or an API key through this app is subject to that provider's own terms and limits.
 
 ---
 
 ## FAQ and troubleshooting
 
 **How much does it cost?**
-The app is free. With your Claude or ChatGPT subscription you pay nothing extra (questions count toward your plan's limit). With an API key you pay per use.
+The app is free. With your Claude, ChatGPT or Google AI subscription (or Google's free tier) you pay nothing extra (questions count toward your plan's limit). With an API key you pay per use.
 
 **The answer doesn't arrive.**
 - Look at the line under the chat title in the game: if it's red, it says what's wrong.
@@ -421,9 +422,10 @@ companion/
   src/secrets.js            Encrypts API keys in config.json (Windows DPAPI, macOS Keychain)
   src/prompt.js             Instructions for the AI
   src/guide.js              WoW Forever guide: date, version, downloads and picking topic sections
-  src/providers.js          Claude, OpenAI/Gemini/Grok/Ollama, Claude Code, Codex, test
+  src/providers.js          Claude, OpenAI/Gemini/Grok/Ollama, Claude Code, Codex, Antigravity, test
   src/codex.js              Codex: install, sign-in and running it
   src/claude-code.js        Claude Code: install and sign-in
+  src/antigravity.js        Antigravity CLI: install, sign-in and running it
   src/tts-voice.js          Installs the silent voice
   src/migrate.js            Moves installs from the project's previous name
   tts/ForeverAICompanionTts.cs  Silent voice engine (C#)

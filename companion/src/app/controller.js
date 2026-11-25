@@ -12,12 +12,16 @@ import {
 } from '../install.js';
 import { knowledgeReadme, sampleContext } from '../assets.js';
 import { buildMessages, buildSystem, cleanAnswer, loadKnowledge, plainAnswer } from '../prompt.js';
-import { ask, canSearch } from '../providers.js';
+import { ask, canSearch, sandboxDir } from '../providers.js';
 import { startWatcher } from '../watcher.js';
 import { authStatus, findClaudeCode, openInstall, openLogin } from '../claude-code.js';
 import {
   codexAuthStatus, codexInstallState, codexSearchState, codexVersion, findCodex, installCodex, openCodexLogin, searchCodex,
 } from '../codex.js';
+import {
+  antigravityAuthStatus, antigravityLoginState, cancelAntigravityLogin, findAntigravity, notifyAntigravityLoggedIn,
+  openAntigravityInstall, startAntigravityLogin, stopAntigravityLogin, submitAntigravityLoginCode,
+} from '../antigravity.js';
 import { ttsEngineSource } from '../assets.js';
 import {
   ENGINE_DLL, compileEngine, installVoiceMachineWide, isLegacyEngineRegistered, isLegacyVoiceVisible, isVoiceVisible,
@@ -46,7 +50,7 @@ const LEGACY_ADDON_CHECK_MS = 10000;
 const LOGIN_CHECK_MS = 5 * 60 * 1000;
 
 // onUpdateAvailable(version): a newer release was found (tray notice).
-export function createController({ log = () => {}, onUpdateAvailable = () => {}, onQuit = () => process.exit(0) } = {}) {
+export function createController({ log = () => {}, onUpdateAvailable = () => {}, onQuit = () => process.exit(0), openUrl = sys.openUrl } = {}) {
   let cfg = loadConfig();
   setAppLang(cfg.language && cfg.language !== 'auto' ? cfg.language : null);
   let watcher = null;
@@ -166,23 +170,31 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
     checkLogin();
   }
 
-  // Whether the chosen subscription AI (Claude Code, Codex) is installed and
+  // Whether the chosen subscription AI (Claude Code, Codex, Antigravity) is installed and
   // signed in: true / false, or null when unknown or not needed. Checked now
   // and then (it runs the AI's own program), and whenever settings change.
   let aiSignedIn = null;
   let loginCheck = null;
   function checkLogin() {
     const provider = cfg.provider;
-    if (provider !== 'claude-code' && provider !== 'codex') {
+    if (provider !== 'claude-code' && provider !== 'codex' && provider !== 'antigravity') {
       aiSignedIn = null;
       beacon?.refresh();
       return Promise.resolve();
     }
     // Not installed: false. The status check itself failing: unknown.
     const run = (async () => {
-      const found = provider === 'claude-code' ? findClaudeCode(cfg.claudeCode.bin) : findCodex(cfg.codex.bin);
+      const found = provider === 'claude-code'
+        ? findClaudeCode(cfg.claudeCode.bin)
+        : provider === 'codex'
+        ? findCodex(cfg.codex.bin)
+        : findAntigravity(cfg.antigravity.bin);
       if (!found) return false;
-      const s = provider === 'claude-code' ? await authStatus(found.path) : await codexAuthStatus(found.path);
+      const s = provider === 'claude-code'
+        ? await authStatus(found.path)
+        : provider === 'codex'
+        ? await codexAuthStatus(found.path)
+        : await antigravityAuthStatus(found.path);
       return s.error ? null : s.loggedIn;
     })();
     loginCheck = run;
@@ -518,6 +530,60 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
       return {};
     },
 
+    async antigravityStatus() {
+      const found = findAntigravity(cfg.antigravity.bin);
+      const login = antigravityLoginState();
+      if (!found) return { installed: false, loggedIn: false, login };
+      if (login.phase === 'starting' || login.phase === 'submitting') {
+        return { installed: true, source: found.source, loggedIn: false, login };
+      }
+      const out = { installed: true, source: found.source, ...(await antigravityAuthStatus(found.path)) };
+      if (out.loggedIn) notifyAntigravityLoggedIn();
+      out.login = antigravityLoginState();
+      noteSignIn('antigravity', out);
+      return out;
+    },
+
+    antigravityInstall() {
+      openAntigravityInstall();
+      return {};
+    },
+
+    async antigravityLogin({ mode } = {}) {
+      const found = findAntigravity(cfg.antigravity.bin);
+      if (!found) throw err('installAntigravityFirst');
+      const login = await startAntigravityLogin(found.path, sandboxDir(), {
+        mode: mode === 'code' ? 'code' : 'auto',
+        openUrl,
+        onLoggedIn: () => checkLogin(),
+      });
+      if (login.phase === 'succeeded') {
+        const s = await antigravityAuthStatus(found.path);
+        if (s.loggedIn) {
+          notifyAntigravityLoggedIn();
+          noteSignIn('antigravity', { installed: true, ...s });
+          return { loggedIn: true, login: antigravityLoginState() };
+        }
+      }
+      return { loggedIn: false, login };
+    },
+
+    async antigravityLoginCode({ code } = {}) {
+      const found = findAntigravity(cfg.antigravity.bin);
+      if (!found) throw err('installAntigravityFirst');
+      await submitAntigravityLoginCode(code);
+      const s = await antigravityAuthStatus(found.path);
+      if (s.loggedIn) notifyAntigravityLoggedIn();
+      const out = { installed: true, source: found.source, ...s, login: antigravityLoginState() };
+      noteSignIn('antigravity', out);
+      return { loggedIn: Boolean(out.loggedIn), login: out.login };
+    },
+
+    async antigravityLoginCancel() {
+      await cancelAntigravityLogin();
+      return { login: antigravityLoginState() };
+    },
+
     async setAutostart({ enabled }) {
       autostart = await sys.setAutostart(Boolean(enabled));
       return { autostart };
@@ -530,6 +596,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
     },
 
     stop() {
+      stopAntigravityLogin();
       beacon.stop();
       clearInterval(loginTimer);
       guideUpdates.stop();

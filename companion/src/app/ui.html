@@ -359,6 +359,11 @@ const I18N = {
     'p.codex.name': 'My ChatGPT subscription',
     'p.codex.desc': 'Uses your ChatGPT Plus or Pro plan through Codex, the official OpenAI program. No keys needed and nothing extra to pay.',
     'p.codex.tag': 'Requires ChatGPT Plus or Pro',
+    'p.antigravity.name': 'My Gemini subscription',
+    'p.antigravity.desc': 'Uses your Google account or Google AI Pro / Ultra plan through Antigravity CLI, Google\'s official program. No keys needed and nothing extra to pay.',
+    'p.antigravity.tag': 'Free, Pro, or Ultra Google plan',
+    'p.antigravity.hydrogen': 'Fast and smart; requires Google AI Pro or Ultra.',
+    'p.antigravity.flash': 'Included on all Google accounts (including Free); slower.',
     'p.claude.name': 'Claude with an API key',
     'p.claude.desc': 'For people without a subscription: you only pay for what you use, on Anthropic\'s website.',
     'p.claude.tag': 'Pay as you go (≈ 1 cent per question)',
@@ -380,7 +385,8 @@ const I18N = {
     'p.grok.key2': 'Add credit in <b>Billing</b>, then create an API key under <b>API Keys</b> and copy it.',
     'p.grok.fast': 'Fast and cheap: a good fit for questions in the game.',
     'p.grok.smart': 'xAI\'s smartest, a bit slower and about twice the cost.',
-    'p.gemini.desc': 'Google\'s AI. It usually has a free tier with limits.',
+    'p.gemini.name': 'Gemini with an API key',
+    'p.gemini.desc': 'Google\'s AI with an API key from Google AI Studio (usually has a free tier with limits). If you have a Google account or Google AI plan, choose “My Gemini subscription”.',
     'p.gemini.tag': 'Free use with limits',
     'p.gemini.key1': 'Go to <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> with your Google account.',
     'p.gemini.key2': 'Click <b>Create API key</b> and copy it.',
@@ -396,6 +402,18 @@ const I18N = {
     'p.ollama.local2': 'Download a model (for example <code>llama3.2</code>) from the Ollama app.',
     'cli.claudeCode.about': 'It\'s Anthropic\'s free, official program that connects your subscription. It installs with one click.',
     'cli.codex.about': 'It\'s OpenAI\'s free, official program that connects your ChatGPT plan. The app downloads and installs it for you (about 130 MB).',
+    'cli.antigravity.about': 'It\'s Google\'s free, official program that connects your Google account or Google AI plan. It installs with one click.',
+    'cli.antigravity.loginText': 'Your browser will open so you can sign in with your Google account (first time only).',
+    'ai.agyStarting': 'Starting…',
+    'ai.agyStartingText': 'Starting Google sign-in…',
+    'ai.agyBrowserWaiting': 'Finish signing in with your Google account in your browser. This screen updates by itself when you\'re done.',
+    'ai.agyWaitingBrowser': 'Waiting for Google sign-in…',
+    'ai.agyUseCode': 'Sign in with a code instead',
+    'ai.agyOpenSignIn': 'Open Google sign-in',
+    'ai.agyCodeWaiting': 'Sign in with your Google account in your browser, then copy the code shown on the page and paste it below.',
+    'ai.agyCodePlaceholder': 'Paste the code from Google here',
+    'ai.agySubmitCode': 'Complete sign-in',
+    'ai.agySubmitting': 'Verifying…',
     'ai.codexDownloading': 'Downloading Codex from OpenAI… {n}%',
     'ai.codexExtracting': 'Installing Codex…',
     'ai.codexError': 'Could not install it: {error}. Try again or, if you already have Codex, find it with the button below.',
@@ -452,7 +470,7 @@ const I18N = {
 
     // AI
     'ai.title': 'Choose your AI',
-    'ai.lead': 'It\'s what answers your questions. If you have Claude Pro or Max, or ChatGPT Plus or Pro, use your subscription: you pay nothing extra.',
+    'ai.lead': 'It\'s what answers your questions. If you have Claude Pro or Max, ChatGPT Plus or Pro, or a Google AI plan, use your subscription: you pay nothing extra.',
     'ai.more': 'More options',
     'ai.setup': 'Set up: {name}',
     'ai.cliInstall': 'Install {app}',
@@ -716,6 +734,11 @@ const I18N = {
     'p.codex.name': 'Mi suscripción de ChatGPT',
     'p.codex.desc': 'Usa tu plan ChatGPT Plus o Pro a través de Codex, el programa oficial de OpenAI. No necesitas claves ni pagar nada extra.',
     'p.codex.tag': 'Requiere ChatGPT Plus o Pro',
+    'p.antigravity.name': 'Mi suscripción de Gemini',
+    'p.antigravity.desc': 'Usa tu cuenta de Google o tu plan Google AI Pro o Ultra a través de Antigravity CLI, el programa oficial de Google. No necesitas claves ni pagar nada extra.',
+    'p.antigravity.tag': 'Plan de Google gratis, Pro o Ultra',
+    'p.antigravity.hydrogen': 'Rápido y listo; requiere Google AI Pro o Ultra.',
+    'p.antigravity.flash': 'Incluido en todas las cuentas de Google (también gratis); más lento.',
     'p.claude.name': 'Claude con clave de API',
     'p.claude.desc': 'Para quien no tiene suscripción: pagas solo lo que usas en la web de Anthropic.',
     'p.claude.tag': 'Pagas por uso (≈ 1 centavo por pregunta)',
@@ -737,7 +760,8 @@ const I18N = {
     'p.grok.key2': 'Carga crédito en <b>Billing</b>, luego crea una clave en <b>API Keys</b> y cópiala.',
     'p.grok.fast': 'Rápido y barato: ideal para preguntas en el juego.',
     'p.grok.smart': 'El más inteligente de xAI, algo más lento y cuesta como el doble.',
-    'p.gemini.desc': 'La IA de Google. Suele tener un uso gratuito con límites.',
+    'p.gemini.name': 'Gemini con clave de API',
+    'p.gemini.desc': 'La IA de Google con clave de Google AI Studio (suele tener uso gratuito con límites). Si tienes una cuenta de Google o un plan de Google AI, elige «Mi suscripción de Gemini».',
     'p.gemini.tag': 'Uso gratis con límites',
     'p.gemini.key1': 'Entra a <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> con tu cuenta de Google.',
     'p.gemini.key2': 'Pulsa <b>Create API key</b> y cópiala.',
@@ -753,6 +777,18 @@ const I18N = {
     'p.ollama.local2': 'Descarga un modelo (por ejemplo <code>llama3.2</code>) desde la app de Ollama.',
     'cli.claudeCode.about': 'Es el programa oficial y gratuito de Anthropic que conecta tu suscripción. Se instala con un clic.',
     'cli.codex.about': 'Es el programa oficial y gratuito de OpenAI que conecta tu plan de ChatGPT. La app lo descarga e instala por ti (unos 130 MB).',
+    'cli.antigravity.about': 'Es el programa oficial y gratuito de Google que conecta tu cuenta de Google o tu plan de Google AI. Se instala con un clic.',
+    'cli.antigravity.loginText': 'Se abrirá tu navegador para que entres con tu cuenta de Google (solo la primera vez).',
+    'ai.agyStarting': 'Iniciando…',
+    'ai.agyStartingText': 'Iniciando sesión con Google…',
+    'ai.agyBrowserWaiting': 'Termina de iniciar sesión con tu cuenta de Google en tu navegador. Esta pantalla se actualiza sola cuando termines.',
+    'ai.agyWaitingBrowser': 'Esperando el inicio de sesión…',
+    'ai.agyUseCode': 'Iniciar sesión con un código',
+    'ai.agyOpenSignIn': 'Abrir inicio de sesión de Google',
+    'ai.agyCodeWaiting': 'Inicia sesión con tu cuenta de Google en tu navegador, luego copia el código que aparece en la página y pégalo abajo.',
+    'ai.agyCodePlaceholder': 'Pega aquí el código de Google',
+    'ai.agySubmitCode': 'Completar inicio de sesión',
+    'ai.agySubmitting': 'Verificando…',
     'ai.codexDownloading': 'Descargando Codex de OpenAI… {n}%',
     'ai.codexExtracting': 'Instalando Codex…',
     'ai.codexError': 'No se pudo instalar: {error}. Vuelve a intentarlo o, si ya tienes Codex, búscalo con el botón de abajo.',
@@ -805,7 +841,7 @@ const I18N = {
     'addon.hint': 'Un clic y listo',
 
     'ai.title': 'Elige tu IA',
-    'ai.lead': 'Es quien responde tus preguntas. Si tienes Claude Pro o Max, o ChatGPT Plus o Pro, usa tu suscripción: no pagas nada extra.',
+    'ai.lead': 'Es quien responde tus preguntas. Si tienes Claude Pro o Max, ChatGPT Plus o Pro o un plan de Google AI, usa tu suscripción: no pagas nada extra.',
     'ai.more': 'Más opciones',
     'ai.setup': 'Configura: {name}',
     'ai.cliInstall': 'Instalar {app}',
@@ -1493,6 +1529,17 @@ function buildData() {
         ['gpt-6-astra', 'GPT-6 Astra', t('model.smartest')],
       ],
     },
+    antigravity: {
+      name: t('p.antigravity.name'),
+      desc: t('p.antigravity.desc'),
+      tags: [['good', t('tag.inPlan')], ['', t('p.antigravity.tag')]],
+      models: [
+        ['default', t('model.planDefault'), t('model.planDefault.descRec'), true],
+        ['gemini-4-hydrogen', 'Gemini 4 Hydrogen', t('p.antigravity.hydrogen')],
+        ['gemini-4-neon', 'Gemini 4 Neon', t('model.smartest')],
+        ['gemini-3.8-flash', 'Gemini 3.8 Flash', t('p.antigravity.flash')],
+      ],
+    },
     claude: {
       name: t('p.claude.name'),
       desc: t('p.claude.desc'),
@@ -1511,7 +1558,7 @@ function buildData() {
       key: [t('p.chatgpt.key1'), t('p.chatgpt.key2'), t('p.chatgpt.key3')],
     },
     gemini: {
-      name: 'Gemini',
+      name: t('p.gemini.name'),
       desc: t('p.gemini.desc'),
       tags: [['good', t('p.gemini.tag')], ['', t('tag.needsKey')]],
       key: [t('p.gemini.key1'), t('p.gemini.key2')],
@@ -1551,6 +1598,7 @@ function buildData() {
   CLI = {
     'claude-code': { api: 'claude', app: 'Claude Code', account: 'Claude', about: t('cli.claudeCode.about') },
     codex: { api: 'codex', app: 'Codex', account: 'ChatGPT', about: t('cli.codex.about') },
+    antigravity: { api: 'antigravity', app: 'Antigravity CLI', account: 'Google', about: t('cli.antigravity.about'), loginText: t('cli.antigravity.loginText') },
   };
 
   STEPS = ['welcome', 'game', 'addon', 'ai', 'voice', 'done'].map((id) => ({
@@ -1570,7 +1618,7 @@ function setLang(next) {
 }
 
 // Options that can search the internet.
-const SEARCHES = ['claude-code', 'claude', 'codex'];
+const SEARCHES = ['claude-code', 'claude', 'codex', 'antigravity'];
 
 const ICON = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="#06210f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -1775,9 +1823,39 @@ const VIEWS = {
         }
       }
       items.push([c.installed, t('ai.cliInstall', { app: m.app }), installText, actions]);
-      items.push([c.loggedIn, t('ai.cliLogin', { account: m.account }), c.loggedIn ? t('ai.cliLoggedIn') : t('ai.cliLoginText'),
-        c.installed && !c.loggedIn ? `<button class="btn primary small" data-act="cli-login">${t('ai.cliLoginBtn')}</button>` : '']);
-      if (c.waiting && !(c.installed && c.loggedIn)) items.push([false, t('ai.cliWaiting'), t('ai.cliWaitingText'), '']);
+      let loginDesc = c.loggedIn ? t('ai.cliLoggedIn')
+        : c.error ? `<span style="color:var(--warn)">${esc(c.error)}</span>`
+          : (m.loginText || t('ai.cliLoginText'));
+      let loginAct = c.installed && !c.loggedIn
+        ? `<button class="btn primary small" data-act="cli-login" ${busyAction === 'cli-login' ? 'disabled' : ''}>${spinner('cli-login', t('ai.cliLoginBtn'), t('ai.agyStarting'))}</button>`
+        : '';
+      if (id === 'antigravity' && c.installed && !c.loggedIn) {
+        const agyLogin = c.login || {};
+        if (agyLogin.phase === 'starting') {
+          loginDesc = t('ai.agyStartingText');
+          loginAct = `<button class="btn primary small" disabled><span class="spin"></span>${t('ai.agyStarting')}</button>`
+            + ` <button class="btn small ghost" data-act="agy-login-cancel">${t('btn.cancel')}</button>`;
+        } else if (agyLogin.phase === 'browser') {
+          loginDesc = t('ai.agyBrowserWaiting');
+          loginAct = `<span class="muted small" style="display:inline-flex;align-items:center;gap:8px"><span class="spin" style="border-color:rgba(91,140,255,.3);border-top-color:var(--accent)"></span>${t('ai.agyWaitingBrowser')}</span>`
+            + (agyLogin.authUrl ? ` <a class="btn small" href="${esc(agyLogin.authUrl)}" target="_blank" rel="noopener">${t('ai.agyOpenSignIn')}</a>` : '')
+            + ` <button class="btn small" data-act="agy-login-code-mode" ${busyAction ? 'disabled' : ''}>${spinner('agy-login-code-mode', t('ai.agyUseCode'), t('ai.agyStarting'))}</button>`
+            + ` <button class="btn small ghost" data-act="agy-login-cancel" ${busyAction ? 'disabled' : ''}>${t('btn.cancel')}</button>`;
+        } else if (agyLogin.phase === 'code' || agyLogin.phase === 'submitting') {
+          const submitting = agyLogin.phase === 'submitting' || busyAction === 'agy-login-submit';
+          loginDesc = t('ai.agyCodeWaiting');
+          loginAct = `<input type="text" id="agy-login-code" autocomplete="off" spellcheck="false" placeholder="${esc(t('ai.agyCodePlaceholder'))}" ${submitting ? 'disabled' : ''}>`
+            + `<button class="btn primary small" data-act="agy-login-submit" ${submitting || busyAction ? 'disabled' : ''}>${submitting ? `<span class="spin"></span>${t('ai.agySubmitting')}` : t('ai.agySubmitCode')}</button>`
+            + (agyLogin.authUrl ? ` <a class="btn small" href="${esc(agyLogin.authUrl)}" target="_blank" rel="noopener">${t('ai.agyOpenSignIn')}</a>` : '')
+            + ` <button class="btn small ghost" data-act="agy-login-cancel" ${submitting ? 'disabled' : ''}>${t('btn.cancel')}</button>`;
+        } else if (agyLogin.phase === 'failed' && agyLogin.error) {
+          loginDesc = `<span style="color:var(--bad)">${esc(agyLogin.error)}</span>`;
+        }
+      }
+      items.push([c.loggedIn, t('ai.cliLogin', { account: m.account }), loginDesc, loginAct]);
+      if (c.waiting && !(c.installed && c.loggedIn) && !(id === 'antigravity' && c.installed)) {
+        items.push([false, t('ai.cliWaiting'), t('ai.cliWaitingText'), '']);
+      }
     }
     if (p.key) {
       items.push([Boolean(saved), t('ai.getKey'), `<ol>${p.key.map((s) => `<li>${s}</li>`).join('')}</ol>`, '']);
@@ -1819,7 +1897,12 @@ const VIEWS = {
       hint: !ready ? t('ai.hintSteps') : testOk ? '' : t('ai.hintTest'),
       after() {
         document.querySelectorAll('input[name=provider]').forEach((r) => {
-          r.onchange = () => { aiChoice = r.value; aiModel = null; aiEffort = null; aiTest = null; render(); if (CLI[r.value]) checkCli(r.value); };
+          r.onchange = () => {
+            if (aiChoice === 'antigravity' && r.value !== 'antigravity' && ['starting', 'browser', 'code'].includes(cli.antigravity?.login?.phase)) {
+              api('antigravity-login-cancel').catch(() => {});
+            }
+            aiChoice = r.value; aiModel = null; aiEffort = null; aiTest = null; render(); if (CLI[r.value]) checkCli(r.value);
+          };
         });
         document.querySelectorAll('input[name=model], input[name=effort]').forEach((r) => {
           r.onchange = () => {
@@ -1832,6 +1915,10 @@ const VIEWS = {
         bindWebSearch();
         const mt = $('model-text');
         if (mt) mt.oninput = () => { aiModel = mt.value; };
+        const agyCode = $('agy-login-code');
+        if (agyCode) {
+          agyCode.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); ACTIONS['agy-login-submit'](); } };
+        }
       },
     };
   },
@@ -1924,8 +2011,15 @@ function renderWizard(full = true) {
   if (full) {
     const focusId = document.activeElement?.id;
     const keyVal = $('key')?.value;
+    const agyEl = $('agy-login-code');
+    const agyCodeVal = agyEl?.value;
+    const agySel = agyEl && focusId === 'agy-login-code' ? [agyEl.selectionStart, agyEl.selectionEnd] : null;
     $('page-inner').innerHTML = currentView.html;
     if (keyVal && $('key')) $('key').value = keyVal;
+    if (agyCodeVal && $('agy-login-code')) {
+      $('agy-login-code').value = agyCodeVal;
+      if (agySel && agySel[0] !== null) $('agy-login-code').setSelectionRange(agySel[0], agySel[1]);
+    }
     if (focusId && $(focusId)) $(focusId).focus();
     document.querySelectorAll('#page [data-act]').forEach((b) => { b.onclick = () => ACTIONS[b.dataset.act](); });
     currentView.after?.();
@@ -1947,6 +2041,9 @@ $('btn-back').onclick = () => {
 };
 
 function go(id) {
+  if (step === 'ai' && id !== 'ai' && ['starting', 'browser', 'code'].includes(cli.antigravity?.login?.phase)) {
+    api('antigravity-login-cancel').catch(() => {});
+  }
   step = id;
   const choice = aiChoice || status?.ai.preset || 'claude-code';
   if (id === 'ai' && CLI[choice]) checkCli(choice);
@@ -1963,6 +2060,9 @@ function openWizard(id, fromDash = false) {
 }
 
 function openDash() {
+  if (step === 'ai' && ['starting', 'browser', 'code'].includes(cli.antigravity?.login?.phase)) {
+    api('antigravity-login-cancel').catch(() => {});
+  }
   mode = 'dash';
   returnToDash = false;
   render();
@@ -2240,8 +2340,45 @@ const ACTIONS = {
   }),
   'cli-login': async () => {
     const id = aiChoice;
-    try { await api(`${CLI[id].api}-login`); cli[id] = { ...(cli[id] || {}), waiting: true }; render(); } catch (e) { toast('bad', esc(e.message)); }
+    if (id === 'antigravity') {
+      await run('cli-login', async () => {
+        const r = await api('antigravity-login', { mode: 'auto' });
+        setCliState('antigravity', { loggedIn: Boolean(r.loggedIn), login: r.login });
+        if (r.loggedIn) await checkCli('antigravity', true);
+      });
+      if (cli.antigravity?.login?.phase === 'code') $('agy-login-code')?.focus();
+      return;
+    }
+    try { await api(`${CLI[id].api}-login`); setCliState(id, { waiting: true }); render(); } catch (e) { toast('bad', esc(e.message)); }
   },
+  'agy-login-code-mode': async () => {
+    await run('agy-login-code-mode', async () => {
+      const r = await api('antigravity-login', { mode: 'code' });
+      setCliState('antigravity', { loggedIn: Boolean(r.loggedIn), login: r.login });
+    });
+    if (cli.antigravity?.login?.phase === 'code') $('agy-login-code')?.focus();
+  },
+  'agy-login-submit': async () => {
+    const code = $('agy-login-code')?.value || '';
+    let submitted = false;
+    await run('agy-login-submit', async () => {
+      try {
+        const r = await api('antigravity-login-code', { code });
+        submitted = true;
+        if ($('agy-login-code')) $('agy-login-code').value = '';
+        setCliState('antigravity', { loggedIn: Boolean(r.loggedIn), login: r.login });
+        await checkCli('antigravity', true);
+      } catch (e) {
+        await checkCli('antigravity', true);
+        throw e;
+      }
+    });
+    if (!submitted) $('agy-login-code')?.focus();
+  },
+  'agy-login-cancel': () => run('agy-login-cancel', async () => {
+    const r = await api('antigravity-login-cancel');
+    setCliState('antigravity', { login: r.login });
+  }),
   knowledge: () => api('knowledge').catch((e) => toast('bad', esc(e.message))),
   updateCheck: () => run('updateCheck', async () => {
     const r = await api('update-check');
@@ -2300,19 +2437,34 @@ function endScreen(title, text) {
 // Data refresh
 // ---------------------------------------------------------------------------
 let stopped = false;
-async function checkCli(id) {
-  let next;
-  try {
-    next = await api(`${CLI[id].api}-status`);
-    if (cli[id]?.waiting && !(next.installed && next.loggedIn)) next.waiting = true;
-  } catch { next = { installed: false, loggedIn: false }; }
-  cli[id] = next;
-  // Codex not in the usual places: search the PC once, without being asked.
-  if (id === 'codex' && !next.installed && next.search?.status === 'idle' && !codexAutoSearched) {
-    codexAutoSearched = true;
-    api('codex-search').then(() => checkCli('codex')).catch(() => {});
+const cliInFlight = {};
+const cliEpoch = {};
+function setCliState(id, patch) {
+  cliEpoch[id] = (cliEpoch[id] || 0) + 1;
+  cli[id] = { ...(cli[id] || {}), ...patch };
+}
+function checkCli(id, fresh = false) {
+  if (cliInFlight[id]) {
+    if (!fresh) return cliInFlight[id];
+    return cliInFlight[id].then(() => checkCli(id, false));
   }
-  if (mode === 'wizard' && step === 'ai') render();
+  const epoch = cliEpoch[id] || 0;
+  return (cliInFlight[id] = (async () => {
+    const prev = JSON.stringify(cli[id]);
+    let next;
+    try {
+      next = await api(`${CLI[id].api}-status`);
+      if (cli[id]?.waiting && !(next.installed && next.loggedIn)) next.waiting = true;
+    } catch { next = { installed: false, loggedIn: false }; }
+    if ((cliEpoch[id] || 0) !== epoch) return;
+    cli[id] = next;
+    // Codex not in the usual places: search the PC once, without being asked.
+    if (id === 'codex' && !next.installed && next.search?.status === 'idle' && !codexAutoSearched) {
+      codexAutoSearched = true;
+      api('codex-search').then(() => checkCli('codex')).catch(() => {});
+    }
+    if (mode === 'wizard' && step === 'ai' && JSON.stringify(next) !== prev) render();
+  })().finally(() => { delete cliInFlight[id]; }));
 }
 let codexAutoSearched = false;
 setInterval(() => {
