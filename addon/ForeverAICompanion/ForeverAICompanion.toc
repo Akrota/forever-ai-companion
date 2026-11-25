@@ -3,6 +3,7 @@
 ## Notes: Your personal assistant in Azeroth: Fizzi (gnome, Alliance) or Rizzik (goblin, Horde). Requires the companion app.
 ## Notes-esES: Tu asistente personal en Azeroth: Fizzi (gnoma, Alianza) o Rizzik (goblin, Horda). Requiere la app compañera.
 ## Notes-esMX: Tu asistente personal en Azeroth: Fizzi (gnoma, Alianza) o Rizzik (goblin, Horda). Requiere la app compañera.
+## Notes-deDE: Dein persönlicher Assistent in Azeroth: Fizzi (Gnomin, Allianz) oder Rizzik (Goblin, Horde). Benötigt die Begleit-App.
 ## Author: Forever AI Companion
 ## Version: 1.11.10
 ## SavedVariables: ForeverAICompanion_DB

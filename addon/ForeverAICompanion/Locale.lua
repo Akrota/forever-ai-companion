@@ -1,9 +1,9 @@
--- Player-visible texts, in English (default) and Spanish. Loaded first.
+-- Player-visible texts, in English (default), Spanish and German. Loaded first.
 -- ns.L.KEY gives the text in the game's language: Spanish for esES / esMX,
--- English for everything else. A key missing in Spanish falls back to
--- English, and an unknown key shows its own name (never nil).
+-- German for deDE, English for everything else. A key missing in Spanish or
+-- German falls back to English, and an unknown key shows its own name (never nil).
 -- Texts with variables are format strings: string.format(L.SENT_TO, name).
--- ns.L.code is "en" or "es" (sent to the companion app as `lang`).
+-- ns.L.code is "en", "es" or "de" (sent to the companion app as `lang`).
 local _, ns = ...
 
 local EN = {
@@ -510,8 +510,260 @@ local ES = {
   RIZZIK_STATUS_ONLINE = "Transmisor goblin en línea",
 }
 
+local DE = {
+  -- Fenster
+  WINDOW_TITLE = "Forever AI Companion",
+  CHANGE_ASSISTANT = "Assistent wechseln",
+  CHANGE_ASSISTANT_TIP = "Wähle zwischen Fizzi (Gnom, Allianz) und Rizzik (Goblin, Horde).",
+  FONT_BIGGER = "Größere Schrift",
+  FONT_SMALLER = "Kleinere Schrift",
+  CHATS = "Chats",
+  CHATS_TIP = "Chatliste ein- oder ausblenden",
+  NEW_CHAT_BUTTON = "+ Neuer Chat",
+  MY_DATA = "Gesendete Daten ansehen",
+  MY_DATA_TIP_TITLE = "Daten deines Charakters",
+  MY_DATA_TIP = "Das bekommt dein Assistent mit jeder Frage: Ausrüstung, Quests, Position...",
+  RENAME_CHAT = "Chat umbenennen",
+  RENAME_CHAT_TIP = "Klick, um den Namen zu ändern.",
+  DELETE_CHAT = "Chat löschen",
+  CONFIRM_DELETE = "Sicher?",
+  CLICK_AGAIN_DELETE = "Zum Löschen nochmal klicken",
+  SEND = "Senden",
+  TODAY = "Heute",
+  YESTERDAY = "Gestern",
+  THIS_WEEK = "Diese Woche",
+  OLDER = "Älter",
+  IS_TYPING = "%s schreibt...",
+  MESSAGE_ONE = "Nachricht",
+  MESSAGE_MANY = "Nachrichten",
+  COPY = "Kopieren",
+  RETRY = "Nochmal versuchen",
+  YOU = "Du",
+  SUGGESTIONS = {
+    "Welcher Dungeon lohnt sich jetzt für mich?",
+    "Schau dir meine Ausrüstung an: Was sollte ich zuerst verbessern?",
+    "Welche Quests sollte ich zuerst abschließen?",
+    "Wo steige ich am schnellsten auf?",
+    "Was mache ich mit dem Zeug in meinen Taschen?",
+    "Gib mir Tipps, wie ich meine Klasse besser spiele.",
+  },
+  WELCOME_HINT = "Jeder Chat merkt sich sein eigenes Gespräch: Nimm am besten einen pro Thema.",
+  CONTEXT_SUGGESTIONS = {
+    auction = { title = "Du hast das Auktionshaus offen: Ich sehe es. Frag mich dazu.",
+      "Was lohnt sich hier für mich zu kaufen?",
+      "Ist der Preis von dem, was ich gesucht habe, ein gutes Angebot?",
+      "Was aus meinen Taschen sollte ich hier verkaufen, und für wie viel?",
+      "Wie laufen meine Auktionen?" },
+    merchant = { title = "Du hast einen Händler offen: Ich sehe, was er verkauft. Frag mich dazu.",
+      "Was lohnt sich bei diesem Händler zu kaufen?",
+      "Ist hier etwas besser als meine Ausrüstung?",
+      "Was sollte ich diesem Händler verkaufen?",
+      "Sollte ich hier reparieren?" },
+    trainer = { title = "Du hast einen Lehrer offen: Ich sehe, was er lehrt. Frag mich dazu.",
+      "Was sollte ich mit meinem Gold zuerst lernen?",
+      "Gibt es hier etwas, das sich nicht lohnt?",
+      "Was kann ich in meinen nächsten Stufen lernen?" },
+    beastTraining = { title = "Du hast die Wildtierausbildung offen: Ich sehe, was dein Tier lernen kann.",
+      "Was sollte ich meinem Tier jetzt beibringen?",
+      "Wie verteile ich die Ausbildungspunkte meines Tiers?",
+      "Welche Fähigkeiten sollte mein Tier automatisch wirken?" },
+    questOffer = { title = "Dir wird eine Quest angeboten: Ich sehe sie. Frag mich dazu.",
+      "Lohnt sich diese Quest?",
+      "Wo und wie erledige ich diese Quest?",
+      "Schaffe ich sie auf meiner Stufe allein?" },
+    questReward = { title = "Du gibst gerade eine Quest ab: Ich sehe die Belohnungen.",
+      "Welche Belohnung sollte ich nehmen?",
+      "Welche Belohnung bringt beim Händler mehr?" },
+    taxi = { title = "Du hast die Flugkarte offen: Ich sehe, wohin du fliegen kannst.",
+      "Wohin sollte ich jetzt fliegen?",
+      "Wie komme ich am günstigsten zu meiner nächsten Quest?" },
+    loot = { title = "Du hast Beute offen: Ich sehe sie.",
+      "Lohnt es sich, davon etwas zu behalten?",
+      "Wofür ist dieser Gegenstand gut?" },
+  },
+  PICK_PERSONA = "%s wählen",
+  NOW_YOUR_ASSISTANT = "%s ist jetzt dein Assistent.",
+  CHOOSER_TITLE = "Wähle deinen Assistenten in Azeroth",
+  CHOOSER_SUB = "Begleitet dich auf deinen Abenteuern und beantwortet deine Fragen.\nDu kannst jederzeit wechseln: Klick einfach oben links auf das Porträt.",
+  BACK_TO_CHAT = "Zurück zum Chat",
+  YOUR_FACTION = "(deine Fraktion)",
+  YOUR_ASSISTANT = "Dein Assistent",
+  SOMETHING_WRONG = "Da ist etwas schiefgelaufen.",
+  WAIT_OTHER = "Moment noch: Ich sende gerade noch eine andere Frage.",
+  NO_SIGNAL = "Kein Signal von der Begleit-App... Ist sie auf deinem PC geöffnet?",
+  VIA_VOICE = "unsichtbare Verbindung",
+  VIA_STRIP = "Bildschirmstreifen",
+  APP_READY = "Forever AI Companion ist offen und bereit",
+  APP_READY_TIP = "Die App auf deinem PC läuft und hat eine KI eingerichtet: Frag einfach drauflos.",
+  APP_CLOSED = "Forever AI Companion ist geschlossen: Öffne die App, um Antworten zu bekommen",
+  APP_CLOSED_TIP = "Die App auf deinem PC läuft nicht, also beantwortet niemand deine Fragen. Öffne Forever AI Companion über das Startmenü (oder lade die App von ihrer GitHub-Seite herunter, falls du sie noch nicht hast).",
+  APP_STUCK = "Forever AI Companion reagiert nicht: Starte die App neu",
+  APP_STUCK_TIP = "Die App gibt keine Lebenszeichen mehr (vielleicht ist sie abgestürzt oder hängt). Beende sie über das Symbol neben der Windows-Uhr oder im Task-Manager und öffne sie dann wieder.",
+  APP_NEED_AI = "Forever AI Companion hat keine KI: Wähle eine in der App",
+  APP_NEED_AI_TIP = "Die App ist offen, hat aber noch keine KI, die sie fragen kann (oder ein API-Schlüssel fehlt). Öffne ihr Fenster und wähle eine KI.",
+  APP_NEED_LOGIN = "Deine KI braucht eine Anmeldung: Öffne die App",
+  APP_NEED_LOGIN_TIP = "Die KI, die du gewählt hast (Claude Code oder Codex), ist nicht installiert oder nicht angemeldet. Öffne das Fenster der App: Dort findest du den Knopf, um das zu beheben.",
+  APP_PROBLEM = "Forever AI Companion hat ein Problem: Öffne die App, um zu sehen, welches",
+  APP_PROBLEM_TIP = "Die App ist offen, kann aber keine Fragen empfangen. Ihr Fenster zeigt, was nicht stimmt.",
+  APP_RESTART_GAME = "Starte WoW neu, um die Einrichtung von Forever AI Companion abzuschließen",
+  APP_RESTART_GAME_TIP = "Das Addon wurde gerade installiert oder aktualisiert. WoW erkennt neue Addon-Dateien erst nach einem kompletten Neustart (ein /reload reicht nicht).",
+  APP_CHECKING = "Prüfe Forever AI Companion...",
+  APP_NO_SOUND = "Kann die App nicht prüfen: Der Spielsound ist aus",
+  APP_NO_SOUND_TIP = "Das Addon spricht mit der App über lautlose Sounddateien, deshalb muss der Spielsound an sein (Optionen > System > Audio > Sound aktivieren). Fragen klappen auch ohne, nur langsamer.",
+  APP_UNKNOWN = "Status der App unbekannt",
+  APP_UNKNOWN_TIP = "Dieses Spiel kann nicht erkennen, ob die App offen ist. Wenn deine Fragen keine Antwort bekommen, prüf, ob Forever AI Companion auf deinem PC läuft.",
+  COPY_HINT = "Strg+C zum Kopieren",
+  COPY_ANSWER = "Antwort kopieren",
+  DECIMAL = ",",
+  TOKENS = "%s Tokens",
+  TOKENS_CHAT = "Dieser Chat: %s Tokens",
+  TOKENS_TIP_TITLE = "Tokens für diese Antwort",
+  TOKENS_CHAT_TIP_TITLE = "Tokens in diesem Chat",
+  TOKENS_READ = "Gelesen: %s (aus dem Cache: %s)",
+  TOKENS_WRITTEN = "Geschrieben: %s",
+  TOKENS_TIP = "Tokens sind die Textstücke, die die KI liest und schreibt; dein Abo oder dein API-Schlüssel wird danach abgerechnet. Sie liest die Daten deines Charakters, den WoW-Forever-Guide und was sie nachschlägt, und schreibt dann die Antwort. Text aus dem Cache (wiederholt aus früheren Fragen) zählt viel weniger.",
+  CONTEXT_TITLE = "Daten deines Charakters, die %s bekommt",
+  ERROR = "Fehler",
+
+  -- Minimap-Knopf
+  BUTTON_HIDDEN = "Knopf ausgeblendet. Gib /ia button ein, um ihn wieder anzuzeigen.",
+  UNREAD_ONE = "%d Chat mit neuen Antworten",
+  UNREAD_MANY = "%d Chats mit neuen Antworten",
+  TIP_CLICK = "Klick",
+  TIP_OPEN_CHATS = "Chats öffnen",
+  TIP_RIGHT_CLICK = "Rechtsklick",
+  TIP_NEW_CHAT = "neuer Chat",
+  TIP_DRAG = "Ziehen",
+  TIP_MOVE = "um die Minimap verschieben",
+  TIP_SHIFT_RIGHT_CLICK = "Shift + Rechtsklick",
+  TIP_HIDE = "ausblenden",
+
+  -- Benachrichtigungen
+  CLICK_TO_OPEN = "Zum Öffnen klicken",
+
+  -- Chats
+  NEW_CHAT = "Neuer Chat",
+  PREVIOUS_CONVERSATION = "Vorheriges Gespräch",
+
+  -- Fragen
+  NO_ANSWER = "Keine Antwort angekommen. Ist die Begleit-App auf deinem PC offen?",
+  FRAME_TOO_BIG = "%d Bytes (JSON %d), obwohl alles gekürzt wurde",
+  COMBAT_ON = "Im Kampf: Behalte das Spiel im Auge",
+  COMBAT_HIT = "Du wirst angegriffen! Achte aufs Spiel",
+  WAIT_PREVIOUS = "Moment noch: Ich sende gerade noch die vorherige Frage.",
+  PREPARING = "Wird vorbereitet...",
+  PREP_ERROR = "Fehler beim Vorbereiten der Frage: %s",
+  PREP_FAILED = "Die Frage konnte nicht vorbereitet werden (%s). Gib /ia status ein und teile, was angezeigt wird.",
+  SENT_TO = "Frage an %s gesendet.",
+  SENDING = "Wird gesendet (%.1f KB)...",
+  READ_FAILED = "Die Frage konnte nicht gelesen werden.",
+  TRY_AGAIN = "Versuch es nochmal.",
+  DOESNT_FIT = "Frage und Daten passen nicht auf den Bildschirm.",
+  SEND_IN_PROGRESS = "Es läuft schon ein Sendevorgang.",
+
+  -- Befehle
+  BUTTON_RESET = "Knopf zurück an seine Startposition gesetzt.",
+  SOUND_ON = "Benachrichtigungston an.",
+  SOUND_OFF = "Benachrichtigungston aus.",
+  HELP = "/ia (oder /ai) öffnet das Fenster · /ia <Frage> fragt im offenen Chat · /ia new erstellt einen Chat · /ia assistant wählt Fizzi oder Rizzik · /ia button zeigt oder versteckt den Minimap-Knopf (/ia button reset setzt ihn zurück) · /ia sound schaltet den Hinweiston an oder aus · /ia data zeigt, was gesendet wird · /ia status · /ia inbox sucht nach Antworten",
+
+  -- Postfächer und /ia status
+  MAILBOX_MISSING = "Die Postfächer des Addons fehlen. Führe 'npm run install-addon' aus und starte WoW neu.",
+  MAILBOX_OUT = "Keine Postfächer mehr für diese Sitzung. Gib /reload ein, um weitere Antworten zu bekommen.",
+  MAILBOX_OUT_POPUP = "Forever AI Companion: Für diese Sitzung sind keine Postfächer mehr frei, deshalb können neue Antworten nicht ins Spiel gelangen.\n\nLade das Interface neu, um alle wiederzubekommen (deine Chats bleiben erhalten).",
+  RELOAD = "Neu laden",
+  CANCEL = "Abbrechen",
+  YES = "ja",
+  NO = "nein",
+  STATUS_BASE = "Version %s · Sound=%s, nächstes Signal=%d/%d, Postfächer benutzt=%d/%d",
+  STATUS_ASSISTANT = " · Assistent: %s (Porträt: %s)",
+  STATUS_CHANNEL = " · Kanal: %s (unsichtbare Verbindung %s)",
+  CHANNEL_VOICE = "Stimme",
+  CHANNEL_STRIP = "Streifen",
+  INSTALLED = "installiert",
+  NOT_INSTALLED = "nicht installiert",
+  STATUS_PREP_FAILED = " · Vorbereitung fehlgeschlagen: ",
+  STATUS_PREP = " · Vorbereitung: Kürzung %d, %d Bytes, Daten %s ms + Kodierung %s ms in %s Frames",
+  STATUS_CELLS = " · Zellen erstellt: %d",
+  STATUS_SCREEN = " · Bildschirm %dx%d",
+  STATUS_LAST = " · letzter Versand: %d Bytes, %dx%d Zellen, sichtbar %s Frames",
+  PORTRAIT_FILE = "Datei ",
+
+  -- Kanaltest
+  PROBE_RUNNING = "Der Kanaltest läuft schon.",
+  PROBE_COMBAT = "Verlass den Kampf, um den Test zu starten.",
+  PROBE_STARTED = "Teste unsichtbare Kanäle (%d s)...",
+  PROBE_QUESTION = "Test der unsichtbaren Kanäle",
+  PROBE_START_QUESTION = "Test der unsichtbaren Kanäle: Aufzeichnung starten",
+  PROBE_NO_APP = "Die App hat nicht geantwortet, deshalb lief der Kanaltest nicht. Ist Forever AI Companion offen?",
+  PROBE_NO_API = "nicht verfügbar",
+  PROBE_FAILED = "fehlgeschlagen",
+  PROBE_NO_VOICES = "keine Stimmen",
+
+  -- /ia test-voice
+  VOICE_PREFIX = "Forever AI · unsichtbare Verbindung:",
+  VOICE_NO_API = "das Spiel hat kein C_VoiceChat.GetTtsVoices",
+  VOICE_LIST_FAILED = "GetTtsVoices fehlgeschlagen: %s",
+  VOICE_ITEM = "Stimme %s: %s",
+  VOICE_NOT_FOUND = "Ich sehe die Stimme der unsichtbaren Verbindung NICHT. Hast du die unsichtbare Verbindung eingeschaltet und WoW komplett neu gestartet?",
+  VOICE_SPEAK_FAILED = "SpeakText ist mit beiden bekannten Signaturen fehlgeschlagen",
+  VOICE_TESTING = "Signatur %s. Sende Tests mit Lautstärke 0 und langen Sätzen (etwa 6 s)...",
+  VOICE_DONE = "Tests gesendet; sag Claude, dass es das Log der App prüfen soll",
+
+  -- Assistenten
+  FACTION_ALLIANCE = "Allianz",
+  FACTION_HORDE = "Horde",
+
+  FIZZI_FULLNAME = "Fizzi Funkenschlüssel",
+  FIZZI_ROLE = "Erfinderin aus Gnomeregan",
+  FIZZI_DEVICE = "Gnomischer Taschenkommunikator",
+  FIZZI_PITCH = "Gnomische Ingenieurin, begeistert und genial. Sie hat den Kommunikator gebaut, mit dem du mit ihr sprichst. Manchmal qualmen ihre Erfindungen.",
+  FIZZI_SAMPLE = "\"Aha! Meine Berechnungen sagen: die Todesminen. Aaaber dein Helm ist bei 60%. Erst reparieren!\"",
+  FIZZI_ONLINE = "Gnomischer Kommunikator verbunden",
+  FIZZI_HELLO = "Hallo, %s! Was erfinden wir heute?",
+  FIZZI_HELLO_NONAME = "Hallo! Was erfinden wir heute?",
+  FIZZI_SUB = "Ich hab schon die Daten deines Charakters: Klasse, Stufe, Ausrüstung, Quests und wo du bist.\nFrag mich, was du willst, oder nimm eine Idee:",
+  FIZZI_PLACEHOLDER = "Frag Fizzi etwas...",
+  FIZZI_THINKING = {
+    "Sender justieren",
+    "Schrauben nachziehen",
+    "Baupläne prüfen",
+    "Rechnen, rechnen",
+    "Gleich hab ich's",
+  },
+  FIZZI_NOTIFY_OK = "Fizzi hat eine Antwort!",
+  FIZZI_NOTIFY_FAIL = "Der Kommunikator qualmt",
+  FIZZI_ERROR_INTRO = "Kawumm! Im Kommunikator ist was durchgebrannt.",
+  FIZZI_TOOLTIP_THINKING = "Fizzi tüftelt an deiner Frage...",
+  FIZZI_STATUS_ONLINE = "Gnomischer Kommunikator online",
+
+  RIZZIK_FULLNAME = "Rizzik Schnellzünder",
+  RIZZIK_ROLE = "Goblin-Ingenieur und Händler",
+  RIZZIK_DEVICE = "Goblin-Deluxe-Sender",
+  RIZZIK_PITCH = "Charmantes Goblin-Schlitzohr vom Bilgewasserkartell, im Dienst der Horde. Für ihn ist alles eine Investition, aber seine Tipps sind Gold wert.",
+  RIZZIK_SAMPLE = "\"Partner, die Todesminen sind eine sichere Investition. Aber der Helm bei 60%... macht 'nen schlechten Eindruck. Reparier ihn.\"",
+  RIZZIK_ONLINE = "Goblin-Sender verbunden",
+  RIZZIK_HELLO = "Was für ein Geschäft machen wir heute, %s?",
+  RIZZIK_HELLO_NONAME = "Was für ein Geschäft machen wir heute, Partner?",
+  RIZZIK_SUB = "Ich hab schon die Daten deines Charakters: Klasse, Stufe, Ausrüstung, Quests und wo du bist.\nFrag ruhig, Zeit ist Geld. Die erste Frage geht aufs Haus:",
+  RIZZIK_PLACEHOLDER = "Frag Rizzik etwas...",
+  RIZZIK_THINKING = {
+    "Kleingedrucktes prüfen",
+    "Gewinne zählen",
+    "Kontakte anrufen",
+    "Sender ölen",
+    "Deal klarmachen",
+  },
+  RIZZIK_NOTIFY_OK = "Rizzik hat den Deal klargemacht!",
+  RIZZIK_NOTIFY_FAIL = "Der Sender ist explodiert (schon wieder)",
+  RIZZIK_ERROR_INTRO = "BUMM! Der Sender ist explodiert. Berufsrisiko, Partner.",
+  RIZZIK_TOOLTIP_THINKING = "Rizzik verhandelt deine Antwort...",
+  RIZZIK_STATUS_ONLINE = "Goblin-Sender online",
+}
+
 EN.code = "en"
 ES.code = "es"
+DE.code = "de"
 
 -- On a Mac the app lives in the menu bar and the Applications folder, not
 -- next to the Windows clock or in the Start menu.
@@ -522,12 +774,22 @@ if IsMacClient and IsMacClient() then
   ES.APP_CLOSED_TIP = "La app de tu Mac no está funcionando, así que nadie responderá tus preguntas. Abre Forever AI Companion desde tu carpeta Aplicaciones (o descárgala de su página de GitHub si aún no la tienes)."
   ES.APP_STUCK_TIP = "La app dejó de dar señales de vida (puede que se haya cerrado de golpe o congelado). Ciérrala desde su ícono en la barra de menús, o con Forzar salida (Opción+Comando+Esc), y vuelve a abrirla."
   ES.APP_READY_TIP = "La app de tu Mac está funcionando y tiene una IA configurada: pregunta lo que quieras."
+  DE.APP_CLOSED_TIP = "Die App auf deinem Mac läuft nicht, also beantwortet niemand deine Fragen. Öffne Forever AI Companion aus deinem Programme-Ordner (oder lade die App von ihrer GitHub-Seite herunter, falls du sie noch nicht hast)."
+  DE.APP_STUCK_TIP = "Die App gibt keine Lebenszeichen mehr (vielleicht ist sie abgestürzt oder hängt). Beende sie über ihr Symbol in der Menüleiste oder mit „Sofort beenden“ (Wahl+Befehl+Esc) und öffne sie dann wieder."
+  DE.APP_READY_TIP = "Die App auf deinem Mac läuft und hat eine KI eingerichtet: Frag einfach drauflos."
 end
 
 -- Unknown keys show their own name instead of nil.
 setmetatable(EN, { __index = function(_, key) return tostring(key) end })
 setmetatable(ES, { __index = EN })
+setmetatable(DE, { __index = EN })
 
 local locale = GetLocale and GetLocale() or "enUS"
-ns.L = (locale == "esES" or locale == "esMX") and ES or EN
-ns.Locales = { en = EN, es = ES }
+if locale == "esES" or locale == "esMX" then
+  ns.L = ES
+elseif locale == "deDE" then
+  ns.L = DE
+else
+  ns.L = EN
+end
+ns.Locales = { en = EN, es = ES, de = DE }

@@ -125,7 +125,7 @@ test('a corrupted grid is rejected by the checksum', () => {
   const broken = cells.slice();
   broken[3 * W + 20] ^= 0b010101; // flip a data cell
   // The message follows the app's language (English or Spanish).
-  assert.throws(() => decodeGrid(renderGrid(W, H, broken, { pitch: 6 })), /could not be read|no se pudo leer/);
+  assert.throws(() => decodeGrid(renderGrid(W, H, broken, { pitch: 6 })), /could not be read|no se pudo leer|konnte nicht gelesen werden/);
 });
 
 test('a grid partly covered by another window is reported, not ignored', () => {
