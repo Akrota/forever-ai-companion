@@ -189,6 +189,8 @@ Every command also works with its Spanish word (shown in parentheses).
 
 With the subscriptions, the app installs the official program (**Claude Code** by Anthropic, **Codex** by OpenAI, or **Antigravity CLI** by Google) and opens your browser to sign in. Your questions count toward your plan's usage limit.
 
+> **My Gemini subscription is at your own risk.** Google's [Antigravity terms](https://antigravity.google/terms) forbid accessing it through third-party tools and say accounts can be suspended for it. This app runs Google's own `agy` program rather than reusing its sign-in, but Google has not said whether that is allowed. If your Google account matters to you, choose another option.
+
 You can change the AI or the model at any time from the app's dashboard (**Change**, next to *Artificial intelligence*).
 
 ---
@@ -352,7 +354,7 @@ Blizzard's Terms of Use and EULA forbid bots, cheats and unauthorized third-part
 2. **Blizzard can break it at any time.** If Blizzard doesn't like this kind of tool, the most likely result is a game patch that closes one of these paths, for example by limiting the text-to-speech or sound functions, rather than action against accounts. Blizzard already restricted combat addons heavily in Midnight, the engine WoW Forever runs on. If that happens, the assistant stops working until another way is found, if one exists.
 3. **Action against your account is possible.** Because it doesn't automate anything or touch the game's memory, we consider the risk low, but Blizzard has the final word on what its Terms of Use allow, and its rules and how it enforces them can change. If your account matters more to you than the convenience, don't use it.
 4. **The AI can be wrong.** Answers can be inaccurate or out of date, especially about things that change with patches. Double-check before spending a lot of gold or time on an answer.
-5. **Your AI provider's terms apply too.** Using Claude, Codex, Antigravity or an API key through this app is subject to that provider's own terms and limits.
+5. **Your AI provider's terms apply too.** Using Claude, Codex, Antigravity or an API key through this app is subject to that provider's own terms and limits. Google's Antigravity terms in particular forbid third-party tools and allow suspending accounts for it (see [Which AI to choose](#which-ai-to-choose)).
 
 ---
 

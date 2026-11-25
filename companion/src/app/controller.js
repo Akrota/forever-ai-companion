@@ -579,6 +579,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
       if (!found) throw err('installAntigravityFirst');
       const login = await startAntigravityLogin(found.path, sandboxDir(), {
         mode: mode === 'code' ? 'code' : 'auto',
+        clientVersion: VERSION,
         openUrl,
         onLoggedIn: () => checkLogin(),
       });
