@@ -97,7 +97,7 @@ export const DEFAULTS = {
   // The app downloads it every few hours; null = only the guide inside the app.
   guideUrl: GUIDE_URL,
 
-  // Language of the app and its messages: "auto" (the system's language), "en" or "es".
+  // Language of the app and its messages: "auto" (the system's language), "en", "es" or "de".
   language: 'auto',
 
   // Closing the app window: "ask" | "tray" (keep running next to the clock /

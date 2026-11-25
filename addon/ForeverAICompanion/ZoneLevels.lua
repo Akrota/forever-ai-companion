@@ -58,14 +58,35 @@ local ZONES = {
   { "Zephras Isle", "Isla de Zephras", 1, 12 },
 }
 
+-- German client names (deDE) of the zones above, by their English name.
+-- Zones new in Forever are not here yet: on a German client they give no
+-- zone tip until their German name is added.
+local GERMAN = {
+  ["Elwynn Forest"] = "Wald von Elwynn", ["Dun Morogh"] = "Dun Morogh", ["Tirisfal Glades"] = "Tirisfal",
+  ["Westfall"] = "Westfall", ["Loch Modan"] = "Loch Modan", ["Silverpine Forest"] = "Silberwald",
+  ["Redridge Mountains"] = "Rotkammgebirge", ["Duskwood"] = "Dämmerwald", ["Wetlands"] = "Sumpfland",
+  ["Hillsbrad Foothills"] = "Vorgebirge des Hügellands", ["Alterac Mountains"] = "Alteracgebirge",
+  ["Arathi Highlands"] = "Arathihochland", ["Stranglethorn Vale"] = "Schlingendorntal", ["Badlands"] = "Ödland",
+  ["Swamp of Sorrows"] = "Sümpfe des Elends", ["The Hinterlands"] = "Hinterland", ["Searing Gorge"] = "Sengende Schlucht",
+  ["Blasted Lands"] = "Verwüstete Lande", ["Western Plaguelands"] = "Westliche Pestländer",
+  ["Burning Steppes"] = "Brennende Steppe", ["Eastern Plaguelands"] = "Östliche Pestländer",
+  ["Deadwind Pass"] = "Gebirgspass der Totenwinde",
+  ["Durotar"] = "Durotar", ["Mulgore"] = "Mulgore", ["Teldrassil"] = "Teldrassil", ["Darkshore"] = "Dunkelküste",
+  ["The Barrens"] = "Brachland", ["Stonetalon Mountains"] = "Steinkrallengebirge", ["Ashenvale"] = "Eschental",
+  ["Thousand Needles"] = "Tausend Nadeln", ["Desolace"] = "Desolace", ["Dustwallow Marsh"] = "Düstermarschen",
+  ["Feralas"] = "Feralas", ["Tanaris"] = "Tanaris", ["Azshara"] = "Azshara", ["Felwood"] = "Teufelswald",
+  ["Un'Goro Crater"] = "Krater von Un'Goro", ["Winterspring"] = "Winterquell", ["Silithus"] = "Silithus",
+}
+
 local byName = {}
 for _, z in ipairs(ZONES) do
   local range = { min = z[3], max = z[4] }
   byName[z[1]:lower()] = range
   byName[z[2]:lower()] = range
+  if GERMAN[z[1]] then byName[GERMAN[z[1]]:lower()] = range end
 end
 
--- { min, max } of a zone by name (English or Spanish), or nil if unknown.
+-- { min, max } of a zone by name (English, Spanish or German), or nil if unknown.
 function ZoneLevels:Range(name)
   if type(name) ~= "string" then return nil end
   local r = byName[name:lower()]

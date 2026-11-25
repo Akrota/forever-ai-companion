@@ -34,13 +34,15 @@ local KINDS = { "level", "zone", "dungeon", "profession", "talents" }
 -- Lower goes first.
 local PRIORITY = { level = 1, dungeon = 2, talents = 3, zone = 4, profession = 5 }
 local MILESTONES = { 75, 150, 225, 300 }
--- Skill lines that are professions (the game's names, English and Spanish).
+-- Skill lines that are professions (the game's names, English, Spanish and German).
 local PROFESSIONS = {}
 for _, name in ipairs({
   "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Herbalism", "Leatherworking", "Mining",
   "Skinning", "Tailoring", "Cooking", "First Aid", "Fishing",
   "Alquimia", "Herrería", "Encantamiento", "Ingeniería", "Botánica", "Peletería", "Minería",
   "Desuello", "Sastrería", "Cocina", "Primeros auxilios", "Pesca",
+  "Alchemie", "Schmiedekunst", "Verzauberkunst", "Ingenieurskunst", "Kräuterkunde", "Lederverarbeitung", "Bergbau",
+  "Kürschnerei", "Schneiderei", "Kochkunst", "Erste Hilfe", "Angeln",
 }) do PROFESSIONS[name:lower()] = true end
 -- App states in which a tip would go nowhere: the queue is emptied.
 local APP_DOWN = { closed = true, stuck = true, restart = true, nosound = true, ["need-ai"] = true, ["need-login"] = true, problem = true }

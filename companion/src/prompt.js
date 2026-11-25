@@ -155,7 +155,7 @@ export function loadKnowledge(dir = path.join(env.dataDir, 'knowledge')) {
 // canSearch: the provider can search the web for this request.
 // guide: the newest Forever guide (guide.currentGuide); client: the game's
 // version and locale from the request (context.client); lang: the player's
-// language ("en" | "es", from the addon); now: today (tests).
+// language ("en" | "es" | "de", from the addon); now: today (tests).
 export function buildSystem(knowledge, persona, {
   canSearch = false, guide = builtinGuide, topics = builtinTopics, question = '', context = null, client = null, lang = null, proactive = null, now,
 } = {}) {
