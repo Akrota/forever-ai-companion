@@ -36,7 +36,7 @@ import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { TOPICS_FILE, currentGuide, guideFreshness, startGuideUpdates, topicsUrl } from '../guide.js';
 import { createUpdater } from '../updater.js';
 
-export const VERSION = '1.12.2';
+export const VERSION = '1.13.0';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
 // Only programs running as the player load this copy (per-user registration);
