@@ -150,26 +150,26 @@ Coming from version 1.5.0 or earlier, the app and the addon move to new folder n
 - **Professions**: open each profession window once and the addon remembers your recipes, so you can ask *"What can I craft with what I have?"* or *"Which recipe should I make to level up?"*.
 - **Is the app ready?** The line under the chat title tells you. Green: the app is open and ready. Red: questions won't be answered yet, and it says why (the app is closed or not responding, no AI is chosen, or your AI needs you to sign in). Hover it for what to do.
 - **Tokens used**: next to each answer's time you see how many tokens it used (*"18.2k tokens"*), and under the text box, below **Send**, the whole chat's total. Hover them for the detail: tokens read (your data, the guide and what it looked up; the part from the cache counts much less) and written. It's what your plan or API key is measured in. The dashboard's recent questions show it too.
-- **Proactive tips** (off by default): in the game, open **Options → AddOns → Forever AI Companion** and turn on **Let the assistant speak up on its own**. Your assistant then sends a short tip, without you asking, when you reach a new level (every 2nd by default), enter a new zone that suits your level, enter a dungeon for the first time, reach a profession milestone (75, 150, 225, 300) or have unspent talent points. Each moment has its own switch. Each tip starts its own chat and shows a notification card, never in the middle of a fight, never repeated for the same character, with a few minutes between them (3 by default), and only while the app is open. They use your AI like any question. In the game, `/ia proactive` shows what is on and `/ia proactive off` silences it on that PC.
+- **Proactive tips** (off by default): in the game, open **Options → AddOns → Forever AI Companion** and turn on **Let the assistant speak up on its own**. Your assistant then sends a short tip, without you asking, when you reach a new level (every 2nd by default), enter a new zone that suits your level, enter a dungeon for the first time, reach a profession milestone (75, 150, 225, 300) or have unspent talent points. Each moment has its own switch. Each tip starts its own chat and shows a notification card, never in the middle of a fight, never repeated for the same character, with a few minutes between them (3 by default), and only while the app is open. They use your AI like any question. In the game, `/ai proactive` shows what is on and `/ai proactive off` turns them off (the same as the switch in Options).
 - **See what is sent**: in the window click **See the data I send**.
 - **In combat** you can still ask, but keep your eyes on the game: while you're in combat a red bar in the window reminds you, and the window's edge flashes red each time you get hit.
 
 ### Chat commands (optional)
 
-Every command also works with its Spanish word (shown in parentheses).
+Every command works with both **`/ai`** and **`/ia`**: `/ai` comes from English (*artificial intelligence*) and `/ia` from Spanish (*inteligencia artificial*). They do exactly the same, so `/ai new` and `/ia nuevo` are the same command. Every command also works with its Spanish word (shown in parentheses).
 
 | Command | What it does |
 |---|---|
-| `/ia` or `/ai` | Opens or closes the window |
-| `/ia <question>` | Asks directly in the open chat |
-| `/ia new` (`nuevo`) | Starts a new chat |
-| `/ia assistant` (`asistente`) | Choose between Fizzi and Rizzik (`/ia assistant fizzi` or `/ia assistant rizzik`) |
-| `/ia button` (`boton`) | Shows or hides the minimap button (`/ia button reset` puts it back in place) |
-| `/ia sound` (`sonido`) | Turns the answer notification sound on or off |
-| `/ia proactive` (`proactivo`) | Shows the proactive tips; `/ia proactive off` or `on` silences or allows them on this PC |
-| `/ia data` (`datos`) | Shows the data that is sent |
-| `/ia status` (`estado`) · `/ia inbox` (`buzon`) | Diagnostics: connection status and check for pending answers |
-| `/ia help` (`ayuda`) | List of commands |
+| `/ai` or `/ia` | Opens or closes the window |
+| `/ai <question>` | Asks directly in the open chat |
+| `/ai new` (`nuevo`) | Starts a new chat |
+| `/ai assistant` (`asistente`) | Choose between Fizzi and Rizzik (`/ai assistant fizzi` or `/ai assistant rizzik`) |
+| `/ai button` (`boton`) | Shows or hides the minimap button (`/ai button reset` puts it back in place) |
+| `/ai sound` (`sonido`) | Turns the answer notification sound on or off |
+| `/ai proactive` (`proactivo`) | Shows the proactive tips; `/ai proactive off` or `on` turns them off or on (the same switch as in Options) |
+| `/ai data` (`datos`) | Shows the data that is sent |
+| `/ai status` (`estado`) · `/ai inbox` (`buzon`) | Diagnostics: connection status and check for pending answers |
+| `/ai help` (`ayuda`) | List of commands |
 
 ---
 
@@ -292,7 +292,7 @@ build: 70938           ← the game's build number
 **To update the guide for every player** (without releasing a new version of the app):
 
 1. Open [`companion/knowledge-builtin/wow-forever.md`](companion/knowledge-builtin/wow-forever.md) on GitHub and click the pencil (*Edit*).
-2. Make your changes and **set `date` to today** (and `gameVersion` and `build` if there was a patch; the build is shown by `/ia data` in the game, in the *client* section).
+2. Make your changes and **set `date` to today** (and `gameVersion` and `build` if there was a patch; the build is shown by `/ai data` in the game, in the *client* section).
 3. Click **Commit changes**. Within a few hours every app downloads it (or right away with **Check for updates** in the dashboard).
 
 Tips: write full dates ("opened on December 9, 2026", not "opening soon"), mark with "per guides" whatever Blizzard hasn't confirmed, and keep it under 200 KB.
@@ -310,7 +310,7 @@ Each player can also add their own knowledge from the app's dashboard (**Server 
 - API keys are stored only on your PC, in `%APPDATA%\ForeverAICompanion\config.json`, **encrypted with Windows DPAPI** for your Windows account: a copy of that file on another PC or account doesn't reveal them. Keys saved in plain text by earlier versions are encrypted the next time the app starts. On a Mac they are in `~/Library/Application Support/ForeverAICompanion/config.json`, encrypted (AES-256-GCM) with a key kept in your **login Keychain** (*Forever AI Companion (API keys)*), with the same protection.
 - **Invisible sending:** the silent voice's file used by elevated programs lives in `%ProgramFiles%\ForeverAICompanion`, which only administrators can change (installs from before this change are offered **Update invisible sending** to move it). The voice keeps only this app's own messages: anything else any program speaks with it is dropped without being written or logged.
 - **Codex:** when the app searches the PC for Codex, or installs it, it only runs a `codex.exe` that Windows confirms is signed by OpenAI. If a future Codex stops accepting one of the safety switches the app relies on (no commands, no file or browser access), the app refuses to use it rather than dropping the switch.
-- The `/ia probe` channel test only watches the game's files while a test is running (and for 15 minutes after, for files the game writes at logout).
+- The `/ai probe` channel test only watches the game's files while a test is running (and for 15 minutes after, for files the game writes at logout).
 - The app window is a local page (`127.0.0.1`) that doesn't accept connections from other computers or other web pages.
 - **The game is not modified**: its memory and files are not touched, and the addon doesn't play for you. It only uses normal addon and Windows features.
 - This is not a Blizzard product. Use it at your own risk (see the next section).
@@ -331,7 +331,7 @@ Blizzard's [UI Add-On Development Policy](https://us.forums.blizzard.com/en/wow/
 |---|---|
 | Addons must be free | ✅ Free, with nothing paid or locked |
 | The code must be fully visible | ✅ Readable, unobfuscated Lua. The app's code is in this repository too |
-| No harm to realms or other players | ✅ It sends nothing to the realm or to other players during normal use (the optional `/ia probe` test whispers one message to yourself) |
+| No harm to realms or other players | ✅ It sends nothing to the realm or to other players during normal use (the optional `/ai probe` test whispers one message to yourself) |
 | No ads and no donation requests in the game | ✅ None |
 | No offensive content | ✅ None |
 | Blizzard may disable any addon feature | Applies, see the risks below |
@@ -367,11 +367,11 @@ The app is free. With your Claude, ChatGPT or Google AI subscription (or Google'
 - Look at the line under the chat title in the game: if it's red, it says what's wrong.
 - Open the app and check that it says **Running** at the top.
 - If you just installed the addon or invisible sending, close WoW completely and open it again.
-- Type `/ia inbox` in the game to check for new answers.
+- Type `/ai inbox` in the game to check for new answers.
 - With the on-screen line, WoW must be visible when asking and in windowed or "fullscreen (windowed)" mode.
 
 **I can't see the minimap button.**
-You may have hidden it (Shift + right-click). Type `/ia button`, or `/ia button reset` to put it back in place.
+You may have hidden it (Shift + right-click). Type `/ai button`, or `/ai button reset` to put it back in place.
 
 **The AI test fails.**
 Check the steps in *Your AI*: the program must be installed and signed in, or the key must be complete. The error message tells you what's missing.
@@ -380,7 +380,7 @@ Check the steps in *Your AI*: the program must be installed and signed in, or th
 Yes, while you play. When you close its window it can keep running next to the Windows clock (click the icon to open it again; right-click to close it). With **Open when Windows starts** you don't have to remember.
 
 **My assistant speaks up on its own and I don't want it to.**
-In the game, open **Options → AddOns → Forever AI Companion** and turn off **Let the assistant speak up on its own** (or just the moments you don't want). To silence it right away, type `/ia proactive off`.
+In the game, open **Options → AddOns → Forever AI Companion** and turn off **Let the assistant speak up on its own** (or just the moments you don't want). To silence it right away, type `/ai proactive off`.
 
 **Does it work on Mac?**
 Yes, from version 1.11.0: macOS 13 Ventura or later, Apple silicon or Intel. See [On a Mac](#on-a-mac).
@@ -389,7 +389,7 @@ Yes, from version 1.11.0: macOS 13 Ventura or later, Apple silicon or Intel. See
 That's macOS protecting you from apps that aren't notarized yet. Go to **System Settings › Privacy & Security** and click **Open Anyway** (once). Updates installed from inside the app don't ask again.
 
 **Mac: the game doesn't see the invisible voice.**
-Close WoW completely and open it again. Then type `/ia test-voice` in the game: *ForeverAICompanion* must be in the list. If it isn't, open the app (it registers the voice every time it starts) and check that invisible sending is on in the dashboard.
+Close WoW completely and open it again. Then type `/ai test-voice` in the game: *ForeverAICompanion* must be in the list. If it isn't, open the app (it registers the voice every time it starts) and check that invisible sending is on in the dashboard.
 
 ---
 
@@ -416,7 +416,7 @@ addon/ForeverAICompanion/   Addon (Lua 5.1, modern client, interface 16001)
   Proactive.lua ZoneLevels.lua
                             Proactive tips: moments, queue and safety rules; zone levels
   Personas.lua              Fizzi and Rizzik
-  Core.lua                  Events and /ia commands
+  Core.lua                  Events and /ai (/ia) commands
 companion/
   src/app/                  App: main (self-install, tray), controller,
                             server (local window), system (Windows, macOS), ui.html

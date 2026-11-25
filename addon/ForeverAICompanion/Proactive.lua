@@ -90,6 +90,12 @@ function Proactive:EnsureSettings()
   if not ns.db then return nil end
   local current = ns.db.proactive
   local clean = self.Sanitize(type(current) == "table" and current or { enabled = false })
+  -- 1.13.0 kept `/ai proactive off` apart from the options' master switch, so
+  -- ticking it again did nothing. Now the command is that switch.
+  if ns.db.proactiveOff then
+    clean.enabled = false
+    ns.db.proactiveOff = nil
+  end
   if type(current) ~= "table" then
     ns.db.proactive = clean
     return clean
@@ -114,11 +120,11 @@ function Proactive:SetSettings(raw)
   for k, v in pairs(clean) do current[k] = v end
 end
 
--- Whether a moment (or any, with nil) may speak: the options say yes and the
--- player has not turned it off in this game (/ia proactive off).
+-- Whether a moment (or any, with nil) may speak: the master switch (in the
+-- options, or /ai proactive on|off) and that moment's own switch are on.
 function Proactive:Enabled(kind)
   local s = ns.db and ns.db.proactive
-  if not s or not s.enabled or ns.db.proactiveOff then return false end
+  if not s or not s.enabled then return false end
   return kind == nil or s[kind] == true
 end
 
@@ -293,6 +299,9 @@ function Proactive:Quiet()
   if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return false end
   if UnitOnTaxi and UnitOnTaxi("player") then return false end
   if ns.Core.working or ns.Uplink.busy or ns.Core:HasPending() then return false end
+  -- Tips only go by the invisible voice: the strip would flash on screen
+  -- while the player is playing (they wait in the queue until it is back).
+  if not (ns.Voice and ns.Voice:Available()) then return false end
   return ns.Personas:Chosen() and true or false
 end
 
@@ -409,19 +418,17 @@ function Proactive:Init()
   end)
 end
 
--- /ia proactive [on|off]: what is going on, or a switch just for this game.
+-- /ai proactive [on|off] (or /ia): what is going on, or the master switch of
+-- the options page (the same one, so either can undo the other).
 function Proactive:Command(arg)
-  if arg == "off" then
-    ns.db.proactiveOff = true
-    self.queue = {}
-    return L.PROACTIVE_NOW_OFF
-  elseif arg == "on" then
-    ns.db.proactiveOff = nil
-    return L.PROACTIVE_NOW_ON
+  if arg == "off" or arg == "on" then
+    local s = self:EnsureSettings()
+    s.enabled = arg == "on"
+    if arg == "off" then self.queue = {} end
+    return arg == "on" and L.PROACTIVE_NOW_ON or L.PROACTIVE_NOW_OFF
   end
   local s = ns.db.proactive
-  local state = ns.db.proactiveOff and L.PROACTIVE_PAUSED
-    or (s and (s.enabled and L.PROACTIVE_ON or L.PROACTIVE_OFF))
+  local state = (s and (s.enabled and L.PROACTIVE_ON or L.PROACTIVE_OFF))
     or L.PROACTIVE_NO_SETTINGS
   local text = string.format(L.PROACTIVE_STATUS, state, #(self.queue or {}))
   if s and s.enabled then

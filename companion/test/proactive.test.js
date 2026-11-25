@@ -124,7 +124,7 @@ test('a level-up queues one tip, and only for enabled moments', () => {
     ns.Proactive:OnLevelUp(14)
     local master = queued()
     ns.db.proactive.enabled = true
-    ns.db.proactiveOff = true
+    ns.Proactive:Command("off")
     ns.Proactive:OnLevelUp(14)
     local local_ = queued()
     RESULT = table.concat({ odd, twice, seen, off, master, local_ }, "|")
@@ -236,6 +236,8 @@ const SEND_SETUP = `
     return "id" .. #ASKED
   end
   ns.Uplink = { busy = false }
+  VOICE = true
+  ns.Voice = { Available = function() return VOICE end }
   ns.Personas = { Chosen = function() return true end }
   ns.Live = { CheckApp = function() CHECKS = CHECKS + 1 end, AppState = function() return STATE end }
   ns.Proactive.readyAt = 0
@@ -276,10 +278,11 @@ test('nothing is sent in combat, dead, on a flight path, in a loading screen or 
     block("loading", nil, function(on) ns.Proactive.loading = on end)
     block("pending", nil, function(on) ns.Core.HasPending = function() return on end end)
     block("working", nil, function(on) ns.Core.working = on end)
+    block("novoice", nil, function(on) VOICE = not on end)
     tick(4)
     RESULT = table.concat(blocked, ",") .. "|" .. #ASKED
   `);
-  assert.equal(out, 'combat=0,dead=0,taxi=0,loading=0,pending=0,working=0|1');
+  assert.equal(out, 'combat=0,dead=0,taxi=0,loading=0,pending=0,working=0,novoice=0|1');
 });
 
 test('in an instance only the dungeon tip goes out', () => {
@@ -314,7 +317,7 @@ test('with the app closed the tips are dropped, with the app starting they wait,
   assert.equal(out, '0/1|0/0|0/0');
 });
 
-test('/ia proactive reports and switches off locally', () => {
+test('/ai proactive reports, and on/off is the same switch as the options page', () => {
   const out = send(`
     ns.db.proactive = nil
     local none = ns.Proactive:Command("")
@@ -322,19 +325,45 @@ test('/ia proactive reports and switches off locally', () => {
     ns.Proactive:Enqueue("level", "level:12", "q")
     local on = ns.Proactive:Command("")
     local off = ns.Proactive:Command("off")
-    local after = ns.Proactive:Command("") .. "/" .. #ns.Proactive.queue
+    local after = ns.Proactive:Command("") .. "/" .. #ns.Proactive.queue .. "/" .. tostring(ns.db.proactive.enabled)
     ns.Proactive:Enqueue("level", "level:14", "q")
     local blocked = #ns.Proactive.queue
-    ns.Proactive:Command("on")
-    RESULT = table.concat({ none, on, off, after, blocked, tostring(ns.Proactive:Enabled("level")) }, "|")
+    -- Ticking the switch in the options page undoes /ai proactive off.
+    ns.db.proactive.enabled = true
+    local ticked = tostring(ns.Proactive:Enabled("level"))
+    ns.Proactive:Command("off")
+    local back = ns.Proactive:Command("on") .. "/" .. tostring(ns.db.proactive.enabled)
+    -- A player who typed /ai proactive off in 1.13.0 keeps them off, and the
+    -- options' switch shows it (so ticking it turns them on again).
+    ns.db.proactive.enabled = true
+    ns.db.proactiveOff = true
+    ns.Proactive:EnsureSettings()
+    local migrated = tostring(ns.db.proactive.enabled) .. "/" .. tostring(ns.db.proactiveOff)
+    RESULT = table.concat({ none, on, off, after, blocked, ticked, back, migrated }, "|")
   `);
-  const [none, on, off, after, blocked, enabled] = out.split('|');
+  const [none, on, off, after, blocked, ticked, back, migrated] = out.split('|');
   assert.match(none, /Options → AddOns → Forever AI Companion/);
   assert.match(on, /on\. Waiting to be sent: 1\. Moments: level, dungeon, profession, talents\./);
-  assert.match(off, /off in this game/);
-  assert.match(after, /off on this PC.*\/0$/);
+  assert.match(off, /^Proactive tips are off\. \/ai proactive on/);
+  assert.match(after, /: off\..*\/0\/false$/);
   assert.equal(blocked, '0');
-  assert.equal(enabled, 'true');
+  assert.equal(ticked, 'true');
+  assert.match(back, /^Proactive tips are on\..*\/true$/);
+  assert.equal(migrated, 'false/nil');
+});
+
+test('a tip\'s new chat never pushes out the chat the player has open', () => {
+  const out = runLua(`
+    ns.db = { chats = {} }
+    for i = 1, ns.Chats.MAX_CHATS do
+      ns.db.chats[i] = { id = "c" .. i, title = "c" .. i, created = i, updated = i, messages = { { id = "m" .. i, status = "done" } } }
+    end
+    ns.db.currentChat = "c1"                  -- the oldest one, open in the window
+    ns.Chats:NewProactive("We've hit level 12.")
+    local open = ns.Chats:Get("c1") and "kept" or "dropped"
+    RESULT = open .. "|" .. #ns.db.chats .. "|" .. (ns.Chats:Get("c2") and "c2" or "-")
+  `, {}, ['Locale.lua', 'Json.lua', 'Chats.lua'], 'GetLocale = function() return "enUS" end; time = os.time');
+  assert.equal(out, 'kept|60|-', 'the open chat stays; the next oldest one goes');
 });
 
 test('the inbox settings are checked before the addon keeps them', () => {

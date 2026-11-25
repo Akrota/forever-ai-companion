@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { runLua, encodePNG } from './helpers.js';
 import { decodeImage } from '../src/image.js';
 import { decodeGrid } from '../src/grid.js';
+import { createAssembler } from '../src/voice-inbox.js';
 
 const FAKE_UI = `
   local function noop() end
@@ -714,7 +715,10 @@ test('slash commands accept English and Spanish words in any game language', () 
     assert.equal(es, spanish ? 'fizzi||cff66ccffForever AI:|r Fizzi es ahora tu asistente.'
       : 'fizzi||cff66ccffForever AI:|r Fizzi is now your assistant.');
     assert.equal(help, ayuda, 'help and ayuda are the same command');
-    assert.match(help, spanish ? /\/ia nuevo crea un chat/ : /\/ia new creates a chat/);
+    assert.match(help, spanish ? /\/ia nuevo crea un chat/ : /\/ai new creates a chat/);
+    // /ai (English) and /ia (Spanish) are the same command, and the help says so.
+    assert.match(help, spanish ? /\|r \/ia \(o \/ai,/ : /\|r \/ai \(or \/ia,/);
+    assert.match(help, spanish ? /funcionan también con \/ai$/ : /also works with \/ia$/);
     assert.match(reset, spanish ? /botón devuelto/ : /button moved back/);
     assert.equal(afterNew, '1');
     assert.equal(afterNuevo, '2');
@@ -741,6 +745,29 @@ test('Spanish falls back to English for a missing key, and every key is translat
   assert.equal(unknown, 'NO_SUCH_KEY', 'never nil');
   assert.equal(thinking, '5');
   assert.equal(untranslated, '', 'both languages have the same keys');
+});
+
+test('German has every English text, with the same placeholders', () => {
+  const out = runLua(`
+    local de, en = ns.Locales.de, ns.Locales.en
+    local problems = {}
+    local function specs(v) local out = {} for f in tostring(v):gmatch("%%[%d%.]*[sdf]") do out[#out + 1] = f end return table.concat(out) end
+    for k, v in pairs(en) do
+      local d = rawget(de, k)
+      if d == nil then problems[#problems + 1] = "missing:" .. k
+      elseif type(v) == "string" and specs(v) ~= specs(d) then problems[#problems + 1] = "format:" .. k end
+    end
+    for k in pairs(de) do if rawget(en, k) == nil then problems[#problems + 1] = "extra:" .. k end end
+    table.sort(problems)
+    RESULT = table.concat(problems, ",") .. "#" .. de.HELP
+  `, {}, ['Locale.lua'], 'GetLocale = function() return "deDE" end');
+  const [problems, help] = out.split('#');
+  assert.equal(problems, '', 'German and English have the same keys and format specifiers');
+  // The German help lists the same commands as the English one.
+  for (const cmd of ['new', 'assistant', 'button', 'sound', 'proactive', 'data', 'status', 'inbox']) {
+    assert.match(help, new RegExp(`/ai ${cmd}`), cmd);
+  }
+  assert.match(help, /\/ia/);
 });
 // --- App status in the chat header -------------------------------------------
 // The app keeps sig/*.wav files that play or not (beacon.js); the addon reads
@@ -1191,7 +1218,7 @@ test('a new chat suggests questions about the game window that is open (vendor, 
   assert.equal(asked, first, 'clicking asks it');
   assert.equal(welcomeShown, 'false');
 });
-test('a proactive tip goes out silently to its own chat, and a tip the app drops leaves no trace', () => {
+test('a proactive tip goes out silently by the voice to its own chat, and a tip the app drops leaves no trace', () => {
   const files = [...ALL_FILES.slice(0, -1), 'ZoneLevels.lua', 'Proactive.lua', 'Core.lua'];
   const out = runLua(`
     START()
@@ -1208,11 +1235,13 @@ test('a proactive tip goes out silently to its own chat, and a tip the app drops
     ns.Live.AppState = function() return "ready" end
     ns.Proactive.readyAt = 0
     FIRE("PLAYER_LEVEL_UP", 12)
+    -- Without the voice the tip waits: it never flashes the strip on screen.
+    HAS_VOICE = false
     for i = 1, 4 do NOW = NOW + 2; ns.Proactive:Tick() end
-    for i = 1, 2000 do
-      if ns.Uplink.grid and ns.Uplink.grid.shown then break end
-      RUN_FRAMES(1)
-    end
+    local waited = #SPOKEN .. "/" .. #ns.Proactive.queue .. "/" .. tostring(ns.Uplink.grid and ns.Uplink.grid.shown)
+    HAS_VOICE = true
+    for i = 1, 4 do NOW = NOW + 2; ns.Proactive:Tick() end
+    UNTIL_IDLE()
     local tips
     local proactiveCount = 0
     for _, c in ipairs(ns.db.chats) do
@@ -1227,15 +1256,21 @@ test('a proactive tip goes out silently to its own chat, and a tip the app drops
     local tip = tips.messages[1]
     RESULT = table.concat({
       settings, tostring(ns.UI:IsShown()), ns.db.currentChat == mine.id and "mine" or "other", #tips.messages, tips.title,
-      tostring(tip.proactive.kind), #mine.messages, DUMP(), tip.id, proactiveCount, afterSecond,
+      tostring(tip.proactive.kind), #mine.messages, table.concat(SPOKEN, "\\1"), tip.id, proactiveCount, afterSecond,
+      waited, tostring(ns.Uplink.grid and ns.Uplink.grid.shown),
     }, "#")
     -- The app turned it down: the tip disappears without an error or a card.
     ns.Core.working, ns.Uplink.busy = false, false
     ns.Core:ApplyInbox({ answers = { { id = tip.id, ok = false, answer = "", skipped = true } } })
     TIPS_AFTER = #tips.messages
     RESULT = RESULT .. "#" .. TIPS_AFTER .. "#" .. tostring(tips.unread)
-  `, {}, files, FAKE_UI + PRELUDE_DRIVE);
-  const [settings, shown, current, tipCount, title, kind, myCount, dump, , proactiveCount, afterSecond, after, unread] = out.split('#');
+  `, {}, files, VOICE_ON + `
+    HAS_VOICE = true
+    C_VoiceChat.GetTtsVoices = function() return HAS_VOICE and { { voiceID = 7, name = "ForeverAICompanion" } } or {} end
+  `);
+  const [settings, shown, current, tipCount, title, kind, myCount, spoken, , proactiveCount, afterSecond, waited, strip, after, unread] = out.split('#');
+  assert.match(waited, /^0\/1\/(nil|false)$/, 'no voice: the tip waits in the queue and the strip stays hidden');
+  assert.notEqual(strip, 'true', 'the strip never shows for a tip');
   assert.equal(settings, 'truefalse');
   assert.notEqual(shown, 'true', 'the window stays closed');
   assert.equal(current, 'mine', 'the open chat is not changed');
@@ -1245,7 +1280,10 @@ test('a proactive tip goes out silently to its own chat, and a tip the app drops
   assert.equal(afterSecond, '2', 'the next tip starts another chat');
   assert.equal(kind, 'level');
   assert.equal(myCount, '1', 'nothing lands in the player\'s chat');
-  const { req } = decodeDump(dump);
+  const asm = createAssembler();
+  let payload = null;
+  for (const s of spoken.split('\x01')) payload = asm.add(s) || payload;
+  const req = JSON.parse(payload.toString('utf8'));
   assert.equal(req.proactive.kind, 'level');
   assert.equal(req.proactive.key, 'level:12');
   assert.deepEqual(req.history, [], 'the player\'s chats are not sent');

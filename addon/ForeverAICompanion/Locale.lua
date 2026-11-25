@@ -124,7 +124,7 @@ local EN = {
   ERROR = "Error",
 
   -- Floating button
-  BUTTON_HIDDEN = "button hidden. Type /ia button to show it again.",
+  BUTTON_HIDDEN = "button hidden. Type /ai button to show it again.",
   UNREAD_ONE = "%d chat with new answers",
   UNREAD_MANY = "%d chats with new answers",
   TIP_CLICK = "Click",
@@ -151,7 +151,7 @@ local EN = {
   WAIT_PREVIOUS = "Wait a moment: I'm still sending the previous question.",
   PREPARING = "Preparing...",
   PREP_ERROR = "Error preparing the question: %s",
-  PREP_FAILED = "Couldn't prepare the question (%s). Type /ia status and share what it shows.",
+  PREP_FAILED = "Couldn't prepare the question (%s). Type /ai status and share what it shows.",
   SENT_TO = "Question sent to %s.",
   SENDING = "Sending (%.1f KB)...",
   READ_FAILED = "Couldn't read the question.",
@@ -176,9 +176,8 @@ local EN = {
   PROACTIVE_NO_SETTINGS = "off (turn them on in Options → AddOns → Forever AI Companion)",
   PROACTIVE_ON = "on",
   PROACTIVE_OFF = "off",
-  PROACTIVE_PAUSED = "off on this PC (/ia proactive on to undo)",
-  PROACTIVE_NOW_OFF = "Proactive tips are off in this game. /ia proactive on turns them back on.",
-  PROACTIVE_NOW_ON = "Proactive tips are allowed again in this game.",
+  PROACTIVE_NOW_OFF = "Proactive tips are off. /ai proactive on, or the switch in Options → AddOns → Forever AI Companion, turns them back on.",
+  PROACTIVE_NOW_ON = "Proactive tips are on. Choose the moments in Options → AddOns → Forever AI Companion.",
   OPT_PRO_TITLE = "Proactive tips",
   OPT_PRO_MASTER = "Let the assistant speak up on its own",
   OPT_PRO_MASTER_TIP = "Each tip opens its own chat, without you asking. Off until you turn this on.",
@@ -204,9 +203,9 @@ local EN = {
   KIND_DUNGEON = "dungeon",
   KIND_PROFESSION = "profession",
   KIND_TALENTS = "talents",
-  HELP = "/ia (or /ai) opens the window · /ia <question> asks in the open chat · /ia new creates a chat · /ia assistant picks Fizzi or Rizzik · /ia button shows or hides the minimap button (/ia button reset moves it back) · /ia sound toggles the alert · /ia proactive shows or turns off the proactive tips · /ia data shows what is sent · /ia status · /ia inbox checks for answers",
+  HELP = "/ai (or /ia, its Spanish twin) opens the window · /ai <question> asks in the open chat · /ai new creates a chat · /ai assistant picks Fizzi or Rizzik · /ai button shows or hides the minimap button (/ai button reset moves it back) · /ai sound toggles the alert · /ai proactive shows the proactive tips (/ai proactive on or off turns them on or off) · /ai data shows what is sent · /ai status · /ai inbox checks for answers · Every command also works with /ia",
 
-  -- Mailboxes and /ia status
+  -- Mailboxes and /ai status
   MAILBOX_MISSING = "The addon's mailboxes are missing. Run 'npm run install-addon' and restart WoW.",
   MAILBOX_OUT = "Out of mailboxes for this session. Type /reload to get more answers.",
   MAILBOX_OUT_POPUP = "Forever AI Companion: out of mailboxes for this session, so new answers can't reach the game.\n\nReload the interface to get them all back (your chats are kept).",
@@ -239,7 +238,7 @@ local EN = {
   PROBE_FAILED = "failed",
   PROBE_NO_VOICES = "no voices",
 
-  -- /ia test-voice
+  -- /ai test-voice
   VOICE_PREFIX = "Forever AI · invisible link:",
   VOICE_NO_API = "the game has no C_VoiceChat.GetTtsVoices",
   VOICE_LIST_FAILED = "GetTtsVoices failed: %s",
@@ -468,9 +467,8 @@ local ES = {
   PROACTIVE_NO_SETTINGS = "desactivados (actívalos en Opciones → AddOns → Forever AI Companion)",
   PROACTIVE_ON = "activados",
   PROACTIVE_OFF = "desactivados",
-  PROACTIVE_PAUSED = "desactivados en este PC (/ia proactivo on para deshacerlo)",
-  PROACTIVE_NOW_OFF = "Los consejos proactivos están desactivados en este juego. /ia proactivo on los reactiva.",
-  PROACTIVE_NOW_ON = "Los consejos proactivos vuelven a estar permitidos en este juego.",
+  PROACTIVE_NOW_OFF = "Los consejos proactivos están apagados. /ia proactivo on, o el interruptor en Opciones → AddOns → Forever AI Companion, los vuelve a activar.",
+  PROACTIVE_NOW_ON = "Los consejos proactivos están activados. Elige los momentos en Opciones → AddOns → Forever AI Companion.",
   OPT_PRO_TITLE = "Consejos proactivos",
   OPT_PRO_MASTER = "Que el asistente hable por su cuenta",
   OPT_PRO_MASTER_TIP = "Cada consejo abre su propio chat, sin que preguntes. Desactivado hasta que lo enciendas.",
@@ -496,7 +494,7 @@ local ES = {
   KIND_DUNGEON = "mazmorra",
   KIND_PROFESSION = "profesión",
   KIND_TALENTS = "talentos",
-  HELP = "/ia abre la ventana · /ia <pregunta> pregunta en el chat abierto · /ia nuevo crea un chat · /ia asistente elige entre Fizzi y Rizzik · /ia boton muestra u oculta el botón del minimapa (/ia boton reset lo recoloca) · /ia sonido activa o silencia el aviso · /ia proactivo muestra o apaga los consejos proactivos · /ia datos muestra lo que se envía · /ia estado · /ia buzon revisa respuestas",
+  HELP = "/ia (o /ai, su gemelo en inglés) abre la ventana · /ia <pregunta> pregunta en el chat abierto · /ia nuevo crea un chat · /ia asistente elige entre Fizzi y Rizzik · /ia boton muestra u oculta el botón del minimapa (/ia boton reset lo recoloca) · /ia sonido activa o silencia el aviso · /ia proactivo muestra los consejos proactivos (/ia proactivo on u off los activa o apaga) · /ia datos muestra lo que se envía · /ia estado · /ia buzon revisa respuestas · Todos los comandos funcionan también con /ai",
 
   -- Buzones y /ia estado
   MAILBOX_MISSING = "Faltan los buzones del addon. Ejecuta 'npm run install-addon' y reinicia WoW.",
@@ -708,7 +706,7 @@ local DE = {
   ERROR = "Fehler",
 
   -- Minimap-Knopf
-  BUTTON_HIDDEN = "Knopf ausgeblendet. Gib /ia button ein, um ihn wieder anzuzeigen.",
+  BUTTON_HIDDEN = "Knopf ausgeblendet. Gib /ai button ein, um ihn wieder anzuzeigen.",
   UNREAD_ONE = "%d Chat mit neuen Antworten",
   UNREAD_MANY = "%d Chats mit neuen Antworten",
   TIP_CLICK = "Klick",
@@ -735,7 +733,7 @@ local DE = {
   WAIT_PREVIOUS = "Moment noch: Ich sende gerade noch die vorherige Frage.",
   PREPARING = "Wird vorbereitet...",
   PREP_ERROR = "Fehler beim Vorbereiten der Frage: %s",
-  PREP_FAILED = "Die Frage konnte nicht vorbereitet werden (%s). Gib /ia status ein und teile, was angezeigt wird.",
+  PREP_FAILED = "Die Frage konnte nicht vorbereitet werden (%s). Gib /ai status ein und teile, was angezeigt wird.",
   SENT_TO = "Frage an %s gesendet.",
   SENDING = "Wird gesendet (%.1f KB)...",
   READ_FAILED = "Die Frage konnte nicht gelesen werden.",
@@ -747,9 +745,9 @@ local DE = {
   BUTTON_RESET = "Knopf zurück an seine Startposition gesetzt.",
   SOUND_ON = "Benachrichtigungston an.",
   SOUND_OFF = "Benachrichtigungston aus.",
-  HELP = "/ia (oder /ai) öffnet das Fenster · /ia <Frage> fragt im offenen Chat · /ia new erstellt einen Chat · /ia assistant wählt Fizzi oder Rizzik · /ia button zeigt oder versteckt den Minimap-Knopf (/ia button reset setzt ihn zurück) · /ia sound schaltet den Hinweiston an oder aus · /ia data zeigt, was gesendet wird · /ia status · /ia inbox sucht nach Antworten",
+  HELP = "/ai (oder /ia, der spanische Zwilling) öffnet das Fenster · /ai <Frage> fragt im offenen Chat · /ai new erstellt einen Chat · /ai assistant wählt Fizzi oder Rizzik · /ai button zeigt oder versteckt den Minimap-Knopf (/ai button reset setzt ihn zurück) · /ai sound schaltet den Hinweiston an oder aus · /ai proactive zeigt die proaktiven Tipps (/ai proactive on oder off schaltet sie an oder aus) · /ai data zeigt, was gesendet wird · /ai status · /ai inbox sucht nach Antworten · Jeder Befehl geht auch mit /ia",
 
-  -- Postfächer und /ia status
+  -- Postfächer und /ai status
   MAILBOX_MISSING = "Die Postfächer des Addons fehlen. Führe 'npm run install-addon' aus und starte WoW neu.",
   MAILBOX_OUT = "Keine Postfächer mehr für diese Sitzung. Gib /reload ein, um weitere Antworten zu bekommen.",
   MAILBOX_OUT_POPUP = "Forever AI Companion: Für diese Sitzung sind keine Postfächer mehr frei, deshalb können neue Antworten nicht ins Spiel gelangen.\n\nLade das Interface neu, um alle wiederzubekommen (deine Chats bleiben erhalten).",
@@ -782,7 +780,7 @@ local DE = {
   PROBE_FAILED = "fehlgeschlagen",
   PROBE_NO_VOICES = "keine Stimmen",
 
-  -- /ia test-voice
+  -- /ai test-voice
   VOICE_PREFIX = "Forever AI · unsichtbare Verbindung:",
   VOICE_NO_API = "das Spiel hat kein C_VoiceChat.GetTtsVoices",
   VOICE_LIST_FAILED = "GetTtsVoices fehlgeschlagen: %s",
@@ -879,10 +877,9 @@ local DE = {
   PROACTIVE_STATUS_KINDS = "Momente: %s.",
   PROACTIVE_ON = "an",
   PROACTIVE_OFF = "aus",
-  PROACTIVE_PAUSED = "auf diesem PC aus (/ia proactive on macht es rückgängig)",
   PROACTIVE_NO_SETTINGS = "aus (schalte sie unter Optionen → AddOns → Forever AI Companion ein)",
-  PROACTIVE_NOW_OFF = "Proaktive Tipps sind in diesem Spiel aus. /ia proactive on schaltet sie wieder ein.",
-  PROACTIVE_NOW_ON = "Proaktive Tipps sind in diesem Spiel wieder erlaubt.",
+  PROACTIVE_NOW_OFF = "Proaktive Tipps sind aus. /ai proactive on oder der Schalter unter Optionen → AddOns → Forever AI Companion schaltet sie wieder ein.",
+  PROACTIVE_NOW_ON = "Proaktive Tipps sind an. Wähle die Momente unter Optionen → AddOns → Forever AI Companion.",
 }
 
 EN.code = "en"
