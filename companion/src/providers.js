@@ -396,7 +396,7 @@ async function antigravity(cfg, system, messages) {
     out = e.stdout;
     const parsed = parseAntigravityEvents(out);
     if (parsed.error) {
-      if (/authentication required|please sign in|not (?:signed|logged) in|401|unauthori[sz]ed/i.test(parsed.error)) {
+      if (/authentication required|please sign in|not (?:signed|logged) in|log ?in required|\b401\b|unauthori[sz]ed/i.test(parsed.error)) {
         antigravityLogin = { ok: false, at: 0, bin: null };
       }
       throw new Error(friendlyAntigravityError(parsed.error));
@@ -408,7 +408,7 @@ async function antigravity(cfg, system, messages) {
 
   const parsed = parseAntigravityEvents(out);
   if (parsed.error) {
-    if (/authentication required|please sign in|not (?:signed|logged) in|401|unauthori[sz]ed/i.test(parsed.error)) {
+    if (/authentication required|please sign in|not (?:signed|logged) in|log ?in required|\b401\b|unauthori[sz]ed/i.test(parsed.error)) {
       antigravityLogin = { ok: false, at: 0, bin: null };
     }
     throw new Error(friendlyAntigravityError(parsed.error));

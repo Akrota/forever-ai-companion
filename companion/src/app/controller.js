@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { EFFORTS, PRESETS, PROACTIVE_KINDS, PROACTIVE_LEVEL_STEPS, env, proactiveSettings, presetEffort, envVar, loadConfig, readUserConfig, saveConfig, wowPaths } from '../config.js';
+import { EFFORTS, PRESETS, env, presetEffort, envVar, loadConfig, readUserConfig, saveConfig, wowPaths } from '../config.js';
 import { startBeacon } from '../beacon.js';
 import { findWowDirs, isWowRunning, isWowRunningAsync, normalizeWowDir } from '../detect.js';
 import {
@@ -36,7 +36,7 @@ import { err, getAppLang, setAppLang, t } from '../i18n.js';
 import { TOPICS_FILE, currentGuide, guideFreshness, startGuideUpdates, topicsUrl } from '../guide.js';
 import { createUpdater } from '../updater.js';
 
-export const VERSION = '1.12.2';
+export const VERSION = '1.13.0';
 
 // Where the silent voice's DLL lives (it is loaded by the game while in use).
 // Only programs running as the player load this copy (per-user registration);
@@ -305,7 +305,6 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
           efforts: Object.fromEntries(Object.keys(PRESETS).filter((k) => PRESETS[k].effort).map((k) => [k, presetEffort(cfg, k)])),
           effortDefaults: Object.fromEntries(Object.entries(PRESETS).filter(([, v]) => v.effort).map(([k, v]) => [k, v.effort])),
           webSearch: cfg.webSearch !== false,
-          proactive: proactiveSettings(cfg),
           // Why the chosen AI can't answer yet: "need-ai" (no AI or no key),
           // "need-login" (Claude Code / Codex signed out), or null.
           issue: ['need-ai', 'need-login'].includes(notReadyReason()) ? notReadyReason() : null,
@@ -357,30 +356,6 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
     setWebSearch({ enabled }) {
       save({ webSearch: Boolean(enabled) });
       return { webSearch: Boolean(enabled) };
-    },
-    // Proactive mode: any of `enabled` and the moments (booleans), `cooldownMin`
-    // and `levelEvery` (numbers). Saving restarts the watcher, which hands the
-    // new settings to the game.
-    setProactive(body = {}) {
-      const patch = {};
-      for (const k of ['enabled', ...PROACTIVE_KINDS]) {
-        if (body[k] === undefined) continue;
-        if (typeof body[k] !== 'boolean') throw err('unknownOption');
-        patch[k] = body[k];
-      }
-      if (body.cooldownMin !== undefined) {
-        const m = Number(body.cooldownMin);
-        if (!Number.isFinite(m) || m < 0 || m > 60) throw err('unknownOption');
-        patch.cooldownMin = Math.round(m);
-      }
-      if (body.levelEvery !== undefined) {
-        if (!PROACTIVE_LEVEL_STEPS.includes(Number(body.levelEvery))) throw err('unknownOption');
-        patch.levelEvery = Number(body.levelEvery);
-      }
-      // Saved whole (merged with what is there), so values fixed by
-      // proactiveSettings are written back clean.
-      save({ proactive: { ...proactiveSettings(cfg), ...patch } });
-      return { proactive: proactiveSettings(cfg) };
     },
     closeAction() { return cfg.closeAction || 'ask'; },
     setCloseAction({ action }) {
@@ -579,6 +554,7 @@ export function createController({ log = () => {}, onUpdateAvailable = () => {},
       if (!found) throw err('installAntigravityFirst');
       const login = await startAntigravityLogin(found.path, sandboxDir(), {
         mode: mode === 'code' ? 'code' : 'auto',
+        clientVersion: VERSION,
         openUrl,
         onLoggedIn: () => checkLogin(),
       });

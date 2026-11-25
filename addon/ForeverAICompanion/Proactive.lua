@@ -12,7 +12,7 @@
 --   * each moment is asked once per character (the `seen` keys below);
 --   * nothing in combat, dead, on a flight path or on a loading screen: the
 --     tip waits in a short queue and goes out when things are quiet;
---   * a cooldown between tips (the app's setting), level-ups first;
+--   * a cooldown between tips (set in the options), level-ups first;
 --   * never while the player's own question is pending, and only while the
 --     app is open and ready (a tip that waited too long is dropped).
 local _, ns = ...
@@ -34,13 +34,16 @@ local KINDS = { "level", "zone", "dungeon", "profession", "talents" }
 -- Lower goes first.
 local PRIORITY = { level = 1, dungeon = 2, talents = 3, zone = 4, profession = 5 }
 local MILESTONES = { 75, 150, 225, 300 }
--- Skill lines that are professions (the game's names, English and Spanish).
+local PILE_UP = 3       -- unspent talent points that are worth a reminder
+-- Skill lines that are professions (the game's names, English, Spanish and German).
 local PROFESSIONS = {}
 for _, name in ipairs({
   "Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Herbalism", "Leatherworking", "Mining",
   "Skinning", "Tailoring", "Cooking", "First Aid", "Fishing",
   "Alquimia", "Herrería", "Encantamiento", "Ingeniería", "Botánica", "Peletería", "Minería",
   "Desuello", "Sastrería", "Cocina", "Primeros auxilios", "Pesca",
+  "Alchemie", "Schmiedekunst", "Verzauberkunst", "Ingenieurskunst", "Kräuterkunde", "Lederverarbeitung", "Bergbau",
+  "Kürschnerei", "Schneiderei", "Kochkunst", "Erste Hilfe", "Angeln",
 }) do PROFESSIONS[name:lower()] = true end
 -- App states in which a tip would go nowhere: the queue is emptied.
 local APP_DOWN = { closed = true, stuck = true, restart = true, nosound = true, ["need-ai"] = true, ["need-login"] = true, problem = true }
@@ -68,7 +71,7 @@ function Proactive.IsProfession(name)
   return type(name) == "string" and PROFESSIONS[name:lower()] == true
 end
 
--- The app's settings, checked (they come from a file the app writes).
+-- The saved settings, checked (saved variables can be edited by hand).
 function Proactive.Sanitize(raw)
   if type(raw) ~= "table" then return nil end
   local s = { enabled = raw.enabled == true }
@@ -100,6 +103,7 @@ function Proactive:EnsureSettings()
   return current
 end
 
+-- Replaces all the settings at once (the tests use it to set a starting point).
 function Proactive:SetSettings(raw)
   if not ns.db then return end
   local clean = self.Sanitize(raw)
@@ -207,13 +211,19 @@ local function unspentPoints()
   return 0
 end
 
--- A talent point was gained (the event's change is positive).
+-- A talent point was gained (the event's change is positive). From the first
+-- talent level on there is a point at every level, so a tip on each one would
+-- come on top of the level tips: only the character's first point gets a tip,
+-- and after that only points left unspent for a while (PILE_UP or more).
 function Proactive:OnPointsChanged(change)
   if (tonumber(change) or 0) <= 0 or not self:Enabled("talents") then return end
   C_Timer.After(1, function()
     local points, level = unspentPoints(), playerLevel()
-    if points > 0 then
-      Proactive:Enqueue("talents", "talents:" .. level, string.format(L.PROACTIVE_Q_TALENTS, points, level))
+    local store = Proactive:Store()
+    if points > 0 and (not store.talentsAsked or points >= PILE_UP) then
+      if Proactive:Enqueue("talents", "talents:" .. level, string.format(L.PROACTIVE_Q_TALENTS, points, level)) then
+        store.talentsAsked = true
+      end
     end
   end)
 end

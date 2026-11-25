@@ -34,9 +34,12 @@ function Core:HasPending()
     if e.status ~= "pending" then return end
     if now - (e.t or now) > PENDING_TIMEOUT then
       -- A tip nobody answered is not worth an error in the chat: it is removed.
+      -- It does not give up the voice either: unlike the player's own
+      -- questions, a tip never gets the strip as a second chance, so one lost
+      -- tip says nothing about the voice (and giving it up can leave a Mac
+      -- without Screen Recording with no answers until /reload).
       if e.proactive then
         expired[#expired + 1] = e.id
-        if e.viaVoice then ns.Voice.broken = true end
         return
       end
       e.status = "error"

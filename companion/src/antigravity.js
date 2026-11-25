@@ -593,7 +593,7 @@ async function startAcpFlow(bin, workDir, opts = {}) {
       params: {
         protocolVersion: 1,
         clientCapabilities: {},
-        clientInfo: { name: 'forever-ai-companion', version: '1.12.1' },
+        clientInfo: { name: 'forever-ai-companion', version: opts.clientVersion || 'unknown' },
       },
     })}\n`);
   } catch {
@@ -906,10 +906,10 @@ export function antigravityUsage(u) {
 
 export function friendlyAntigravityError(message) {
   const m = String(message || '');
-  if (/authentication required|please sign in|not (?:signed|logged) in|401|unauthori[sz]ed|\blogin\b/i.test(m)) {
+  if (/authentication required|please sign in|not (?:signed|logged) in|log ?in required|\b401\b|unauthori[sz]ed/i.test(m)) {
     return t('antigravitySignedOut');
   }
-  if (/usage limit|rate limit|weekly.*limit|429|quota|out of credits|exhausted|spend[- ]?cap/i.test(m)) {
+  if (/usage limit|rate limit|weekly.*limit|\b429\b|quota|out of credits|exhausted|spend[- ]?cap/i.test(m)) {
     return t('antigravityLimit');
   }
   if (/invalid model|not recognized as a known model|model.*(?:not (?:supported|available|found|recognized)|does not exist)|access to model|not included in your plan/i.test(m)) {

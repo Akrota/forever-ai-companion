@@ -1,35 +1,17 @@
-// Proactive mode: the app's switches (config, watcher guard, prompt) and the
+// Proactive mode: what the app does with a tip (watcher guard, prompt) and the
 // addon's rules (Proactive.lua, ZoneLevels.lua), run with the real Lua.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DEFAULTS, proactiveAllowed, proactiveSettings } from '../src/config.js';
+import { DEFAULTS } from '../src/config.js';
 import { buildMessages, buildSystem } from '../src/prompt.js';
 import { handleRequest } from '../src/watcher.js';
 import { wowPaths } from '../src/config.js';
 import { runLua } from './helpers.js';
 
 // App side ------------------------------------------------------------------------
-
-test('proactive mode is off by default and its settings are checked', () => {
-  assert.equal(proactiveSettings({}).enabled, false);
-  assert.equal(proactiveSettings(DEFAULTS).enabled, false);
-  assert.equal(proactiveAllowed(DEFAULTS, 'level'), false);
-
-  const on = { proactive: { enabled: true, zone: false, cooldownMin: 999, levelEvery: 7, dungeon: 'yes' } };
-  const s = proactiveSettings(on);
-  assert.equal(s.enabled, true);
-  assert.equal(s.zone, false);
-  assert.equal(s.dungeon, true, 'not a boolean: the default');
-  assert.equal(s.cooldownMin, 60, 'capped');
-  assert.equal(s.levelEvery, 2, 'unknown step: the default');
-  assert.equal(proactiveAllowed(on, 'level'), true);
-  assert.equal(proactiveAllowed(on, 'zone'), false);
-  assert.equal(proactiveAllowed(on, 'unknown'), false);
-  assert.equal(proactiveAllowed({ proactive: { enabled: 'true' } }, 'level'), false, 'only a real true turns it on');
-});
 
 test('the prompt asks for a short tip and leaves out the player\'s chat history', () => {
   const normal = buildSystem('', 'fizzi', {});
@@ -50,11 +32,11 @@ function setup() {
   return { dir, paths, state: { processed: [], answers: [], nextSig: 1 } };
 }
 
-test('an unknown tip is dropped; a known one is answered even when the app switch is off', async (t) => {
+test('an unknown tip is dropped; a known one is answered (the game decides which moments are on)', async (t) => {
   const { dir, paths, state } = setup();
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const calls = [];
-  const cfg = { ...DEFAULTS, provider: 'echo', slots: 2, signals: 5, keepAnswers: 10, proactive: { ...DEFAULTS.proactive, enabled: false, zone: false } };
+  const cfg = { ...DEFAULTS, provider: 'echo', slots: 2, signals: 5, keepAnswers: 10 };
   const system = () => { calls.push('system'); return ''; };
   const base = { cfg, paths, state, system, save: () => {}, log: () => {} };
 
@@ -203,18 +185,26 @@ test('professions: the first scan only takes note, then milestones and new profe
   assert.equal(out, '|profession:Mining:150||profession:Mining:225|profession:Herrería:new');
 });
 
-test('talents: a gained point with unspent points queues a tip once per level', () => {
+test('talents: the first point gets a tip, then only points left unspent', () => {
   const out = lua(`
     POINTS = 1
     GetUnspentTalentPoints = function() return POINTS end
     ns.Proactive:OnPointsChanged(-1)     -- spent one
     local spent = queued()
+    ns.Proactive:OnPointsChanged(1)      -- the character's first talent point
+    local first = queued()
     ns.Proactive:OnPointsChanged(1)
-    local gained = queued()
-    ns.Proactive:OnPointsChanged(1)
-    RESULT = table.concat({ spent, gained, queued() }, "|")
+    local again = queued()
+    -- Next levels: a point that gets spent right away is no news.
+    ns.Proactive.queue = {}
+    LEVEL = 13; POINTS = 1; ns.Proactive:OnPointsChanged(1)
+    local spentRightAway = queued()
+    LEVEL = 14; POINTS = 2; ns.Proactive:OnPointsChanged(1)
+    local two = queued()
+    LEVEL = 15; POINTS = 3; ns.Proactive:OnPointsChanged(1)
+    RESULT = table.concat({ spent, first, again, spentRightAway, two, queued() }, "|")
   `);
-  assert.equal(out, '|talents:12|talents:12');
+  assert.equal(out, '|talents:12|talents:12|||talents:15');
 });
 
 test('the queue keeps three, dropping old non-level tips first, and sends level-ups first', () => {

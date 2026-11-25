@@ -202,6 +202,10 @@ test('events, usage, models and auth status parsing match Antigravity CLI format
   assert.match(runInLang('es', () => friendlyAntigravityError('429 quota exceeded')), /límite de uso/);
   assert.match(runInLang('en', () => friendlyAntigravityError('invalid model selection (--model "x")')), /does not include/);
   assert.match(runInLang('es', () => friendlyAntigravityError('not recognized as a known model')), /no incluye ese modelo/);
+  assert.match(runInLang('de', () => friendlyAntigravityError('HTTP 401 Unauthorized')), /nicht angemeldet/);
+  // Numbers and words that only contain the codes or "login" are not mistaken for them.
+  assert.match(runInLang('en', () => friendlyAntigravityError('the answer used 1429 tokens and stopped')), /^Antigravity CLI: the answer/);
+  assert.match(runInLang('en', () => friendlyAntigravityError('bad loginHint value')), /^Antigravity CLI: bad loginHint/);
 });
 
 test('preset, config and web search capability work for Antigravity', () => {

@@ -364,6 +364,8 @@ const I18N = {
     'p.antigravity.tag': 'Free, Pro, or Ultra Google plan',
     'p.antigravity.hydrogen': 'Fast and smart; requires Google AI Pro or Ultra.',
     'p.antigravity.flash': 'Included on all Google accounts (including Free); slower.',
+    'p.antigravity.warnTitle': 'Use it at your own risk',
+    'p.antigravity.warn': 'Google\'s Antigravity terms forbid using it through third-party tools and say accounts can be suspended for it. This app runs Google\'s official program, but some risk remains: if your Google account matters to you, choose another option. <a href="https://antigravity.google/terms" target="_blank">Read the terms</a>',
     'p.claude.name': 'Claude with an API key',
     'p.claude.desc': 'For people without a subscription: you only pay for what you use, on Anthropic\'s website.',
     'p.claude.tag': 'Pay as you go (≈ 1 cent per question)',
@@ -739,6 +741,8 @@ const I18N = {
     'p.antigravity.tag': 'Plan de Google gratis, Pro o Ultra',
     'p.antigravity.hydrogen': 'Rápido y listo; requiere Google AI Pro o Ultra.',
     'p.antigravity.flash': 'Incluido en todas las cuentas de Google (también gratis); más lento.',
+    'p.antigravity.warnTitle': 'Úsalo bajo tu propio riesgo',
+    'p.antigravity.warn': 'Los términos de Antigravity de Google prohíben usarlo a través de herramientas de terceros y dicen que las cuentas pueden ser suspendidas por eso. Esta app usa el programa oficial de Google, pero queda cierto riesgo: si tu cuenta de Google es importante para ti, elige otra opción. <a href="https://antigravity.google/terms" target="_blank">Leer los términos</a>',
     'p.claude.name': 'Claude con clave de API',
     'p.claude.desc': 'Para quien no tiene suscripción: pagas solo lo que usas en la web de Anthropic.',
     'p.claude.tag': 'Pagas por uso (≈ 1 centavo por pregunta)',
@@ -1102,6 +1106,13 @@ const I18N = {
     'p.codex.name': 'Mein ChatGPT-Abo',
     'p.codex.desc': 'Nutzt dein Abo ChatGPT Plus oder Pro über Codex, das offizielle Programm von OpenAI. Du brauchst keine Schlüssel und zahlst nichts extra.',
     'p.codex.tag': 'Braucht ChatGPT Plus oder Pro',
+    'p.antigravity.name': 'Mein Gemini-Abo',
+    'p.antigravity.desc': 'Nutzt dein Google-Konto oder dein Abo Google AI Pro / Ultra über Antigravity CLI, das offizielle Programm von Google. Du brauchst keine Schlüssel und zahlst nichts extra.',
+    'p.antigravity.tag': 'Kostenloses Google-Konto, Pro oder Ultra',
+    'p.antigravity.hydrogen': 'Schnell und klug; braucht Google AI Pro oder Ultra.',
+    'p.antigravity.flash': 'In allen Google-Konten enthalten (auch kostenlos); langsamer.',
+    'p.antigravity.warnTitle': 'Nutzung auf eigenes Risiko',
+    'p.antigravity.warn': 'Laut den Antigravity-Nutzungsbedingungen von Google ist der Zugriff über Programme von Drittanbietern verboten, und Konten können dafür gesperrt werden. Diese App nutzt das offizielle Programm von Google, ein gewisses Risiko bleibt aber: Wenn dir dein Google-Konto wichtig ist, wähl eine andere Option. <a href="https://antigravity.google/terms" target="_blank">Nutzungsbedingungen lesen</a>',
     'p.claude.name': 'Claude mit API-Schlüssel',
     'p.claude.desc': 'Für alle ohne Abo: Du zahlst auf der Website von Anthropic nur, was du wirklich nutzt.',
     'p.claude.tag': 'Zahlung nach Nutzung (≈ 1 Cent pro Frage)',
@@ -1123,7 +1134,8 @@ const I18N = {
     'p.grok.key2': 'Lade unter <b>Billing</b> Guthaben auf, erstell dann unter <b>API Keys</b> einen Schlüssel und kopier ihn.',
     'p.grok.fast': 'Schnell und günstig: ideal für Fragen im Spiel.',
     'p.grok.smart': 'Das klügste von xAI, etwas langsamer und etwa doppelt so teuer.',
-    'p.gemini.desc': 'Die KI von Google. Meist kannst du sie mit Limits kostenlos nutzen.',
+    'p.gemini.name': 'Gemini mit API-Schlüssel',
+    'p.gemini.desc': 'Die KI von Google mit einem API-Schlüssel aus Google AI Studio (meist mit Limits kostenlos nutzbar). Wenn du ein Google-Konto oder ein Google-AI-Abo hast, wähl „Mein Gemini-Abo“.',
     'p.gemini.tag': 'Kostenlos mit Limits',
     'p.gemini.key1': 'Geh mit deinem Google-Konto auf <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>.',
     'p.gemini.key2': 'Klick auf <b>Create API key</b> und kopier ihn.',
@@ -1139,6 +1151,18 @@ const I18N = {
     'p.ollama.local2': 'Lade in der Ollama-App ein Modell herunter (zum Beispiel <code>llama3.2</code>).',
     'cli.claudeCode.about': 'Das ist das kostenlose, offizielle Programm von Anthropic, das dein Abo verbindet. Es ist mit einem Klick installiert.',
     'cli.codex.about': 'Das ist das kostenlose, offizielle Programm von OpenAI, das dein ChatGPT-Abo verbindet. Die App lädt es herunter und installiert es für dich (etwa 130 MB).',
+    'cli.antigravity.about': 'Das ist das kostenlose, offizielle Programm von Google, das dein Google-Konto oder dein Google-AI-Abo verbindet. Es ist mit einem Klick installiert.',
+    'cli.antigravity.loginText': 'Dein Browser öffnet sich, damit du dich mit deinem Google-Konto anmelden kannst (nur beim ersten Mal).',
+    'ai.agyStarting': 'Wird gestartet…',
+    'ai.agyStartingText': 'Google-Anmeldung wird gestartet…',
+    'ai.agyBrowserWaiting': 'Schließ die Anmeldung mit deinem Google-Konto im Browser ab. Diese Ansicht aktualisiert sich von selbst, wenn du fertig bist.',
+    'ai.agyWaitingBrowser': 'Warte auf die Google-Anmeldung…',
+    'ai.agyUseCode': 'Stattdessen mit einem Code anmelden',
+    'ai.agyOpenSignIn': 'Google-Anmeldung öffnen',
+    'ai.agyCodeWaiting': 'Melde dich im Browser mit deinem Google-Konto an, kopier dann den Code von der Seite und füg ihn unten ein.',
+    'ai.agyCodePlaceholder': 'Code von Google hier einfügen',
+    'ai.agySubmitCode': 'Anmeldung abschließen',
+    'ai.agySubmitting': 'Wird geprüft…',
     'ai.codexDownloading': 'Codex wird von OpenAI heruntergeladen… {n}%',
     'ai.codexExtracting': 'Codex wird installiert…',
     'ai.codexError': 'Installation fehlgeschlagen: {error}. Versuch es noch mal oder such Codex mit dem Button unten, falls du es schon hast.',
@@ -1191,7 +1215,7 @@ const I18N = {
     'addon.hint': 'Nur ein Klick',
 
     'ai.title': 'Wähl deine KI',
-    'ai.lead': 'Sie beantwortet deine Fragen. Wenn du Claude Pro oder Max bzw. ChatGPT Plus oder Pro hast, nimm dein Abo: Du zahlst nichts extra.',
+    'ai.lead': 'Sie beantwortet deine Fragen. Wenn du Claude Pro oder Max, ChatGPT Plus oder Pro oder ein Google-AI-Abo hast, nimm dein Abo: Du zahlst nichts extra.',
     'ai.more': 'Weitere Optionen',
     'ai.setup': 'Einrichten: {name}',
     'ai.cliInstall': '{app} installieren',
@@ -1885,6 +1909,8 @@ const VIEWS = {
         <p class="lead">${t('ai.lead')}</p>
         <div class="choices">${Object.entries(PROVIDERS).map(([pid, q]) => choice(pid, q)).join('')}</div>
         <details class="more" ${ADVANCED[id] ? 'open' : ''}><summary>${t('ai.more')}</summary><div class="choices" style="margin-top:10px">${Object.entries(ADVANCED).map(([pid, q]) => choice(pid, q)).join('')}</div></details>
+        ${id === 'antigravity' ? `<div class="callout warn" style="margin-top:18px"><span class="ic">${ICON.alert}</span><div><b>${t('p.antigravity.warnTitle')}</b>
+          <p>${t('p.antigravity.warn')}</p></div></div>` : ''}
         ${items.length ? `<div class="card" style="margin-top:18px"><h3>${t('ai.setup', { name: p.name })}</h3>
           <ol class="todo">${items.map(([ok, title, d, act], i) => `<li><span class="n ${ok ? 'ok' : ''}">${ok ? '✓' : i + 1}</span>
             <div><b>${title}</b>${d.startsWith('<ol>') ? d : d ? `<p>${d}</p>` : ''}${act ? `<div class="act">${act}</div>` : ''}</div></li>`).join('')}</ol></div>` : ''}

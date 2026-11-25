@@ -938,6 +938,26 @@ test('no answer at all through the voice: the question fails and the voice is gi
   assert.equal(out, 'error#true#done#Hola, aventurera.#nil');
 });
 
+test('a proactive tip lost through the voice is removed and does not give the voice up', () => {
+  const out = runLua(`
+    START()
+    ns.Personas:Set("fizzi")
+    ns.Core:Ask("We've hit level 12.", { proactive = { kind = "level", key = "level:12" } }, nil, nil, { silent = true })
+    UNTIL_IDLE()
+    local tip
+    for _, c in ipairs(ns.db.chats) do if c.proactive then tip = c.messages[1] end end
+    local via = tostring(tip.viaVoice)
+    -- No strip resend for a tip, and no answer ever comes back.
+    tip.t = time() - 46; ns.Core:HasPending(); UNTIL_IDLE()
+    local resent = tostring(tip.resent)
+    tip.t = time() - 151; ns.Core:HasPending()
+    local left = 0
+    for _, c in ipairs(ns.db.chats) do if c.proactive then left = left + #c.messages end end
+    RESULT = table.concat({ via, resent, left, tostring(ns.Voice.broken) }, "#")
+  `, {}, ALL_FILES, VOICE_ON);
+  assert.equal(out, 'true#nil#0#nil', 'sent by voice, not resent, removed, and the voice is still trusted');
+});
+
 // --- Asking in combat ----------------------------------------------------------------
 const IN_COMBAT = RECORD_TEXT + PRELUDE_DRIVE + `
   INCOMBAT = false
