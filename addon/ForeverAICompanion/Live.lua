@@ -9,11 +9,12 @@
 -- WoW only sees files that existed at startup, so all of them are created
 -- empty by the installer and only their content changes afterwards.
 --
--- On Windows, PlaySoundFile refuses an empty file right away. On macOS it
--- says yes to any file that exists, but an empty one stops at once: there
--- the files are played and checked a moment later with C_Sound.IsPlaying
--- ("deferred" checks, see Live:Probe). Trusting the first answer on a Mac
--- took every signal as rung and used up the mailboxes in a few questions.
+-- Some games refuse an empty file right away, but macOS and some Windows
+-- clients say yes to any file that exists, and an empty one stops at once.
+-- So wherever C_Sound.IsPlaying exists the files are played and checked a
+-- moment later ("deferred" checks, see Live:Probe and Live:Calibrate).
+-- Trusting the first answer took every signal as rung and used up the
+-- mailboxes in a few questions.
 local _, ns = ...
 
 local Live = {}
@@ -79,10 +80,9 @@ end
 
 -- How this game tells an empty sound file from a real one. Without a way to
 -- tell (a Mac game with no C_Sound.IsPlaying) the signals are not used:
--- mailboxes are opened on a timer instead.
--- The Windows client can also say yes to an empty file (PlaySoundFile returns
--- willPlay = true, and it stops at once), so the deferred check is used
--- wherever C_Sound.IsPlaying exists, not only on a Mac.
+-- mailboxes are opened on a timer instead. The deferred check is used
+-- wherever C_Sound.IsPlaying exists, not only on a Mac: some Windows clients
+-- also say yes to an empty file (willPlay = true, and it stops at once).
 function Live:Calibrate()
   local mac = IsMacClient and IsMacClient() or false
   self.deferred = IsPlaying ~= nil
