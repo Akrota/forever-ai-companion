@@ -906,6 +906,31 @@ test('Mac without C_Sound.IsPlaying: signals are not trusted, mailboxes go by th
   assert.equal(out, '0#false#unknown');
 });
 
+// --- Windows: the client can also say "will play" for an empty file ------------------
+// Seen on WoW Forever for Windows: PlaySoundFile returns willPlay = true for an
+// empty sig\NNN.wav (it stops at once). Trusting it opened a mailbox on every
+// Tick (every 2 s) while an answer was pending: 7-12 mailboxes per question with
+// a slow model. The deferred check now runs wherever C_Sound.IsPlaying exists.
+test('Windows that accepts empty files: a mailbox only when the app really rings', () => {
+  const out = runLua(`
+    START()
+    FLUSH()
+    ns.Core.HasPending = function() return true end
+    local first = ns.db.nextSig
+    for i = 1, 15 do ns.Live:Tick(); FLUSH() end   -- 30 s waiting for an answer
+    local idle = LOADS .. "/" .. ns.db.nextSig
+    REAL[string.format("%03d", ns.db.nextSig)] = true   -- the app rings
+    ns.Live:Tick(); FLUSH()
+    local rung = LOADS .. "/" .. ns.db.nextSig
+    RESULT = first .. "#" .. idle .. "#" .. rung .. "#" .. tostring(ns.Live.deferred) .. "#" .. tostring(ns.Live.noSignals)
+  `, {}, ALL_FILES, MAC_SOUND + 'IsMacClient = function() return false end\n');
+  const [first, idle, rung, deferred, noSignals] = out.split('#');
+  assert.equal(deferred, 'true');
+  assert.equal(noSignals, 'false');
+  assert.equal(idle, `0/${first}`, 'no mailbox used and no signal skipped while nothing rang');
+  assert.equal(rung, `1/${Number(first) + 1}`, 'one ring, one mailbox');
+});
+
 // --- A slow answer through the invisible voice ------------------------------------
 const VOICE_ON = RECORD_TEXT + PRELUDE_DRIVE + `
   SPOKEN = {}

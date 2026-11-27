@@ -80,9 +80,12 @@ end
 -- How this game tells an empty sound file from a real one. Without a way to
 -- tell (a Mac game with no C_Sound.IsPlaying) the signals are not used:
 -- mailboxes are opened on a timer instead.
+-- The Windows client can also say yes to an empty file (PlaySoundFile returns
+-- willPlay = true, and it stops at once), so the deferred check is used
+-- wherever C_Sound.IsPlaying exists, not only on a Mac.
 function Live:Calibrate()
   local mac = IsMacClient and IsMacClient() or false
-  self.deferred = mac and IsPlaying ~= nil
+  self.deferred = IsPlaying ~= nil
   self.noSignals = mac and IsPlaying == nil
 end
 
